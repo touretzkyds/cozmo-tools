@@ -158,7 +158,7 @@ def cli_loop(robot):
                 ans = None # ans = await ans
             if not ans is None:
                 print(ans,end='\n\n')
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             print()
 
@@ -171,7 +171,7 @@ def reconnect():
         cozmo.setup_basic_logging()
         logging_is_setup = True
     try:
-        if 0 == len(sys.argv) :
+        if len(sys.argv) <= 1:
             cozmo.connect_with_tkviewer(run)
         else:
             cozmo.connect(run)
