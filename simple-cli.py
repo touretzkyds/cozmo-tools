@@ -1,4 +1,4 @@
-#!/usr/bin/python3 
+#!/usr/bin/python3 -i
 '''
 
 Simple Cozmo CLI
@@ -83,6 +83,9 @@ import readline
 import rlcompleter 
 import atexit 
 import os 
+
+from monitor import monitor_on, monitor_off
+
 # tab completion 
 readline.parse_and_bind('tab: complete') 
 # history file 
@@ -127,7 +130,8 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
 def run(sdk_conn):
     global robot
     robot = sdk_conn.wait_for_robot()
-    time.sleep(1) # allow time for Tk to set up the window
+    if len(sys.argv) <= 1:
+        time.sleep(1) # allow time for Tk to set up the window
     cli_loop(robot)
 
 def cli_loop(robot):
@@ -138,7 +142,8 @@ def cli_loop(robot):
         while line == '':
            line = console.raw_input('C> ').strip()
         do_await = False
-        if line[0:7] == 'import ' or line[0:5] == 'from ' or line[0:7] == 'global ':
+        if line[0:7] == 'import ' or line[0:5] == 'from ' or line[0:7] == 'global ' \
+           or line[0:4] == 'del ':
             # Can't use assignment to capture a return value, so None.
             ans = None
         elif line[0:6] == 'await ':
