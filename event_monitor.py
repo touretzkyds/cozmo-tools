@@ -15,6 +15,10 @@ Author: David S. Touretzky, Carnegie Mellon University
 ChangeLog
 =========
 
+*   Add event handlers to world instead of to robot.
+        Dave Touretzky
+            - Many events (e.g. face stuff) aren't reliably sent to robot.
+
 *   Renaming and more face support
         Dave Touretzky
             - Renamed module to event_monitor
@@ -98,13 +102,13 @@ def monitor(_robot, evt_class=None):
     global robot
     robot = _robot
     if evt_class in dispatch_table:
-        robot.add_event_handler(evt_class,dispatch_table[evt_class])
+        robot.world.add_event_handler(evt_class,dispatch_table[evt_class])
     elif not evt_class is None:
-        robot.add_event_handler(evt_class,monitor_generic)
+        robot.world.add_event_handler(evt_class,monitor_generic)
     else:
         for k,v in dispatch_table.items():
             if not k in excluded_events:
-                robot.add_event_handler(k,v)
+                robot.world.add_event_handler(k,v)
 
 def unmonitor(_robot, evt_class=None):
     if not isinstance(_robot, cozmo.robot.Robot):
@@ -115,12 +119,12 @@ def unmonitor(_robot, evt_class=None):
     robot = _robot
     try:
         if evt_class in dispatch_table:
-            robot.remove_event_handler(evt_class,dispatch_table[evt_class])
+            robot.world.remove_event_handler(evt_class,dispatch_table[evt_class])
         elif not evt_class is None:
-            robot.remove_event_handler(evt_class,monitor_generic)
+            robot.world.remove_event_handler(evt_class,monitor_generic)
         else:
             for k,v in dispatch_table.items():
-                robot.remove_event_handler(k,v)
+                robot.world.remove_event_handler(k,v)
     except Exception:
         pass
 
