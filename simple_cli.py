@@ -54,6 +54,11 @@ Author:     David S. Touretzky, Carnegie Mellon University
 Changelog
 =========
 
+*   Added event moniitoring
+        Dave Touretzky
+            - Imports monitor and unmonitor functions from event_monitor.py
+            - Also restored the -i switch on line 1 to prevent unwanted exits
+
 *   TCP socket interface + 'exit' command + optional 'tk' mode
         Real Ouellet, ABB inc.
             - TCP socket listens on port 4242
@@ -62,7 +67,7 @@ Changelog
             - Do not start in tk mode if an argument is passed
 
 *   Synchronous instead of async calls. 
-        David Touretzky
+        Dave Touretzky
             - Not thread-safe but works much more smoothly.
 
 '''
@@ -84,7 +89,7 @@ import rlcompleter
 import atexit 
 import os 
 
-from monitor import monitor_on, monitor_off
+from event_monitor import monitor, unmonitor
 
 # tab completion 
 readline.parse_and_bind('tab: complete') 

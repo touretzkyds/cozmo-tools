@@ -1,13 +1,29 @@
 '''
-  A tool for monitoring Cozmo events.
 
-  Usage:
-    monitor_on(robot) to monitor all event types in the dispatch table
-    monitor_on(robot, Event) to monitor a specific type of event
+Event Monitor Tool for Cozmo
+============================
 
-    monitor_off(robot[, Event]) to turn off monitoring
+Usage:
+    monitor(robot) to monitor all event types in the dispatch table
+    monitor(robot, Event) to monitor a specific type of event
 
-  Author: David S. Touretzky
+    unmonitor(robot[, Event]) to turn off monitoring
+
+Author: David S. Touretzky, Carnegie Mellon University
+=====
+
+ChangeLog
+=========
+
+*   Renaming and more face support
+        Dave Touretzky
+            - Renamed module to event_monitor
+            - Renamed monitor_on/off to monitor/unmonitor
+            - Added monitor_face to handle face events
+
+*   Created
+        Dave Touretzky
+
 '''
 
 import cozmo
@@ -48,6 +64,10 @@ def monitor_EvtObjectTapped(evt, *, obj, tap_count, tap_duration, tap_intensity,
     print(' count=', tap_count, \
           ' duration=', tap_duration, ' intensity=', tap_intensity, sep='')
 
+def monitor_face(evt, face, **args):
+    print_prefix(evt)
+    print("'", face.name, "' face_id=", face.face_id, sep='')
+
 dispatch_table = {                                                    \
   cozmo.action.EvtActionStarted        : monitor_generic,             \
   cozmo.action.EvtActionCompleted      : monitor_EvtActionCompleted,  \
@@ -58,14 +78,19 @@ dispatch_table = {                                                    \
   cozmo.objects.EvtObjectAvailable     : monitor_generic,             \
   cozmo.objects.EvtObjectAppeared      : monitor_generic,             \
   cozmo.objects.EvtObjectDisappeared   : monitor_generic,             \
-#  cozmo.objects.EvtObjectObserved      : monitor_generic,             \
+  cozmo.objects.EvtObjectObserved      : monitor_generic,             \
   cozmo.objects.EvtObjectTapped        : monitor_EvtObjectTapped,     \
-  cozmo.faces.EvtFaceAppeared          : monitor_generic,             \
-  cozmo.faces.EvtFaceObserved          : monitor_generic,             \
-  cozmo.faces.EvtFaceDisappeared       : monitor_generic,             \
+  cozmo.faces.EvtFaceAppeared          : monitor_face,                \
+  cozmo.faces.EvtFaceObserved          : monitor_face,                \
+  cozmo.faces.EvtFaceDisappeared       : monitor_face,                \
 }
 
-def monitor_on(_robot, evt_class=None):
+excluded_events = {    # Occur too frequently to monitor by default   \
+    cozmo.objects.EvtObjectObserved,    \
+    cozmo.faces.EvtFaceObserved,        \
+}
+
+def monitor(_robot, evt_class=None):
     if not isinstance(_robot, cozmo.robot.Robot):
         raise TypeError('First argument must be a Robot instance')
     if not ( evt_class is None or issubclass(evt_class, cozmo.event.Event) ):
@@ -78,9 +103,10 @@ def monitor_on(_robot, evt_class=None):
         robot.add_event_handler(evt_class,monitor_generic)
     else:
         for k,v in dispatch_table.items():
-            robot.add_event_handler(k,v)
+            if not k in excluded_events:
+                robot.add_event_handler(k,v)
 
-def monitor_off(_robot, evt_class=None):
+def unmonitor(_robot, evt_class=None):
     if not isinstance(_robot, cozmo.robot.Robot):
         raise TypeError('First argument must be a Robot instance')
     if not ( evt_class is None or issubclass(evt_class, cozmo.event.Event) ):
