@@ -44,21 +44,25 @@ def print_object(obj):
         r = r[1:r.index(" ")]
         print(r,end='')
 
-def monitor_generic(evt, **args):
+def monitor_generic(evt, **kwargs):
     print_prefix(evt)
-    if 'behavior_type_name' in args:
-        print(args['behavior_type_name'], '', end='')
+    if 'behavior_type_name' in kwargs:
+        print(kwargs['behavior_type_name'], '', end='')
         print(' ', end='')
-    if 'obj' in args:
-        print_object(args['obj'])
+    if 'obj' in kwargs:
+        print_object(kwargs['obj'])
         print(' ', end='')
-    print(set(args.keys()))
+    if 'action' in kwargs and isinstance(kwargs['action'], cozmo.anim.Animation):
+        print(kwargs['action'].anim_name, '', end='')
+    print(set(kwargs.keys()))
 
-def monitor_EvtActionCompleted(evt, action, state, failure_code, failure_reason, **args):
+def monitor_EvtActionCompleted(evt, action, state, failure_code, failure_reason, **kwargs):
     print_prefix(evt)
     print_object(action)
+    if isinstance(action, cozmo.anim.Animation):
+        print('', action.anim_name, end='')
     print('',state,end='')
-    if not failure_code is None:
+    if failure_code is not None:
         print('',failure_code,failure_reason,end='')
     print()
 
@@ -68,9 +72,10 @@ def monitor_EvtObjectTapped(evt, *, obj, tap_count, tap_duration, tap_intensity,
     print(' count=', tap_count, \
           ' duration=', tap_duration, ' intensity=', tap_intensity, sep='')
 
-def monitor_face(evt, face, **args):
+def monitor_face(evt, face, **kwargs):
     print_prefix(evt)
-    print("'", face.name, "' face_id=", face.face_id, sep='')
+    name = face.name if face.name is not '' else '[unknown face]'
+    print(name, ' face_id=', face.face_id, sep='')
 
 dispatch_table = {                                                    \
   cozmo.action.EvtActionStarted        : monitor_generic,             \
@@ -97,30 +102,30 @@ excluded_events = {    # Occur too frequently to monitor by default   \
 def monitor(_robot, evt_class=None):
     if not isinstance(_robot, cozmo.robot.Robot):
         raise TypeError('First argument must be a Robot instance')
-    if not ( evt_class is None or issubclass(evt_class, cozmo.event.Event) ):
+    if evt_class is not None and not issubclass(evt_class, cozmo.event.Event):
         raise TypeError('Second argument must be an Event subclass')
     global robot
     robot = _robot
     if evt_class in dispatch_table:
         robot.world.add_event_handler(evt_class,dispatch_table[evt_class])
-    elif not evt_class is None:
+    elif evt_class is not None:
         robot.world.add_event_handler(evt_class,monitor_generic)
     else:
         for k,v in dispatch_table.items():
-            if not k in excluded_events:
+            if k not in excluded_events:
                 robot.world.add_event_handler(k,v)
 
 def unmonitor(_robot, evt_class=None):
     if not isinstance(_robot, cozmo.robot.Robot):
         raise TypeError('First argument must be a Robot instance')
-    if not ( evt_class is None or issubclass(evt_class, cozmo.event.Event) ):
+    if evt_class is not None and not issubclass(evt_class, cozmo.event.Event):
         raise TypeError('Second argument must be an Event subclass')
     global robot
     robot = _robot
     try:
         if evt_class in dispatch_table:
             robot.world.remove_event_handler(evt_class,dispatch_table[evt_class])
-        elif not evt_class is None:
+        elif evt_class is not None:
             robot.world.remove_event_handler(evt_class,monitor_generic)
         else:
             for k,v in dispatch_table.items():
