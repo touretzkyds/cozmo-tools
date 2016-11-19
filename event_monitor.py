@@ -30,6 +30,8 @@ ChangeLog
 
 '''
 
+import re
+
 import cozmo
 
 def print_prefix(evt):
@@ -40,9 +42,8 @@ def print_object(obj):
         cube_id = next(k for k,v in robot.world.light_cubes.items() if v==obj)
         print('LightCube-',cube_id,sep='',end='')
     else:
-        r = obj.__repr__()
-        r = r[1:r.index(" ")]
-        print(r,end='')
+        r = re.search('<(\w*)', obj.__repr__())
+        print(r.group(1), end='')
 
 def monitor_generic(evt, **kwargs):
     print_prefix(evt)
@@ -52,8 +53,12 @@ def monitor_generic(evt, **kwargs):
     if 'obj' in kwargs:
         print_object(kwargs['obj'])
         print(' ', end='')
-    if 'action' in kwargs and isinstance(kwargs['action'], cozmo.anim.Animation):
-        print(kwargs['action'].anim_name, '', end='')
+    if 'action' in kwargs:
+        action = kwargs['action']
+        if isinstance(action, cozmo.anim.Animation):
+            print(action.animation_name, '', end='')
+        elif isinstance(action, cozmo.anim.AnimationTrigger):
+            print(action.trigger.name, '', end='')
     print(set(kwargs.keys()))
 
 def monitor_EvtActionCompleted(evt, action, state, failure_code, failure_reason, **kwargs):
@@ -61,6 +66,8 @@ def monitor_EvtActionCompleted(evt, action, state, failure_code, failure_reason,
     print_object(action)
     if isinstance(action, cozmo.anim.Animation):
         print('', action.anim_name, end='')
+    elif isinstance(action, cozmo.anim.AnimationTrigger):
+        print('', action.trigger.name, end='')
     print('',state,end='')
     if failure_code is not None:
         print('',failure_code,failure_reason,end='')
@@ -83,7 +90,7 @@ dispatch_table = {                                                    \
   cozmo.behavior.EvtBehaviorStarted    : monitor_generic,             \
   cozmo.behavior.EvtBehaviorStopped    : monitor_generic,             \
   cozmo.anim.EvtAnimationsLoaded       : monitor_generic,             \
-  cozmo.anim.EvtAnimationCompleted     : monitor_generic,             \
+  cozmo.anim.EvtAnimationCompleted     : monitor_EvtActionCompleted,  \
   cozmo.objects.EvtObjectAvailable     : monitor_generic,             \
   cozmo.objects.EvtObjectAppeared      : monitor_generic,             \
   cozmo.objects.EvtObjectDisappeared   : monitor_generic,             \
