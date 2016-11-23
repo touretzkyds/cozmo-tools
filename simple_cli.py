@@ -53,6 +53,9 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+*   Added world_viewer
+        Dave Touretzky
+            - Imports the world_viewer module.  Do viewer(robot) to start it.
 
 *   Added event moniitoring
         Dave Touretzky
@@ -90,6 +93,12 @@ import atexit
 import os 
 
 from event_monitor import monitor, unmonitor
+
+try:
+    import world_viewer
+    from world_viewer import viewer
+except:
+    pass
 
 # tab completion 
 readline.parse_and_bind('tab: complete') 
@@ -136,11 +145,15 @@ def run(sdk_conn):
     global robot
     robot = sdk_conn.wait_for_robot()
     if len(sys.argv) <= 1:
-        time.sleep(1) # allow time for Tk to set up the window
+        time.sleep(1.5) # allow time for Tk to set up the window
     cli_loop(robot)
 
 def cli_loop(robot):
     console = code.InteractiveConsole()
+    try:
+        world_viewer.init(robot)
+    except:
+        pass
     global ans
     while True:
         line = ''
