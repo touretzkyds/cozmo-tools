@@ -50,7 +50,7 @@ try:
     from OpenGL.GL import *
     from OpenGL.GLU import *
 except:
-    print("Can't find required OpenGL package.  Do 'pip3 install PyOpenGL'")
+    print("Can't find required OpenGL package.  Do 'pip3 install PyOpenGL PyOpenGL_accelerate'")
     raise
 
 import cozmo
