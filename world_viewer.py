@@ -26,14 +26,20 @@ Author:  David S. Touretzky, Carnegie Mellon University
 
 Change Log:
 ===========
+* Display improvements.
+    Dave Touretzky
+        - Added the charger.
+        - Draw edges in black.
+        - Draw light cubes as solid colors.
+        - Add position offsets for robot and charger, since the robot's
+          origin is between the front wheels and the charger's origin is
+          at the front lip.
 
 * Created.
 
 To Do:
 ======
-    * Add charger object
     * Add user-generated barriers
-    * Different appearance for each light cube to tell them apart
     * Add the robot's lift
     * Replace cubes and robot body with texture-mapped images
     * Add a floor to the world
@@ -88,6 +94,13 @@ cube_colors_1 = array.array('f', \
      0.8, 0.0, 0.8, \
      0.9, 0.9, 0.9, \
      0.9, 0.9, 0.9 ])
+
+color_black = (0., 0., 0.)
+color_red   = (1., 0., 0.)
+color_green = (0., 1., 0.)
+color_blue  = (0., 0., 1.0)
+
+
 cube_cIndices = array.array('B', \
     [0, 3, 2, 1, \
      2, 3, 7, 6, \
@@ -97,39 +110,78 @@ cube_cIndices = array.array('B', \
      0, 1, 5, 4 ])
 
 light_cube_size_mm = 44.3
+
 robot_body_size_mm = (56, 30, 70)
+robot_body_offset_mm = (0, 0, 30)
 robot_head_size_mm = (39.4, 39, 36)
 robot_head_offset_mm = (20, 0, 38)
+
+charger_size = (98, 34.75, 104)
+
 wscale = 0.02  # millimeters to graphics coordinates
 
-def make_cube(xsize=1, ysize=1, zsize=1, vis=False):
+def make_cube(xsize=1, ysize=1, zsize=1, vis=False, color=None):
     """Make a cube centered on the origin"""
-    glEnableClientState(GL_COLOR_ARRAY)
     glEnableClientState(GL_VERTEX_ARRAY)
-    if vis:
-        glColorPointer(3, GL_FLOAT, 0, cube_colors_1.tostring())
+    if color is None:
+        glEnableClientState(GL_COLOR_ARRAY)
+        if vis:
+            glColorPointer(3, GL_FLOAT, 0, cube_colors_1.tostring())
+        else:
+            glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tostring())
     else:
-        glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tostring())
+        if not vis:
+            s = 0.5   # scale down the brightness
+            color = (color[0]*s, color[1]*s, color[2]*s)
+        glColor3f(*color)
     verts = cube_vertices * 1;
     for i in range(0,24,3):
         verts[i  ] *= xsize * wscale
         verts[i+1] *= ysize * wscale
         verts[i+2] *= zsize * wscale
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
     glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
     glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
+    # begin wireframe
+    for i in range(0,24):
+        verts[i] *= 1.0
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+    glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
+    glDisableClientState(GL_COLOR_ARRAY)
+    glColor3f(*color_black)
+    glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
+    # end wireframe
     glDisableClientState(GL_COLOR_ARRAY)
     glDisableClientState(GL_VERTEX_ARRAY)
 
-def make_light_cube(lcube):
+def make_light_cube(cube_number):
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
+    lcube = robot.world.light_cubes[cube_number]
     p = lcube.pose.position.x_y_z
     if p != (0.0, 0.0, 0.0):
         glPushMatrix()
         glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
         glRotatef(lcube.pose.rotation.angle_z.degrees, 0, 1, 0)
         s = light_cube_size_mm
-        make_cube(s, s, s, lcube.is_visible)
+        color = (None, color_red, color_green, color_blue)[cube_number]
+        make_cube(s, s, s, lcube.is_visible, color)
+        glPopMatrix()
+    glEndList()
+    return c
+
+def make_charger():
+    c = glGenLists(1)
+    glNewList(c, GL_COMPILE)
+    charger = next(v for v in robot.world._objects.values() if 
+                    isinstance(v, cozmo.objects.Charger))
+    p = charger.pose.position.x_y_z
+    if p != (0.0, 0.0, 0.0):
+        glPushMatrix()
+        glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
+        glTranslatef(0, 0, -charger_size[2]/2*wscale)
+        glRotatef(charger.pose.rotation.angle_z.degrees, 0, 1, 0)
+        make_cube(*charger_size, charger.is_visible)
         glPopMatrix()
     glEndList()
     return c
@@ -140,6 +192,7 @@ def make_cozmo_robot():
     p = robot.pose.position.x_y_z
     glPushMatrix()
     glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
+    glTranslatef(0, 0, robot_body_offset_mm[2]*wscale)
     glRotatef(robot.pose.rotation.angle_z.degrees, 0, 1, 0)
     make_cube(*robot_body_size_mm)
     h = robot_head_offset_mm
@@ -151,11 +204,13 @@ def make_cozmo_robot():
     return c
 
 def make_shapes():
-    global cube1, cube2, cube3, cozmo_robot
-    # cube 1
-    cube1 = make_light_cube(robot.world.light_cubes[1])
-    cube2 = make_light_cube(robot.world.light_cubes[2])
-    cube3 = make_light_cube(robot.world.light_cubes[3])
+    global cube1, cube2, cube3, charger, cozmo_robot
+    # light cubes
+    cube1 = make_light_cube(1)
+    cube2 = make_light_cube(2)
+    cube3 = make_light_cube(3)
+    # charger
+    charger = make_charger()
     # cozmo robot
     cozmo_robot = make_cozmo_robot()
 
@@ -163,6 +218,7 @@ def del_shapes():
     glDeleteLists(cube1,1)
     glDeleteLists(cube2,1)
     glDeleteLists(cube3,1)
+    glDeleteLists(charger,1)
     glDeleteLists(cozmo_robot,1)
 
 initial_view_translate = [1.1, 2.5, -0.5]
@@ -191,6 +247,7 @@ def display():
     glCallList(cube1)
     glCallList(cube2)
     glCallList(cube3)
+    glCallList(charger)
     glCallList(cozmo_robot)
     glutSwapBuffers()
     del_shapes()
@@ -234,17 +291,17 @@ def special(key, x, y):
     global view_translate, view_rotate, view_dist
     hdg = -view_rotate[1]
     if key == GLUT_KEY_LEFT:
-      view_rotate[1] += 5
+        view_rotate[1] += 5
     elif key == GLUT_KEY_RIGHT:
-      view_rotate[1] -= 5
+        view_rotate[1] -= 5
     elif key == GLUT_KEY_UP:
         view_rotate[0] -= 5
     elif key == GLUT_KEY_DOWN:
         view_rotate[0] += 5
     elif key == GLUT_KEY_PAGE_UP:
-      view_translate[1] += 0.1
+        view_translate[1] += 0.1
     elif key == GLUT_KEY_PAGE_DOWN:
-      view_translate[1] -= -.1
+        view_translate[1] -= -.1
     glutPostRedisplay()
 
 def reshape(width, height):
