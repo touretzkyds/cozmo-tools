@@ -53,6 +53,11 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+*   Added OS test because Tkinter breaks console input
+        Dave Touretzky
+            - Use sys.stdin.readline() on Macs as a workaround, although
+              this means we don't get command line editing.
+
 *   Added world_viewer
         Dave Touretzky
             - Imports the world_viewer module.  Do viewer(robot) to start it.
@@ -80,6 +85,7 @@ import threading
 import socket
 import socketserver
 import sys
+import platform
 import code
 import traceback
 import time
@@ -110,6 +116,9 @@ except IOError:
     pass 
 atexit.register(readline.write_history_file, histfile) 
 del os, histfile, readline, rlcompleter
+
+os_version = platform.system()
+del platform
 
 
 # 'robot' might not have to be global. Feel free to modify this, 
@@ -158,7 +167,11 @@ def cli_loop(robot):
     while True:
         line = ''
         while line == '':
-           line = console.raw_input('C> ').strip()
+            if os_version == 'Darwin':   # Tkinter breaks console on Macs
+                print('c> ', end='')
+                line = sys.stdin.readline().strip()
+            else:
+                line = console.raw_input('C> ').strip()
         do_await = False
         if line[0:7] == 'import ' or line[0:5] == 'from ' or line[0:7] == 'global ' \
            or line[0:4] == 'del ':
@@ -185,7 +198,6 @@ def cli_loop(robot):
             traceback.print_exc()
             print()
 
-global logging_is_setup
 logging_is_setup = False
 
 def reconnect():
