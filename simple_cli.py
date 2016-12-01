@@ -174,7 +174,7 @@ def cli_loop(robot):
                 line = console.raw_input('C> ').strip()
         do_await = False
         if line[0:7] == 'import ' or line[0:5] == 'from ' or line[0:7] == 'global ' \
-           or line[0:4] == 'del ':
+           or line[0:4] == 'del ' or line[0:4] == 'def ' or line[0:6] == 'async ':
             # Can't use assignment to capture a return value, so None.
             ans = None
         elif line[0:6] == 'await ':
@@ -182,6 +182,9 @@ def cli_loop(robot):
             line = 'global ans, res; ans=' + line[6:]
         elif line[0:5] == 'exit':
             # Clean up
+            try:
+                world_viewer.exited = True
+            except: pass
             server.shutdown()
             server.socket.close()
             sys.exit()

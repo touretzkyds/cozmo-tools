@@ -1,6 +1,6 @@
 '''
 
-OpenGL viewer for Cozmo's world map.
+OpenGL world viewer for Cozmo's world map.
 ====================================
 
 Run it by typing:  viewer(robot)
@@ -39,7 +39,9 @@ Change Log:
 
 To Do:
 ======
-    * Add user-generated barriers
+    * Give cubes distinctive faces so we can see their orientation
+    * Use quaternion instead of angle_z so we can fully rotate the cube
+    * Add representation of custom (user-generated) barriers
     * Add the robot's lift
     * Replace cubes and robot body with texture-mapped images
     * Add a floor to the world
@@ -62,6 +64,7 @@ except:
 import cozmo
 
 exited = False
+window = None
 
 initial_window_size = (500, 500)
 
@@ -253,6 +256,9 @@ def display():
     del_shapes()
 
 def idle():
+    if exited:
+        glutDestroyWindow(window)
+        return
     glutPostRedisplay()
 
 def keyboard(key, x, y):
@@ -314,11 +320,12 @@ def visible(vis):
         glutIdleFunc(None)
 
 def init_display():
+    global window
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(*initial_window_size)
     # glutInitWindowPosition(100, 100)
     glutInit()
-    glutCreateWindow("Cozmo's World")
+    window = glutCreateWindow("Cozmo's World")
     glClearColor(0, 0, 0, 0)
     glEnable(GL_DEPTH_TEST)
     glShadeModel(GL_SMOOTH)
@@ -333,6 +340,6 @@ def init_display():
 def viewer(_robot):
     global robot
     robot = _robot
-    th = threading.Thread(None,init_display)
+    th = threading.Thread(target=init_display)
     th.start()
 

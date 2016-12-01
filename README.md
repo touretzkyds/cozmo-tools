@@ -9,6 +9,6 @@ event_monitor.py provides Cozmo event monitoring.
     Type monitor(robot) to start monitoring.  See doc for more options.
 
 world_viewer.py is an OpenGL viewer for Cozmo's world map.
-    Requires the PyOpenGL and PyOpenGL_accelerate packages.
+    Requires the PyOpenGL and PyOpenGL_accelerate packages (from pip), and freeglut3.
     Run it by typing: viewer(robot). May not work on Macs due to Tkinter brokenness.
 
