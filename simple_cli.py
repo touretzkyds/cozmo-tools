@@ -47,12 +47,58 @@ The functions do_square and q_turn also become available to the
 keyboard CLI side.
 
 
+*********
+
+Available CLI commands:
+
+    (python code)
+        Executable statements are directly passed to python's interpreter.  Some magic global variables:
+            ans:    results from the keyboard CLI can be returned in this global object
+            res:    results from the TCP server CLI can be returned in this global object
+        
+    exit    
+        Quit all the running activities
+
+    monitor(robot[, Event])
+        Monitor all event types in the dispatch table, or a specified type of Event
+    
+    unmonitor(robot[, Event])
+        Turn off monitoring
+
+    viewer(robot)
+        Start a 3D real-time model of the World around Cozmo
+
+        Keyboard commands available in the World Window:
+          a          Translate left
+          d          Translate right
+          w          Translate forward
+          s          Translate backward
+          page-up    Translate up
+          page-down  Translate down
+
+          left-arrow   Rotate left
+          right-arrow  Rotate right
+          up-arrow     Rotate upward
+          down-arrow   Rotate downward
+
+          z          Reset view
+
+*********
+
+
 
 Author:     David S. Touretzky, Carnegie Mellon University
 =======
 
 Changelog
 =========
+*   Healthier exit code to allow quitting without drama
+        Real Ouellet
+            - Push Cozmo's code in a daemon thread
+            - Use 'return' genereously
+            - Forbid exiting from the GL window with 'ESC': it messes up the host console
+            - Add some doc
+
 *   Added OS test because Tkinter breaks console input
         Dave Touretzky
             - Use sys.stdin.readline() on Macs as a workaround, although
@@ -102,7 +148,8 @@ from event_monitor import monitor, unmonitor
 
 try:
     import world_viewer
-    from world_viewer import viewer
+    from world_viewer import viewer, RUNNING_world
+
 except:
     pass
 
@@ -123,13 +170,12 @@ del platform
 
 # 'robot' might not have to be global. Feel free to modify this, 
 # but remember that it must still be available to the TCP side.
-global res, ans, robot;
+global res, ans, robot, RUNNING
 res=0
+RUNNING=True
 
 # Helper class for TCP requests
 # The TCP CLI is handled here.
-# This code was written by a Python ignoramus... Feel free to make it better
-# in any way!
 class ThreadedExecRequestHandler( socketserver.BaseRequestHandler ):
     def handle(self):
         global res
@@ -158,13 +204,19 @@ def run(sdk_conn):
     cli_loop(robot)
 
 def cli_loop(robot):
+    global RUNNING
+    
+
     console = code.InteractiveConsole()
     try:
         world_viewer.init(robot)
     except:
         pass
     global ans
+    ans=None
     while True:
+        if RUNNING == False:
+            return
         line = ''
         while line == '':
             if os_version == 'Darwin':   # Tkinter breaks console on Macs
@@ -187,7 +239,7 @@ def cli_loop(robot):
             except: pass
             server.shutdown()
             server.socket.close()
-            sys.exit()
+            RUNNING=False
         else:
             line = 'global ans, res; ans=' + line
         try:
@@ -220,6 +272,10 @@ def reconnect():
 
 
 if __name__ == '__main__':
+
+    # Fair warning
+    if os_version == 'Darwin':
+        print("WARNING!! This program does not really work on OSX, because Not Linux. You have been warned.")
     
     # Start the TCP CLI server
     address = ('localhost', 4242)  # let the kernel assign a port
@@ -227,11 +283,17 @@ if __name__ == '__main__':
                                 ThreadedExecRequestHandler)
     server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     ip, port = server.server_address  # what port was assigned?
-    t = threading.Thread(target=server.serve_forever)
-    t.setDaemon(True)  # don't hang on exit
-    t.start()
-    print('Server loop running on port', port)
+    CLI_server = threading.Thread(target=server.serve_forever)
+    CLI_server.setDaemon(True)  # don't hang on exit
+    CLI_server.start()
+    print('CLI server loop running on port', port)
     
-    # Connect to Cozmo and start the keyboard CLI
-    reconnect()
+    # Start the Cozmo thread:  connect to Cozmo and start the keyboard CLI
+    COZMO_server = threading.Thread(target=reconnect)
+    COZMO_server.setDaemon(True)  # don't hang on exit
+    COZMO_server.start()
+    
+    # Start doing nothing until not anymore ...
+    while RUNNING:
+        time.sleep(1)
 
