@@ -148,7 +148,7 @@ from event_monitor import monitor, unmonitor
 
 try:
     import world_viewer
-    from world_viewer import viewer, RUNNING_world
+    from world_viewer import viewer
 
 except:
     pass
