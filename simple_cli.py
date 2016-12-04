@@ -207,7 +207,7 @@ def cli_loop(robot):
     global RUNNING
     
 
-    console = code.InteractiveConsole()
+    cli_loop.console = code.InteractiveConsole()
     try:
         world_viewer.init(robot)
     except:
@@ -217,22 +217,23 @@ def cli_loop(robot):
     while True:
         if RUNNING == False:
             return
-        line = ''
-        while line == '':
+        cli_loop._line = ''
+        while cli_loop._line == '':
             if os_version == 'Darwin':   # Tkinter breaks console on Macs
                 print('c> ', end='')
-                line = sys.stdin.readline().strip()
+                cli_loop._line = sys.stdin.readline().strip()
             else:
-                line = console.raw_input('C> ').strip()
-        do_await = False
-        if line[0:7] == 'import ' or line[0:5] == 'from ' or line[0:7] == 'global ' \
-           or line[0:4] == 'del ' or line[0:4] == 'def ' or line[0:6] == 'async ':
+                cli_loop._line = cli_loop.console.raw_input('C> ').strip()
+        cli_loop._do_await = False
+        if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
+           cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
+           cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
             # Can't use assignment to capture a return value, so None.
             ans = None
-        elif line[0:6] == 'await ':
-            do_await = True
-            line = 'global ans, res; ans=' + line[6:]
-        elif line[0:5] == 'exit':
+        elif cli_loop._line[0:6] == 'await ':
+            cli_loop._do_await = True
+            cli_loop._line = 'global ans, res; ans=' + cli_loop._line[6:]
+        elif cli_loop._line[0:5] == 'exit':
             # Clean up
             try:
                 world_viewer.exited = True
@@ -241,10 +242,10 @@ def cli_loop(robot):
             server.socket.close()
             RUNNING=False
         else:
-            line = 'global ans, res; ans=' + line
+            cli_loop._line = 'global ans, res; ans=' + cli_loop._line
         try:
-            exec(line)
-            if do_await:
+            exec(cli_loop._line)
+            if cli_loop._do_await:
                 print("Can't use await outside of an async def.")
                 ans = None # ans = await ans
             if not ans is None:
