@@ -205,9 +205,8 @@ def run(sdk_conn):
 
 def cli_loop(robot):
     global RUNNING
-    
 
-    cli_loop.console = code.InteractiveConsole()
+    cli_loop._console = code.InteractiveConsole()
     try:
         world_viewer.init(robot)
     except:
@@ -223,7 +222,7 @@ def cli_loop(robot):
                 print('c> ', end='')
                 cli_loop._line = sys.stdin.readline().strip()
             else:
-                cli_loop._line = cli_loop.console.raw_input('C> ').strip()
+                cli_loop._line = cli_loop._console.raw_input('C> ').strip()
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
            cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
