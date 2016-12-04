@@ -6,6 +6,7 @@
 
 from .events import *
 
+
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self, _name):
@@ -16,7 +17,7 @@ class StateNode(EventListener):
         self.children = []
 
     def start(self,event=None):
-        if running: return
+        if self.running: return
         super().start()
         print('starting transitions of',self.name)
         if self.children:
@@ -24,10 +25,10 @@ class StateNode(EventListener):
         for t in self.transitions: t.start()
 
     def stop(self):
-        if not running: return
+        if not self.running: return
         super().stop()
         for t in self.transitions: t.stop()
-        for c in children: c.stop()
+        for c in self.children: c.stop()
 
     def add_transition(self, trans):
         if not isinstance(trans, Transition):
@@ -67,12 +68,12 @@ class Transition(EventListener):
         self.destinations.append(node)
 
     def start(self):
-        if running: return
+        if self.running: return
         super().start()
         self.handle = None
 
     def stop(self):
-        if not running: return
+        if not self.running: return
         if self.handle is not None:
             print(self.name,'cancelling',self.handle)
             self.handle.cancel()
@@ -81,4 +82,4 @@ class Transition(EventListener):
     def fire(self,event=None):
         self.stop()
         for src in self.sources: src.stop()
-        for dest in self.destinations: dest.start(event)
+        for dest in self.destinations: dest.start(event=event)

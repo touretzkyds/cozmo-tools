@@ -1,11 +1,10 @@
 from .events import *
 from .base import *
 
-
 class NullTrans(Transition):
     def start(self):
         super.start()
-        pass   ### TODO: finish this
+        get_robot().loop.call_soon(self.fire)
 
 
 class CompletionTrans(Transition):
@@ -21,7 +20,7 @@ class CompletionTrans(Transition):
             erouter.remove_listener(self,CompletionEvent,source)
 
     def handle_event(self,event):
-        print('CompletionTrans',self,'got',event)
+        super().handle_event(event)
         self.fire(event)
 
 
@@ -33,7 +32,7 @@ class TimerTrans(Transition):
 
     def start(self):
         super().start()
-        self.handle = robot.loop.call_later(self.duration, self.fire)
+        self.handle = get_robot().loop.call_later(self.duration, self.fire)
 
     def stop(self):
         super().stop()
@@ -61,10 +60,11 @@ class SignalTrans(Transition):
         super.stop()
 
     def handle_event(self,event):
+        super().handle_event(event)
         if isinstance(event,DataEvent):
-            if self.value is not None
+            if self.value is not None:
                 self.fire(event)
             else: # wildcard case: fire only if nothing else does
-                self.handle = robot.loop.call_later(0.1, self.fire, event)
+                self.handle = get_robot().loop.call_later(0.1, self.fire, event)
         else:
             raise TypeError('%s is not a DataEvent' % event)

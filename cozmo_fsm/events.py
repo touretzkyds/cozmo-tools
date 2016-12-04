@@ -6,6 +6,16 @@
 
 """
 
+def set_robot(_robot):
+    global robot
+    robot = _robot
+
+def get_robot():
+    if robot:
+        return robot
+    else:
+        raise Exception("Don't have a robot.")
+
 global erouter
 
 class Event:
@@ -93,8 +103,8 @@ class EventRouter:
         if not isinstance(event,Event):
             raise TypeError('%s is not an Event' % event)
         for listener in self._get_listeners(event):
-            print('scheduling',listener,'on',event)
-            robot.loop.call_soon(listener,event)
+            #print('scheduling',listener,'on',event)
+            get_robot().loop.call_soon(listener,event)
 
 erouter = EventRouter()
 
@@ -114,7 +124,7 @@ class EventListener:
         print(self,'stopped')
 
     def handle_event(self, event):
-        if not running:
+        if not self.running:
             print('Handler',self,'not running, but received',event)
         else:
             pass
