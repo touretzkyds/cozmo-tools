@@ -64,7 +64,7 @@ except:
 import cozmo
 
 exited = False
-window = None
+GLwindow = None
 
 initial_window_size = (500, 500)
 
@@ -257,16 +257,16 @@ def display():
 
 def idle():
     if exited:
-        glutDestroyWindow(window)
+        glutDestroyWindow(GLwindow)
         return
     glutPostRedisplay()
 
 def keyboard(key, x, y):
     global exited
     if ord(key) == 27:
-        exited = True
-        glutDestroyWindow(1)
-        sys.exit(0)
+        print("Use 'exit' to quit.")
+        #exited = True
+        #return
     global view_translate, view_rotate, view_dist
     hdg = -view_rotate[1]
     if key == b'a':
@@ -320,12 +320,13 @@ def visible(vis):
         glutIdleFunc(None)
 
 def init_display():
-    global window
+    global GLwindow
+    
+    glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(*initial_window_size)
     # glutInitWindowPosition(100, 100)
-    glutInit()
-    window = glutCreateWindow("Cozmo's World")
+    GLwindow = glutCreateWindow("Cozmo's World")
     glClearColor(0, 0, 0, 0)
     glEnable(GL_DEPTH_TEST)
     glShadeModel(GL_SMOOTH)
