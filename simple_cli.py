@@ -92,6 +92,12 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+*   Provide useful user-visible variables.
+        Dave Touretzky
+            - Added charger, cube1-cube3, light_cubes, and world.
+            - Announce these variables on start-up.
+            - Removed bogus call to world_viewer.init()
+
 *   Healthier exit code to allow quitting without drama
         Real Ouellet
             - Push Cozmo's code in a daemon thread
