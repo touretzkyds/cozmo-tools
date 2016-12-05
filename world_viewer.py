@@ -173,7 +173,8 @@ def make_light_cube(cube_number):
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
     lcube = robot.world.light_cubes[cube_number]
-    lcube.was_visible = lcube.was_visible or lcube.is_visible
+    lcube.was_visible = lcube.object_id and \
+          (lcube.was_visible or lcube.is_visible)
     if lcube.was_visible:
         p = lcube.pose.position.x_y_z
         glPushMatrix()
