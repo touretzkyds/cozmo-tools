@@ -149,7 +149,6 @@ from event_monitor import monitor, unmonitor
 try:
     import world_viewer
     from world_viewer import viewer
-
 except:
     pass
 
@@ -168,11 +167,10 @@ os_version = platform.system()
 del platform
 
 
-# 'robot' might not have to be global. Feel free to modify this, 
-# but remember that it must still be available to the TCP side.
-global res, ans, robot, RUNNING
-res=0
-RUNNING=True
+global res, ans, RUNNING
+res = 0
+ans = None
+RUNNING = True
 
 # Helper class for TCP requests
 # The TCP CLI is handled here.
@@ -204,15 +202,17 @@ def run(sdk_conn):
     cli_loop(robot)
 
 def cli_loop(robot):
-    global RUNNING
+    global ans, RUNNING
+
+    world = robot.world
+    light_cubes = robot.world.light_cubes
+    cube1 = light_cubes[1]
+    cube2 = light_cubes[2]
+    cube3 = light_cubes[3]
+    charger = robot.world.charger
+    exec("print();print('Variables:', dir())")
 
     cli_loop._console = code.InteractiveConsole()
-    try:
-        world_viewer.init(robot)
-    except:
-        pass
-    global ans
-    ans=None
     while True:
         if RUNNING == False:
             return
