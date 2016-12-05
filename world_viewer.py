@@ -311,6 +311,7 @@ def keyboard(key, x, y):
     elif key == b'z':
         fixation_point = initial_fixation_point.copy()
         camera_rotation = initial_camera_rotation.copy()
+        camera_distance = initial_camera_distance
     #print(fixation_point, camera_rotation)
     glutPostRedisplay()
 
