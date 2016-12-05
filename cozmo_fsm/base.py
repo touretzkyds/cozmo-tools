@@ -19,16 +19,17 @@ class StateNode(EventListener):
     def start(self,event=None):
         if self.running: return
         super().start()
-        print('starting transitions of',self.name)
+        # Start transitions before children, because children
+        # may post a completion event for their parent.
+        for t in self.transitions: t.start()
         if self.children:
             self.children[0].start()
-        for t in self.transitions: t.start()
 
     def stop(self):
         if not self.running: return
         super().stop()
-        for t in self.transitions: t.stop()
         for c in self.children: c.stop()
+        for t in self.transitions: t.stop()
 
     def add_transition(self, trans):
         if not isinstance(trans, Transition):
@@ -38,7 +39,7 @@ class StateNode(EventListener):
     def set_parent(self, parent):
         if not isinstance(parent, StateNode):
             raise TypeError('%s is not a StateNode' % parent)
-        if parent:
+        if self.parent:
             raise Exception('parent already set')
         self.parent = parent
         parent.children.append(self)
@@ -56,15 +57,22 @@ class Transition(EventListener):
         self.destinations = []
         self.handle = None
 
+    def _sibling_check(self,node):
+        for sibling in self.sources + self.destinations:
+            if sibling.parent is not node.parent:
+                raise ValueError("All source/destination nodes must have the same parent.")
+
     def add_source(self, node):
         if not isinstance(node, StateNode):
             raise TypeError('%s is not a StateNode' % node)
+        self._sibling_check(node)
         node.add_transition(self)
         self.sources.append(node)
 
     def add_destination(self, node):
         if not isinstance(node, StateNode):
             raise TypeError('%s is not a StateNode' % node)
+        self._sibling_check(node)
         self.destinations.append(node)
 
     def start(self):

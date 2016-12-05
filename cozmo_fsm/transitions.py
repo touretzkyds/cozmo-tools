@@ -3,14 +3,19 @@ from .base import *
 
 class NullTrans(Transition):
     def start(self):
-        super.start()
+        super().start()
         get_robot().loop.call_soon(self.fire)
 
 
 class CompletionTrans(Transition):
     """Transition fires when a source node completes."""
+    def __init__(self,name,count=None):
+        super().__init__(name)
+        self.count = count
+
     def start(self):
         super().start()
+        self.completed = set()
         for source in self.sources:
             erouter.add_listener(self,CompletionEvent,source)
 
@@ -21,7 +26,12 @@ class CompletionTrans(Transition):
 
     def handle_event(self,event):
         super().handle_event(event)
-        self.fire(event)
+        if isinstance(event,CompletionEvent):
+            self.completed.add(event.source)
+            if len(self.completed) >= (self.count or len(self.sources)):
+                self.fire(event)
+        else:
+            raise ValueError("CompletionTrans can't handle %s" % event)
 
 
 class TimerTrans(Transition):
