@@ -209,6 +209,7 @@ def run(sdk_conn):
 
 def cli_loop(robot):
     global ans, RUNNING
+    charger_warned = False
 
     world = robot.world
     light_cubes = robot.world.light_cubes
@@ -224,6 +225,12 @@ def cli_loop(robot):
             return
         cli_loop._line = ''
         while cli_loop._line == '':
+            if robot.is_on_charger:
+                if not charger_warned:
+                    print("On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
+                    charger_warned = True
+            else:
+                charger_warned = False
             if os_version == 'Darwin':   # Tkinter breaks console on Macs
                 print('c> ', end='')
                 cli_loop._line = sys.stdin.readline().strip()
@@ -266,12 +273,12 @@ def reconnect():
     if not logging_is_setup:
         cozmo.setup_basic_logging()
         logging_is_setup = True
+    cozmo.robot.Robot.drive_off_charger_on_connect = False
     try:
         if len(sys.argv) <= 1:
             cozmo.connect_with_tkviewer(run)
         else:
             cozmo.connect(run)
-
     except cozmo.ConnectionError as e:
         sys.exit("A connection error occurred: %s" % e)
 
