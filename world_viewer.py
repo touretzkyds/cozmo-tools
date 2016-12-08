@@ -5,28 +5,23 @@ OpenGL world viewer for Cozmo's world map.
 
 Run it by typing:  viewer(robot)
 
-Keyboard commands:
-  a          Translate left
-  d          Translate right
-  w          Translate forward
-  s          Translate backward
-  page-up    Translate up
-  page-down  Translate down
-
-  left-arrow   Rotate left
-  right-arrow  Rotate right
-  up-arrow     Rotate upward
-  down-arrow   Rotate downward
-
-  z          Reset view
-
   
 Author:  David S. Touretzky, Carnegie Mellon University
 =======
 
 Change Log:
 ===========
-* Various improvements.
+* 12/7/2016: More enhancements.
+    Dave Touretzky
+        - Display coordinate axes and gazepoint dot.
+        - 'x' command toggles axes; 'h' prints help, 'v' displays viewpoint.
+        - 'w' and 's' now translate; '<' and '>' zoom.
+        - Up/down arrow motion was reversed; fixed it.
+        - Page up/page down only moved in one direction; fixed it.
+        - Charger now displayed in two pieces: bed and back wall.
+        - Use proper height offsets for robot and charger.
+
+* 12/4/2016: Various improvements.
     Dave Touretzky
         - Add was_visible attribute to determine whether an object has ever been
           visible.  If not, we can't trust its coordinates, and while they will
@@ -50,12 +45,18 @@ Change Log:
 
 To Do:
 ======
-    * Give cubes distinctive faces so we can see their orientation
-    * Use quaternion instead of angle_z so we can fully rotate the cube
-    * Add representation of custom (user-generated) barriers
-    * Add the robot's lift
-    * Replace cubes and robot body with texture-mapped images
-    * Add a floor to the world
+* Use origin_id in place of was_visible and display just the wireframe
+    if a shape no longer has a valid pose.
+* Add 'f' to display fixation point and camera pitch values.
+* Move the scaling and axis swap into the model view so all
+    the rest of the code can work in Cozmo world coordinates
+    (x-forward, z-up) and millimeter units.
+* Give cubes distinctive faces so we can see their orientation
+* Use quaternion instead of angle_z so we can fully rotate the cube
+* Add representation of custom (user-generated) barriers
+* Add the robot's lift
+* Replace cubes and robot body with texture-mapped images
+* Add a floor to the world
 
 '''
 
@@ -74,33 +75,58 @@ except:
 
 import cozmo
 
+help_text = """
+World viewer keyboard commands:
+  a            Translate gazepoint left
+  d            Translate gazepoint right
+  w            Translate gazepoint forward
+  s            Translate gazepoint backward
+  <            Zoom in
+  >            Zoom out
+  page-up      Translate gazepoint up
+  page-down    Translate gazepoint down
+
+  left-arrow   Orbit camera left
+  right-arrow  Orbit camera right
+  up-arrow     Orbit camera upward
+  down-arrow   Orbit camera downward
+
+  x            Toggle axes
+  z            Reset to initial view
+  v            Display viewing parameters
+  h            Print help
+"""
+
 exited = False
 GLwindow = None
 
-global window_width, window_height
 window_width = window_height = 500
 
-cube_vertices = array.array('f', \
-    [-0.5, -0.5, +0.5, \
+cube_vertices = array.array('f', [ \
+     -0.5, -0.5, +0.5, \
      -0.5, +0.5, +0.5, \
      +0.5, +0.5, +0.5, \
      +0.5, -0.5, +0.5, \
      -0.5, -0.5, -0.5, \
      -0.5, +0.5, -0.5, \
      +0.5, +0.5, -0.5, \
-     +0.5, -0.5, -0.5 ])
+     +0.5, -0.5, -0.5  \
+     ])
 
-cube_colors_0 = array.array('f', \
-    [0.8, 0.0, 0.0, \
-     0.8, 0.0, 0.0, \
-     0.0, 0.8, 0.0, \
-     0.0, 0.8, 0.0, \
-     0.0, 0.0, 0.8, \
-     0.0, 0.0, 0.8, \
-     0.5, 0.5, 0.5, \
-     0.5, 0.5, 0.5 ])
+cube_colors_0 = array.array('f', [ \
+     0.6, 0.6, 0.0, \
+     0.6, 0.6, 0.0, \
+     0.0, 0.0, 0.7, \
+     0.0, 0.0, 0.7, \
+     0.7, 0.0, 0.0, \
+     0.7, 0.0, 0.0, \
+     0.0, 0.7, 0.0, \
+     0.0, 0.7, 0.0, \
+     ])
 
-cube_colors_1 = array.array('f', \
+cube_colors_1 = array.array('f', [x/0.7 for x in cube_colors_0])
+
+cube_colors_2 = array.array('f', \
     [0.8, 0.8, 0.0, \
      0.8, 0.8, 0.0, \
      0.0, 0.8, 0.8, \
@@ -111,6 +137,7 @@ cube_colors_1 = array.array('f', \
      0.9, 0.9, 0.9 ])
 
 color_black = (0., 0., 0.)
+color_white = (1., 1., 1.)
 color_red   = (1., 0., 0.)
 color_green = (0., 1., 0.)
 color_blue  = (0., 0., 1.0)
@@ -124,66 +151,89 @@ cube_cIndices = array.array('B', \
      4, 5, 6, 7, \
      0, 1, 5, 4 ])
 
+def is_dummy_pose(pose):
+    return pose.position.x_y_z == (0, 0, 0) and \
+           pose.rotation.q0_q1_q2_q3 == (1, 0, 0, 0)
+
 light_cube_size_mm = 44.3
 
-robot_body_size_mm = (56, 30, 70)
-robot_body_offset_mm = (0, 0, 30)
-robot_head_size_mm = (39.4, 39, 36)
-robot_head_offset_mm = (20, 0, 38)
+robot_body_size_mm =   (56,   30, 70)
+robot_body_offset_mm = ( 0,   15, 30)
+robot_head_size_mm =   (39.4, 39, 36)
+robot_head_offset_mm = (20,    0, 38)
 
-charger_size = (98, 34.75, 104)
+#charger_size_mm = (98, 34.75, 104)
+charger_bed_size_mm = (98, 10, 104)
+charger_back_size_mm = (90, 34.75, 5)
 
 wscale = 0.02  # millimeters to graphics window coordinates
 
-def make_cube(xsize=1, ysize=1, zsize=1, vis=False, color=None):
+def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
     """Make a cube centered on the origin"""
     glEnableClientState(GL_VERTEX_ARRAY)
     if color is None:
         glEnableClientState(GL_COLOR_ARRAY)
-        if vis:
+        if highlight:
             glColorPointer(3, GL_FLOAT, 0, cube_colors_1.tostring())
         else:
             glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tostring())
     else:
-        if not vis:
-            s = 0.5   # scale down the brightness
+        if not highlight:
+            s = 0.5   # scale down the brightness if necessary
             color = (color[0]*s, color[1]*s, color[2]*s)
         glColor3f(*color)
-    verts = cube_vertices * 1;
+    verts = cube_vertices * 1; # copy the array
     for i in range(0,24,3):
-        verts[i  ] *= xsize * wscale
-        verts[i+1] *= ysize * wscale
-        verts[i+2] *= zsize * wscale
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-    glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
-    glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
-    # begin wireframe
-    for i in range(0,24):
-        verts[i] *= 1.0
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-    glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
-    glDisableClientState(GL_COLOR_ARRAY)
-    glColor3f(*color_black)
-    glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
-    # end wireframe
+        verts[i  ] *= size[0] * wscale
+        verts[i+1] *= size[1] * wscale
+        verts[i+2] *= size[2] * wscale
+    if body:
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
+        glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
+    if edges:
+        # begin wireframe
+        for i in range(0,24): verts[i] *= 1.01
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
+        glDisableClientState(GL_COLOR_ARRAY)
+        if body:
+            if highlight:
+                glColor3f(*color_white)
+            else:
+                glColor3f(*color_black)
+        else:
+            if highlight:
+                glColor3f(*color)
+            else:
+                s = 0.7   # scale down the brightness if necessary
+                glColor3f(color[0]*s, color[1]*s, color[2]*s)
+        glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
+        # end wireframe
     glDisableClientState(GL_COLOR_ARRAY)
     glDisableClientState(GL_VERTEX_ARRAY)
 
 def make_light_cube(cube_number):
+    lcube = robot.world.light_cubes[cube_number]
+    # check for dummy pose because of buggy updating of origin_id
+    lcube.was_visible = ( lcube.pose.origin_id > 1 and \
+                          not is_dummy_pose(lcube.pose) ) \
+            or lcube.is_visible or lcube.was_visible
+    if not lcube.was_visible: return None
+    p = lcube.pose.position.x_y_z
+    s = light_cube_size_mm
+    color = (None, color_red, color_green, color_blue)[cube_number]
+    valid_coords = (lcube.pose.origin_id == robot.pose.origin_id)
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
-    lcube = robot.world.light_cubes[cube_number]
-    lcube.was_visible = lcube.object_id and \
-          (lcube.was_visible or lcube.is_visible)
-    if lcube.was_visible:
-        p = lcube.pose.position.x_y_z
-        glPushMatrix()
-        glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
-        glRotatef(lcube.pose.rotation.angle_z.degrees, 0, 1, 0)
-        s = light_cube_size_mm
-        color = (None, color_red, color_green, color_blue)[cube_number]
-        make_cube(s, s, s, lcube.is_visible, color)
-        glPopMatrix()
+    glPushMatrix()
+    glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
+    glRotatef(lcube.pose.rotation.angle_z.degrees, 0, 1, 0)
+    if valid_coords:  # make solid cube and highlight if visible
+        make_cube((s,s,s), highlight=lcube.is_visible, color=color)
+    else:  # make wireframe if once seen but coords no longer valid
+        make_cube((s,s,s), body=False, highlight=True, color=color)
+    glPopMatrix()
     glEndList()
     return c
 
@@ -191,14 +241,23 @@ def make_charger():
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
     charger = robot.world.charger
-    charger.was_visible = charger.was_visible or charger.is_visible
-    if charger.was_visible:
+    charger.was_visible = charger.was_visible or charger.is_visible or \
+            robot.is_on_charger
+    high = charger.is_visible or \
+        (robot.is_on_charger and charger.pose.origin_id == robot.pose.origin_id)
+    if True or charger.was_visible:
         p = charger.pose.position.x_y_z
         glPushMatrix()
         glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
-        glTranslatef(0, 0, -charger_size[2]/2*wscale)
         glRotatef(charger.pose.rotation.angle_z.degrees, 0, 1, 0)
-        make_cube(*charger_size, charger.is_visible)
+        glTranslatef(0., charger_bed_size_mm[1]/2*wscale,
+                        -charger_bed_size_mm[2]/2*wscale)
+        glRotatef(180, 0, 1, 0) # charger "front" is opposite robot "front"
+        make_cube(charger_bed_size_mm, highlight=high)
+        glTranslatef(0., \
+               (charger_back_size_mm[1]-charger_bed_size_mm[1])/2*wscale, \
+               charger_bed_size_mm[2]/2*wscale)
+        make_cube(charger_back_size_mm, highlight=high)
         glPopMatrix()
     glEndList()
     return c
@@ -206,22 +265,63 @@ def make_charger():
 def make_cozmo_robot():
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
-    p = robot.pose.position.x_y_z
     glPushMatrix()
+    p = robot.pose.position.x_y_z
     glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
-    glTranslatef(0, 0, robot_body_offset_mm[2]*wscale)
+    glTranslatef(0, robot_body_offset_mm[1]*wscale, robot_body_offset_mm[2]*wscale)
     glRotatef(robot.pose.rotation.angle_z.degrees, 0, 1, 0)
-    make_cube(*robot_body_size_mm)
+    make_cube(robot_body_size_mm, highlight=robot.is_on_charger)
     h = robot_head_offset_mm
     glTranslatef(-h[1]*wscale, h[2]*wscale, -h[0]*wscale)
     glRotatef(robot.head_angle.degrees, 1, 0, 0)
-    make_cube(*robot_head_size_mm)
+    make_cube(robot_head_size_mm, highlight=robot.is_on_charger)
+    glPopMatrix()
+    glEndList()
+    return c
+
+axis_length = 100
+axis_width = 1
+show_axes = True
+
+def make_axes():
+    if not show_axes: return None
+    c = glGenLists(1)
+    glNewList(c, GL_COMPILE)
+    glPushMatrix()
+    l = axis_length
+    w = axis_width
+    glTranslate(0, 0, -l/2 * wscale)
+    make_cube((w,w,l), highlight=True, color=color_red, edges=False)
+    glPopMatrix()
+    glPushMatrix()
+    glTranslate(-l/2 * wscale, 0, 0)
+    make_cube((l,w,w), highlight=True, color=color_green, edges=False)
+    glPopMatrix()
+    glPushMatrix()
+    glTranslate(0, l/2 * wscale, 0)
+    make_cube((w,l,w), highlight=True, color=color_blue, edges=False)
+    glPopMatrix()
+    glEndList()
+    return c
+
+def make_gazepoint():
+    c = glGenLists(1)
+    glNewList(c, GL_COMPILE)
+    glPushMatrix()
+    glTranslate(fixation_point[0], fixation_point[1], \
+                fixation_point[2])
+    s = 3.
+    make_cube((s,s,s), highlight=True, color=(1.0, 0.9, 0.1), edges=False)
     glPopMatrix()
     glEndList()
     return c
 
 def make_shapes():
-    global cube1, cube2, cube3, charger, cozmo_robot
+    global axes, gazepoint, cube1, cube2, cube3, charger, cozmo_robot
+    # axes
+    axes = make_axes()
+    # gaze point
+    gazepoint = make_gazepoint()
     # light cubes
     cube1 = make_light_cube(1)
     cube2 = make_light_cube(2)
@@ -232,21 +332,21 @@ def make_shapes():
     cozmo_robot = make_cozmo_robot()
 
 def del_shapes():
-    glDeleteLists(cube1,1)
-    glDeleteLists(cube2,1)
-    glDeleteLists(cube3,1)
-    glDeleteLists(charger,1)
+    if gazepoint: glDeleteLists(gazepoint,1)
+    if axes: glDeleteLists(axes,1)
+    if cube1: glDeleteLists(cube1,1)
+    if cube2: glDeleteLists(cube2,1)
+    if cube3: glDeleteLists(cube3,1)
+    if charger: glDeleteLists(charger,1)
     glDeleteLists(cozmo_robot,1)
 
-initial_fixation_point = [1.1, 2.5, -0.5]
+initial_fixation_point = [1.1, 0, -0.5]
 initial_camera_rotation = [25, 25, 0]
-initial_camera_distance = 7.0
+initial_camera_distance = 10.0
 
 fixation_point = initial_fixation_point.copy()
 camera_rotation = initial_camera_rotation.copy()
 camera_distance = initial_camera_distance
-
-global window_width, window_height
 
 def display():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -269,10 +369,12 @@ def display():
                   camera_distance * cos(radians(heading)) + fixation_point[2]]
     gluLookAt(*camera_loc, *fixation_point, 0.0, 1.0, 0.0)
     make_shapes()
-    glCallList(cube1)
-    glCallList(cube2)
-    glCallList(cube3)
-    glCallList(charger)
+    if axes: glCallList(axes)
+    if gazepoint: glCallList(gazepoint)
+    if cube1: glCallList(cube1)
+    if cube2: glCallList(cube2)
+    if cube3: glCallList(cube3)
+    if charger: glCallList(charger)
     glCallList(cozmo_robot)
     glutSwapBuffers()
     del_shapes()
@@ -289,7 +391,7 @@ def keyboard(key, x, y):
         print("Use 'exit' to quit.")
         #exited = True
         #return
-    global fixation_point, camera_rotation, camera_distance
+    global fixation_point, camera_rotation, camera_distance, show_axes
     heading = -camera_rotation[1]
     if key == b'a':
         fixation_point[0] -= 0.1 * cos(radians(heading))
@@ -297,9 +399,15 @@ def keyboard(key, x, y):
     elif key == b'd':
         fixation_point[0] += 0.1 * cos(radians(heading))
         fixation_point[2] += 0.1 * sin(radians(heading))
-    elif key == b's':
-        camera_distance += 0.1
     elif key == b'w':
+        fixation_point[0] -= 0.1 * cos(radians(heading+90))
+        fixation_point[2] -= 0.1 * sin(radians(heading+90))
+    elif key == b's':
+        fixation_point[0] += 0.1 * cos(radians(heading+90))
+        fixation_point[2] += 0.1 * sin(radians(heading+90))
+    elif key == b'>':
+        camera_distance += 0.1
+    elif key == b'<':
         camera_distance -= 0.1
     elif key == b'j':
         camera_rotation[1] += 5
@@ -309,29 +417,41 @@ def keyboard(key, x, y):
         camera_rotation[0] += 5
     elif key == b'i':
         camera_rotation[0] -= 5
+    elif key == b'x':
+        show_axes = not show_axes
+    elif key == b'h':
+        print(help_text)
+    elif key == b'v':
+        # permute gazepoint coords to match robot instead of OpenGL
+        print('gazepoint[%.1f, %.1f, %.1f]'
+              '  camera[pan=%d, tilt=%d]  distance=%.1f' %
+              (fixation_point[2] / wscale, \
+               -fixation_point[0] / wscale, \
+               fixation_point[1] / wscale, \
+               camera_rotation[1], camera_rotation[0], \
+               camera_distance/wscale))
     elif key == b'z':
         fixation_point = initial_fixation_point.copy()
         camera_rotation = initial_camera_rotation.copy()
         camera_distance = initial_camera_distance
-    #print(fixation_point, camera_rotation)
-    glutPostRedisplay()
+    display()
 
 def special(key, x, y):
     global fixation_point, camera_rotation, camera_distance
     heading = -camera_rotation[1]
     if key == GLUT_KEY_LEFT:
-        camera_rotation[1] += 5
+        camera_rotation[1] = (camera_rotation[1] - 5) % 360
     elif key == GLUT_KEY_RIGHT:
-        camera_rotation[1] -= 5
+        camera_rotation[1] = (camera_rotation[1] + 5) % 360
     elif key == GLUT_KEY_UP:
-        camera_rotation[0] -= 5
-    elif key == GLUT_KEY_DOWN:
         camera_rotation[0] += 5
+    elif key == GLUT_KEY_DOWN:
+        camera_rotation[0] -= 5
     elif key == GLUT_KEY_PAGE_UP:
         fixation_point[1] += 0.1
     elif key == GLUT_KEY_PAGE_DOWN:
-        fixation_point[1] -= -.1
-    glutPostRedisplay()
+        fixation_point[1] -= 0.1
+    display()
 
 def reshape(width, height):
     global window_width, window_height
