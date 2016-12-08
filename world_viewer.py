@@ -19,14 +19,16 @@ Change Log:
         - Up/down arrow motion was reversed; fixed it.
         - Page up/page down only moved in one direction; fixed it.
         - Charger now displayed in two pieces: bed and back wall.
+        - Objects are displayed in wireframe if their pose is no longer valid.
         - Use proper height offsets for robot and charger.
+        - Rename was_visible to is_present since charger may never be seen.
 
 * 12/4/2016: Various improvements.
     Dave Touretzky
         - Add was_visible attribute to determine whether an object has ever been
           visible.  If not, we can't trust its coordinates, and while they will
           initially be (0,0,0) for lightcubes, that is not true for the charger.
-          Only objects with was_visible == True are displayed; they are
+          Only objects with was_present == True are displayed; they are
           highlighted if is_visible == True.
         - Fix aspect ratio in gluPespective call if the window is resized.
         - Some variable renaming and comments added to improve readability.
@@ -45,9 +47,6 @@ Change Log:
 
 To Do:
 ======
-* Use origin_id in place of was_visible and display just the wireframe
-    if a shape no longer has a valid pose.
-* Add 'f' to display fixation point and camera pitch values.
 * Move the scaling and axis swap into the model view so all
     the rest of the code can work in Cozmo world coordinates
     (x-forward, z-up) and millimeter units.
@@ -216,20 +215,20 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
 def make_light_cube(cube_number):
     lcube = robot.world.light_cubes[cube_number]
     # check for dummy pose because of buggy updating of origin_id
-    lcube.was_visible = ( lcube.pose.origin_id > 1 and \
+    lcube.is_present = ( lcube.pose.origin_id > 1 and \
                           not is_dummy_pose(lcube.pose) ) \
-            or lcube.is_visible or lcube.was_visible
-    if not lcube.was_visible: return None
+            or lcube.is_visible or lcube.is_present
+    if not lcube.is_present: return None
     p = lcube.pose.position.x_y_z
     s = light_cube_size_mm
     color = (None, color_red, color_green, color_blue)[cube_number]
-    valid_coords = (lcube.pose.origin_id == robot.pose.origin_id)
+    valid_pose = (lcube.pose.origin_id == robot.pose.origin_id)
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
     glPushMatrix()
     glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
     glRotatef(lcube.pose.rotation.angle_z.degrees, 0, 1, 0)
-    if valid_coords:  # make solid cube and highlight if visible
+    if valid_pose:  # make solid cube and highlight if visible
         make_cube((s,s,s), highlight=lcube.is_visible, color=color)
     else:  # make wireframe if once seen but coords no longer valid
         make_cube((s,s,s), body=False, highlight=True, color=color)
@@ -238,27 +237,37 @@ def make_light_cube(cube_number):
     return c
 
 def make_charger():
+    charger = robot.world.charger
+    charger.is_present = charger.is_present or charger.is_visible or \
+            robot.is_on_charger
+    if not charger.is_present: return None
+    # Bug: charger.pose.origin_id doesn't always update when on charger
+    valid_pose = (charger.pose.origin_id == robot.pose.origin_id) and \
+        not is_dummy_pose(charger.pose)
+    high = charger.is_visible or (robot.is_on_charger and valid_pose)
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
-    charger = robot.world.charger
-    charger.was_visible = charger.was_visible or charger.is_visible or \
-            robot.is_on_charger
-    high = charger.is_visible or \
-        (robot.is_on_charger and charger.pose.origin_id == robot.pose.origin_id)
-    if True or charger.was_visible:
-        p = charger.pose.position.x_y_z
-        glPushMatrix()
-        glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
-        glRotatef(charger.pose.rotation.angle_z.degrees, 0, 1, 0)
-        glTranslatef(0., charger_bed_size_mm[1]/2*wscale,
-                        -charger_bed_size_mm[2]/2*wscale)
-        glRotatef(180, 0, 1, 0) # charger "front" is opposite robot "front"
+    p = charger.pose.position.x_y_z
+    glPushMatrix()
+    glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
+    glRotatef(charger.pose.rotation.angle_z.degrees, 0, 1, 0)
+    glTranslatef(0., charger_bed_size_mm[1]/2*wscale,
+                    -charger_bed_size_mm[2]/2*wscale)
+    glRotatef(180, 0, 1, 0) # charger "front" is opposite robot "front"
+    if valid_pose:
         make_cube(charger_bed_size_mm, highlight=high)
-        glTranslatef(0., \
-               (charger_back_size_mm[1]-charger_bed_size_mm[1])/2*wscale, \
-               charger_bed_size_mm[2]/2*wscale)
+    else:
+        make_cube(charger_bed_size_mm, body=False, \
+                  highlight=False, color=color_white)
+    glTranslatef(0., \
+           (charger_back_size_mm[1]-charger_bed_size_mm[1])/2*wscale, \
+           charger_bed_size_mm[2]/2*wscale)
+    if valid_pose:
         make_cube(charger_back_size_mm, highlight=high)
-        glPopMatrix()
+    else:
+        make_cube(charger_back_size_mm, body=False, \
+                  highlight=False, color=color_white)
+    glPopMatrix()
     glEndList()
     return c
 
@@ -500,7 +509,7 @@ def viewer(_robot):
     robot = _robot
     for obj in robot.world._objects.values():
         try:
-            obj.was_visible = obj.is_visible
+            obj.is_present = obj.is_visible
         except:
             pass
     th = threading.Thread(target=init_display)
