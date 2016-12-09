@@ -11,6 +11,10 @@ Author:  David S. Touretzky, Carnegie Mellon University
 
 Change Log:
 ===========
+* 12/9/2016: Better handling of missing cubes
+    Real Ouellet
+        - Will not crash when one or more cubes are totally missing
+
 * 12/7/2016: More enhancements.
     Dave Touretzky
         - Display coordinate axes and gazepoint dot.
