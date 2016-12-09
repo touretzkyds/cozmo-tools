@@ -15,6 +15,9 @@ class StateNode(EventListener):
         self.parent = None
         self.children = []
 
+    def __repr__(self):
+        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
+
     def start(self,event=None):
         if self.running: return
         super().start()
@@ -57,6 +60,9 @@ class Transition(EventListener):
         self.destinations = []
         self.handle = None
 
+    def __repr__(self):
+        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
+
     def _sibling_check(self,node):
         for sibling in self.sources + self.destinations:
             if sibling.parent is not node.parent:
@@ -90,4 +96,8 @@ class Transition(EventListener):
     def fire(self,event=None):
         self.stop()
         for src in self.sources: src.stop()
-        for dest in self.destinations: dest.start(event=event)
+        #for dest in self.destinations: dest.start(event=event)
+        get_robot().loop.call_later(0.01,self.fire2,event)
+
+    def fire2(self,event):
+        for dest in self.destinations: dest.start(event)

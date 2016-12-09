@@ -1,3 +1,5 @@
+from math import sqrt
+
 from .events import *
 from .base import *
 
@@ -9,32 +11,35 @@ class DriveWheels(StateNode):
         self.l_wheel_speed = l_wheel_speed
         self.r_wheel_speed = r_wheel_speed
 
-    def start(self):
-        super().start(self)
-        robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed)
+    def start(self,event=None):
+        super().start(event)
+        robot = get_robot()
+        self.task_handle = robot.loop.create_task(robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed))
 
     def stop(self):
-        robot.drive_wheels(0, 0)
-        super().stop(self)
+        self.task_handle.cancel()
+        robot = get_robot()
+        robot.loop.create_task(robot.drive_wheels(0, 0))
+        super().stop()
 
 
-class DriveDistance(DriveWheels):
+class DriveForward(DriveWheels):
     def __init__(self, distance=50, speed=50):
         if distance < 0:
             distance = -distance
             speed = -speed
         super().__init__(speed,speed)
         self.distance = distance
-        self.poll_interval = 0.1
+        self.polling_interval = 0.1
 
-    def start(self):
-        super().start()
-        self.start_position = robot.pose.position
+    def start(self,event=None):
+        super().start(event)
+        self.start_position = get_robot().pose.position
 
     def poll(self):
         """See how far we've traveled"""
         p0 = self.start_position
-        p1 = robot.pose.position
+        p1 = get_robot().pose.position
         diff = (p1.x - p0.x, p1.y - p0.y)
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
@@ -78,8 +83,11 @@ class Forward(ActionNode):
 
     def start(self,event=None):
         super().start(event)
-        self.cozmo_action_handle = \
-            get_robot().drive_straight(self.distance,self.speed,**self.kwargs)
+        try:
+            self.cozmo_action_handle = \
+                get_robot().drive_straight(self.distance,self.speed,**self.kwargs)
+        except:
+            raise  # TODO: handle exceptions.RobotBusy
         self.post_when_complete()
 
 

@@ -16,6 +16,12 @@ class CompletionTrans(Transition):
         super().__init__()
         self.count = count
 
+    def __repr__(self):
+        srcs = ','.join(node.name for node in self.sources)
+        dests = ','.join(node.name for node in self.destinations)
+        return '<%s %s: %s=>%s >' % \
+            (self.__class__.__name__, self.name, srcs, dests)
+
     def start(self):
         super().start()
         self.completed = set()

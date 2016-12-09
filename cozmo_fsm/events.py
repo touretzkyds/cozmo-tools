@@ -23,13 +23,14 @@ class Event:
     def __init__(self):
         self.source = None
 
-
 class CompletionEvent(Event):
     """Signals completion of a state node's action."""
     def __init__(self,source):
         super().__init__()
         self.source = source
 
+    def __repr__(self):
+        return '<%s for %s>' % (self.__class__.__name__, self.source.name)
 
 class DataEvent(Event):
     """Signals a data item broadcase by the node."""
@@ -114,7 +115,7 @@ class EventListener:
     """Parent class for both StateNode and Transition."""
     def __init__(self):
         self.running = False
-        self.name = None
+        self.name = 'anon'
         self.polling_interval = None
         self.poll_handle = None
 
@@ -123,20 +124,17 @@ class EventListener:
 
     def start(self):
         self.running = True
-        if polling_interval:
+        if self.polling_interval:
             self.next_poll()
-        print(self,'running')
+        #print(self,'running')
 
     def stop(self):
         self.running = False
-        if self.poll_handle: poll_handle.cancel()
-        print(self,'stopped')
+        if self.poll_handle: self.poll_handle.cancel()
+        #print(self,'stopped')
 
     def handle_event(self, event):
-        if not self.running:
-            print('Handler',self,'not running, but received',event)
-        else:
-            pass
+        pass
 
     def set_polling_interval(self,interval):
         if isinstance(interval, (int,float)):
