@@ -215,10 +215,10 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
 def make_light_cube(cube_number):
     lcube = robot.world.light_cubes[cube_number]
     # check for dummy pose because of buggy updating of origin_id
-    lcube.is_present = ( lcube.pose.origin_id > 1 and \
-                          not is_dummy_pose(lcube.pose) ) \
-            or lcube.is_visible or lcube.is_present
+    if not hasattr(lcube, 'is_present'):
+        lcube.is_present = lcube.is_visible or ( lcube.object_id != None and lcube.pose.origin_id > 1 )
     if not lcube.is_present: return None
+    if is_dummy_pose(lcube.pose): return None
     p = lcube.pose.position.x_y_z
     s = light_cube_size_mm
     color = (None, color_red, color_green, color_blue)[cube_number]
