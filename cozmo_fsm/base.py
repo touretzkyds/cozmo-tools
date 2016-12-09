@@ -15,8 +15,8 @@ class StateNode(EventListener):
         self.parent = None
         self.children = []
 
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
+#    def __repr__(self):
+#        return '<' + self.__class__.__name__ + ' ' + self.name + '>'
 
     def start(self,event=None):
         if self.running: return
@@ -60,8 +60,8 @@ class Transition(EventListener):
         self.destinations = []
         self.handle = None
 
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
+#    def __repr__(self):
+#        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
 
     def _sibling_check(self,node):
         for sibling in self.sources + self.destinations:
