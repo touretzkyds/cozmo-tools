@@ -3,9 +3,51 @@ from .base import *
 
 from cozmo.util import distance_mm, speed_mmps, degrees
 
+class DriveWheels(StateNode):
+    def __init__(self,l_wheel_speed,r_wheel_speed):
+        super().__init__()
+        self.l_wheel_speed = l_wheel_speed
+        self.r_wheel_speed = r_wheel_speed
+
+    def start(self):
+        super().start(self)
+        robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed)
+
+    def stop(self):
+        robot.drive_wheels(0, 0)
+        super().stop(self)
+
+
+class DriveDistance(DriveWheels):
+    def __init__(self, distance=50, speed=50):
+        if distance < 0:
+            distance = -distance
+            speed = -speed
+        super().__init__(speed,speed)
+        self.distance = distance
+        self.poll_interval = 0.1
+
+    def start(self):
+        super().start()
+        self.start_position = robot.pose.position
+
+    def poll(self):
+        """See how far we've traveled"""
+        p0 = self.start_position
+        p1 = robot.pose.position
+        diff = (p1.x - p0.x, p1.y - p0.y)
+        dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
+        if dist >= self.distance:
+            self.post_completion()
+        else:
+            self.next_poll()
+
+
+#________________ Action Nodes ________________
+
 class ActionNode(StateNode):
-    def __init__(self,name):
-        super().__init__(name)
+    def __init__(self):
+        super().__init__()
         self.cozmo_action_handle = None
 
     def post_when_complete(self):
@@ -23,9 +65,9 @@ class ActionNode(StateNode):
 
 
 class Forward(ActionNode):
-    def __init__(self, name, distance=distance_mm(50),
+    def __init__(self, distance=distance_mm(50),
                  speed=speed_mmps(50), **kwargs):
-        super().__init__(name)
+        super().__init__()
         if isinstance(distance,int) or isinstance(distance,float):
             distance = distance_mm(distance)
         if isinstance(speed,int) or isinstance(speed,float):
@@ -42,10 +84,10 @@ class Forward(ActionNode):
 
 
 class Turn(ActionNode):
-    def __init__(self, name, angle=degrees(90)):
+    def __init__(self, angle=degrees(90)):
         if isinstance(angle,int) or isinstance(angle,float):
             angle = degrees(angle)
-        super().__init__(name)
+        super().__init__()
         self.angle = angle
 
     def start(self,event=None):
@@ -56,8 +98,8 @@ class Turn(ActionNode):
 
 class Say(ActionNode):
     """Speaks some text, then posts a completion event."""
-    def __init__(self, name, text, **kwargs):
-        super().__init__(name)
+    def __init__(self, text, **kwargs):
+        super().__init__()
         self.text = text
         self.kwargs = kwargs
 

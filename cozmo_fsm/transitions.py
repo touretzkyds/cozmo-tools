@@ -2,6 +2,9 @@ from .events import *
 from .base import *
 
 class NullTrans(Transition):
+    def __init__(self):
+        super().__init__()
+
     def start(self):
         super().start()
         get_robot().loop.call_soon(self.fire)
@@ -9,8 +12,8 @@ class NullTrans(Transition):
 
 class CompletionTrans(Transition):
     """Transition fires when a source node completes."""
-    def __init__(self,name,count=None):
-        super().__init__(name)
+    def __init__(self,count=None):
+        super().__init__()
         self.count = count
 
     def start(self):
@@ -36,8 +39,8 @@ class CompletionTrans(Transition):
 
 class TimerTrans(Transition):
     """Transition fires when the timer has expired."""
-    def __init__(self,name,duration):
-        super().__init__(name)
+    def __init__(self,duration):
+        super().__init__()
         self.duration = duration
 
     def start(self):
@@ -55,8 +58,8 @@ class TimerTrans(Transition):
 
 class SignalTrans(Transition):
     """Transition fires when value matches."""
-    def __init__(self,name,value=None):
-        super().__init__(name)
+    def __init__(self,value=None):
+        super().__init__()
         self.value = value
 
     def start(self):

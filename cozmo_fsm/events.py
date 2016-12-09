@@ -114,13 +114,22 @@ class EventListener:
     """Parent class for both StateNode and Transition."""
     def __init__(self):
         self.running = False
+        self.name = None
+        self.polling_interval = None
+        self.poll_handle = None
+
+    def set_name(self,name):
+        self.name = name
 
     def start(self):
         self.running = True
+        if polling_interval:
+            self.next_poll()
         print(self,'running')
 
     def stop(self):
         self.running = False
+        if self.poll_handle: poll_handle.cancel()
         print(self,'stopped')
 
     def handle_event(self, event):
@@ -129,3 +138,17 @@ class EventListener:
         else:
             pass
 
+    def set_polling_interval(self,interval):
+        if isinstance(interval, (int,float)):
+            self.polling_interval = interval
+        else:
+            raise TypeError('interval must be a number')
+
+    def next_poll(self):
+        """Call this to schedule the next polling interval."""
+        self.poll_handle = \
+            get_robot().loop.call_later(self.polling_interval, self.poll)
+
+    def poll(self):
+        """Dummy polling function in case sublass neglects to supply one."""
+        print('%s has no poll() method' % self)

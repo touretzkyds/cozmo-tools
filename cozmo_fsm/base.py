@@ -9,9 +9,8 @@ from .events import *
 
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
-    def __init__(self, _name):
+    def __init__(self):
         super().__init__()
-        self.name = _name
         self.transitions = []
         self.parent = None
         self.children = []
@@ -20,7 +19,7 @@ class StateNode(EventListener):
         if self.running: return
         super().start()
         # Start transitions before children, because children
-        # may post a completion event for their parent.
+        # may post an event that we're listening for (like completion).
         for t in self.transitions: t.start()
         if self.children:
             self.children[0].start()
@@ -28,6 +27,8 @@ class StateNode(EventListener):
     def stop(self):
         if not self.running: return
         super().stop()
+        # Stop children before transitions, because a child's stop()
+        # method could post an event we want to handle.
         for c in self.children: c.stop()
         for t in self.transitions: t.stop()
 
@@ -50,9 +51,8 @@ class StateNode(EventListener):
 
 class Transition(EventListener):
     """Base class for transitions: does nothing."""
-    def __init__(self, _name):
+    def __init__(self):
         super().__init__()
-        self.name = _name
         self.sources = []
         self.destinations = []
         self.handle = None
