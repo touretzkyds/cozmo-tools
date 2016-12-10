@@ -82,7 +82,7 @@ Author:     David S. Touretzky, Carnegie Mellon University
 Changelog
 =========
 * 12/10/2016:  Add runfsm('myfsm') to re-load and run a state machine.
-        Real Oulette and Dave Touretzky
+        Real Ouellet and Dave Touretzky
             - Imports the module if it's not already loaded, else reloads it.
             - Then does myfsm.run(robot) to run the state machine.
 
