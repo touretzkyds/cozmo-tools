@@ -215,7 +215,7 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
 def make_light_cube(cube_number):
     lcube = robot.world.light_cubes[cube_number]
     # check for dummy pose because of buggy updating of origin_id
-    lcube.is_present = ( lcube.pose.origin_id > 1 and \
+    lcube.is_present = (lcube.pose and lcube.pose.origin_id > 1 and \
                           not is_dummy_pose(lcube.pose) ) \
             or lcube.is_visible or lcube.is_present
     if not lcube.is_present: return None
@@ -507,7 +507,12 @@ def viewer(_robot):
         RUNNING = True
     global robot
     robot = _robot
-    for obj in robot.world._objects.values():
+    # Missing lightcubes are still in world.light_cubes but not in
+    # world._objects. Being overly inclusive here in case more
+    # object types are added later.
+    for obj in set(robot.world._objects.values()) \
+            .union(set(robot.world.light_cubes.values())) \
+                .union(set([robot.world.charger])):
         try:
             obj.is_present = obj.is_visible
         except:

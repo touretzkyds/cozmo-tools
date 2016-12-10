@@ -66,22 +66,11 @@ Available CLI commands:
         Turn off monitoring
 
     viewer(robot)
-        Start a 3D real-time model of the World around Cozmo
+        Start a 3D real-time model of the World around Cozmo.  See the
+        world_viewer documentation for a list of commands.
 
-        Keyboard commands available in the World Window:
-          a          Translate left
-          d          Translate right
-          w          Translate forward
-          s          Translate backward
-          page-up    Translate up
-          page-down  Translate down
-
-          left-arrow   Rotate left
-          right-arrow  Rotate right
-          up-arrow     Rotate upward
-          down-arrow   Rotate downward
-
-          z          Reset view
+    runfsm(module_name)
+        Imports or reloads a state machine module and runs the state machine.
 
 *********
 
@@ -92,7 +81,12 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
-*   Provide useful user-visible variables.
+* 12/10/2016:  Add runfsm('myfsm') to re-load and run a state machine.
+        Real Oulette and Dave Touretzky
+            - Imports the module if it's not already loaded, else reloads it.
+            - Then does myfsm.run(robot) to run the state machine.
+
+* 12/04/2016:  Provide useful user-visible variables.
         Dave Touretzky
             - Added charger, cube1-cube3, light_cubes, and world.
             - Announce these variables on start-up.
@@ -141,14 +135,16 @@ import platform
 import code
 import traceback
 import time
-import cozmo
-from cozmo.util import *
+import os 
+from importlib import __import__, reload
 
 # This should be in your '.pythonstartup' file, but I put it also here just in case...
 import readline 
 import rlcompleter 
 import atexit 
-import os 
+
+import cozmo
+from cozmo.util import *
 
 from event_monitor import monitor, unmonitor
 
@@ -198,6 +194,14 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
                          ):
     pass
 
+# runfsm('myfsm') will import or reload myfsm and then do myfsm.run(robot)
+def runfsm(module_name, running_modules=dict()):
+    """"runfsm('modname') reloads that module and calls its run() function."""
+    try:
+        reload(running_modules[module_name])
+    except:
+        running_modules[module_name] = __import__(module_name)
+    running_modules[module_name].run(robot)
 
 
 def run(sdk_conn):
@@ -209,7 +213,7 @@ def run(sdk_conn):
 
 def cli_loop(robot):
     global ans, RUNNING
-    charger_warned = False
+    cli_loop.charger_warned = False
 
     world = robot.world
     light_cubes = robot.world.light_cubes
@@ -226,11 +230,11 @@ def cli_loop(robot):
         cli_loop._line = ''
         while cli_loop._line == '':
             if robot.is_on_charger:
-                if not charger_warned:
+                if not cli_loop.charger_warned:
                     print("On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
-                    charger_warned = True
+                    cli_loop.charger_warned = True
             else:
-                charger_warned = False
+                cli_loop.charger_warned = False
             if os_version == 'Darwin':   # Tkinter breaks console on Macs
                 print('c> ', end='')
                 cli_loop._line = sys.stdin.readline().strip()
