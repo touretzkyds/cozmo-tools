@@ -92,6 +92,13 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+*   Allow running imported modules repeatedly
+        Real Ouellet
+            - The 'go' function allows to load and run modules repeatedly.
+              'go("test1")' , for example, will either import the "test1" module or reload it. 
+              Then it will call "test1.run(robot)" automatically.
+              Simply doing 'go("test1")' again will reload and re-run the module.
+
 *   Provide useful user-visible variables.
         Dave Touretzky
             - Added charger, cube1-cube3, light_cubes, and world.
@@ -143,6 +150,7 @@ import traceback
 import time
 import cozmo
 from cozmo.util import *
+from importlib import *
 
 # This should be in your '.pythonstartup' file, but I put it also here just in case...
 import readline 
@@ -178,6 +186,9 @@ res = 0
 ans = None
 RUNNING = True
 
+global running_modules
+running_modules={}
+
 # Helper class for TCP requests
 # The TCP CLI is handled here.
 class ThreadedExecRequestHandler( socketserver.BaseRequestHandler ):
@@ -198,7 +209,13 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
                          ):
     pass
 
-
+def go(module):
+    global running_modules
+    try:
+        reload(running_modules[module])
+    except:
+        running_modules[module] = __import__(module)
+    running_modules[module].run(robot)
 
 def run(sdk_conn):
     global robot
