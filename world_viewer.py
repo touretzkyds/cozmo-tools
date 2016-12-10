@@ -13,7 +13,7 @@ Change Log:
 ===========
 * 12/7/2016: More enhancements.
     Dave Touretzky
-        - Display coordinate axes and gazepoint dot.
+        - Display coordinate axes and show the gazepoint as a yellow dot.
         - 'x' command toggles axes; 'h' prints help, 'v' displays viewpoint.
         - 'w' and 's' now translate; '<' and '>' zoom.
         - Up/down arrow motion was reversed; fixed it.
