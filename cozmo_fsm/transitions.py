@@ -23,17 +23,15 @@ class CompletionTrans(Transition):
             (self.__class__.__name__, self.name, srcs, dests)
 
     def start(self):
+        if self.running: return
         super().start()
         self.completed = set()
         for source in self.sources:
             erouter.add_listener(self,CompletionEvent,source)
 
-    def stop(self):
-        super().stop()
-        for source in self.sources:
-            erouter.remove_listener(self,CompletionEvent,source)
-
     def handle_event(self,event):
+        print(self,'is handling',event)
+        if not self.running: return
         super().handle_event(event)
         if isinstance(event,CompletionEvent):
             self.completed.add(event.source)

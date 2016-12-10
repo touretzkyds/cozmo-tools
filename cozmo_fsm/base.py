@@ -16,14 +16,16 @@ class StateNode(EventListener):
         self.children = []
 
     def __repr__(self):
-        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
+        return '<%s %s>' % (self.__class__.__name__, self.name)
 
     def start(self,event=None):
         if self.running: return
         super().start()
         # Start transitions before children, because children
         # may post an event that we're listening for (like completion).
-        for t in self.transitions: t.start()
+        for t in self.transitions:
+            # print(self,'starting',t)
+            t.start()
         if self.children:
             self.children[0].start()
 
@@ -49,6 +51,7 @@ class StateNode(EventListener):
         parent.children.append(self)
 
     def post_completion(self):
+        print(self,'posting completion')
         erouter.post(CompletionEvent(self))
 
 
@@ -61,7 +64,7 @@ class Transition(EventListener):
         self.handle = None
 
     def __repr__(self):
-        return '<' + self.__class__.__name__ + ' ' + self.get_name() + '>'
+        return '<%s %s>' % (self.__class__.__name__, self.name)
 
     def _sibling_check(self,node):
         for sibling in self.sources + self.destinations:
@@ -88,16 +91,25 @@ class Transition(EventListener):
 
     def stop(self):
         if not self.running: return
-        if self.handle is not None:
+        # don't stop if we still have a live source
+        for src in self.sources:
+            if src.running:
+                # print(self,'saved from stopping by',src)
+                return
+        if self.handle:
             print(self.name,'cancelling',self.handle)
             self.handle.cancel()
         super().stop()
 
     def fire(self,event=None):
+        for src in self.sources:
+            # print(self,'fire is stopping',src)
+            src.stop()
         self.stop()
-        for src in self.sources: src.stop()
-        #for dest in self.destinations: dest.start(event=event)
-        get_robot().loop.call_later(0.01,self.fire2,event)
+        action_cancel_delay = 0.1  # wait for source node action cancellations to take effect
+        get_robot().loop.call_later(action_cancel_delay, self.fire2,event)
 
     def fire2(self,event):
-        for dest in self.destinations: dest.start(event)
+        for dest in self.destinations:
+            # print(self,'fire2 is starting',dest)
+            dest.start(event)

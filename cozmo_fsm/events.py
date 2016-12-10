@@ -54,10 +54,11 @@ class EventRouter:
     def __init__(self):
         self.dispatch_table = dict(
                {
-                CompletionEvent : dict() ,
-        TapEvent : dict()
+                  CompletionEvent : dict() ,
+                  TapEvent : dict()
                }
             )
+        self.listener_registry = dict()   # indexed by listener
 
     def start(self):
         pass
@@ -75,6 +76,9 @@ class EventRouter:
         handlers.append(listener.handle_event)
         source_dict[source] = handlers
         self.dispatch_table[event_type] = source_dict
+        reg_entry = self.listener_registry.get(listener,[])
+        reg_entry.append((event_type,source))
+        self.listener_registry[listener] = reg_entry
 
     def remove_listener(self, listener, event_type, source):
         if not issubclass(event_type, Event):
@@ -84,7 +88,15 @@ class EventRouter:
         handlers = source_dict.get(source, None)
         if handlers is None: return
         try:
+            # print('erouter removing',listener,'for',event_type,source)
             handlers.remove(listener.handle_event)
+        except: pass
+
+    def remove_all_listener_entries(self, listener):
+        for event_type, source in erouter.listener_registry.get(listener,[]):
+            erouter.remove_listener(listener, event_type, source)
+        try:
+            del erouter.listener_registry[listener]
         except: pass
 
     def _get_listeners(self,event):
@@ -104,7 +116,7 @@ class EventRouter:
         if not isinstance(event,Event):
             raise TypeError('%s is not an Event' % event)
         for listener in self._get_listeners(event):
-            #print('scheduling',listener,'on',event)
+            # print('scheduling',listener,'on',event)
             get_robot().loop.call_soon(listener,event)
 
 erouter = EventRouter()
@@ -115,7 +127,8 @@ class EventListener:
     """Parent class for both StateNode and Transition."""
     def __init__(self):
         self.running = False
-        self.name = 'anon'
+        rep = object.__repr__(self)
+        self.name = rep[1+rep.rfind(' '):-1]  # name defaults to hex address
         self.polling_interval = None
         self.poll_handle = None
 
@@ -129,8 +142,10 @@ class EventListener:
         #print(self,'running')
 
     def stop(self):
+        if not self.running: return
         self.running = False
         if self.poll_handle: self.poll_handle.cancel()
+        erouter.remove_all_listener_entries(self)
         #print(self,'stopped')
 
     def handle_event(self, event):

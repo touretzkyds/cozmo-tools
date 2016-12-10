@@ -61,7 +61,9 @@ class ActionNode(StateNode):
     async def wait_for_completion(self):
         async_task = self.cozmo_action_handle.wait_for_completed()
         await async_task
-        self.post_completion()
+        print('done awaiting',self.cozmo_action_handle)
+        if self.running:
+            self.post_completion()
 
     def stop(self):
         if self.cozmo_action_handle and self.cozmo_action_handle.is_running:
