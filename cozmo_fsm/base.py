@@ -1,25 +1,26 @@
 """
     Base classes StateNode for nodes.py and Transition for
     transitions.py are placed here due to circular dependencies.
+    Their parent class EventListener is imported from erouter.py.
 
 """
 
-from .events import *
-
+from .trace import TRACE
+from .erouter import EventListener, erouter, get_robot, set_robot
+from .events import CompletionEvent, FailureEvent
 
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self):
         super().__init__()
-        self.transitions = []
         self.parent = None
         self.children = []
-
-    def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.name)
+        self.transitions = []
 
     def start(self,event=None):
         if self.running: return
+        if TRACE.trace_level >= TRACE.statenode_start:
+            print('TRACE%d:' % TRACE.statenode_start, self, 'starting')
         super().start()
         # Start transitions before children, because children
         # may post an event that we're listening for (like completion).
@@ -31,6 +32,8 @@ class StateNode(EventListener):
 
     def stop(self):
         if not self.running: return
+        if TRACE.trace_level >= TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop, self, 'stopping')
         super().stop()
         # Stop children before transitions, because a child's stop()
         # method could post an event we want to handle.
@@ -51,8 +54,14 @@ class StateNode(EventListener):
         parent.children.append(self)
 
     def post_completion(self):
-        print(self,'posting completion')
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting completion')
         erouter.post(CompletionEvent(self))
+
+    def post_failure(self,details=None):
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting failure', details)
+        erouter.post(FailureEvent(self,details))
 
 
 class Transition(EventListener):
@@ -64,7 +73,10 @@ class Transition(EventListener):
         self.handle = None
 
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.name)
+        srcs = ','.join(node.name for node in self.sources)
+        dests = ','.join(node.name for node in self.destinations)
+        return '<%s %s: %s=>%s >' % \
+            (self.__class__.__name__, self.name, srcs, dests)
 
     def _sibling_check(self,node):
         for sibling in self.sources + self.destinations:
@@ -86,6 +98,8 @@ class Transition(EventListener):
 
     def start(self):
         if self.running: return
+        if TRACE.trace_level >= TRACE.transition_startstop:
+            print('TRACE%d:' % TRACE.transition_startstop, self, 'starting')
         super().start()
         self.handle = None
 
@@ -96,17 +110,24 @@ class Transition(EventListener):
             if src.running:
                 # print(self,'saved from stopping by',src)
                 return
+        if TRACE.trace_level >= TRACE.transition_startstop:
+            print('TRACE%d:' % TRACE.transition_startstop, self, 'stopping')
         if self.handle:
-            print(self.name,'cancelling',self.handle)
+            print('****',self.name,'cancelling',self.handle)
             self.handle.cancel()
         super().stop()
 
     def fire(self,event=None):
+        if TRACE.trace_level >= TRACE.transition_fire:
+            if event == None:
+                evt_desc = ''
+            else:
+                evt_desc = ' on %s' % event
+            print('TRACE%d:' % TRACE.transition_fire, self, 'firing'+evt_desc)
         for src in self.sources:
-            # print(self,'fire is stopping',src)
             src.stop()
         self.stop()
-        action_cancel_delay = 0.1  # wait for source node action cancellations to take effect
+        action_cancel_delay = 0.001  # wait for source node action cancellations to take effect
         get_robot().loop.call_later(action_cancel_delay, self.fire2,event)
 
     def fire2(self,event):

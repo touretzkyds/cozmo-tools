@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -i
-'''
+"""
 
 Simple Cozmo CLI
 ================
@@ -81,6 +81,10 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+* 12/11/2016: Imported TRACE from cozmo_fsm.trace
+        Dave Touretzky
+            - Allows user to set TRACE.trace_level before calling runfsm
+
 * 12/10/2016:  Add runfsm('myfsm') to re-load and run a state machine.
         Real Ouellet and Dave Touretzky
             - Imports the module if it's not already loaded, else reloads it.
@@ -124,7 +128,7 @@ Changelog
         Dave Touretzky
             - Not thread-safe but works much more smoothly.
 
-'''
+"""
 
 # All that stuff we really need in order to get going.
 import threading
@@ -149,10 +153,13 @@ from cozmo.util import *
 from event_monitor import monitor, unmonitor
 
 try:
+    from cozmo_fsm.trace import TRACE
+except: pass
+
+try:
     import world_viewer
     from world_viewer import viewer
-except:
-    pass
+except: pass
 
 # tab completion 
 readline.parse_and_bind('tab: complete') 
@@ -196,7 +203,7 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
 
 # runfsm('myfsm') will import or reload myfsm and then do myfsm.run(robot)
 def runfsm(module_name, running_modules=dict()):
-    """"runfsm('modname') reloads that module and calls its run() function."""
+    """runfsm('modname') reloads that module and calls its run() function."""
     try:
         reload(running_modules[module_name])
     except:

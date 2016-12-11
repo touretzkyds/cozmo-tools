@@ -1,12 +1,17 @@
-from .events import *
+from .erouter import get_robot
 from .base import *
+from .events import *
 
 class NullTrans(Transition):
+    """Transition fires immediately; does not require an event to trigger it."""
     def __init__(self):
         super().__init__()
 
     def start(self):
+        if self.running: return
         super().start()
+        # Don't fire immediately on start because the source node(s) may
+        # have other startup calls to make. Give them time to finish.
         get_robot().loop.call_soon(self.fire)
 
 
@@ -16,26 +21,21 @@ class CompletionTrans(Transition):
         super().__init__()
         self.count = count
 
-    def __repr__(self):
-        srcs = ','.join(node.name for node in self.sources)
-        dests = ','.join(node.name for node in self.destinations)
-        return '<%s %s: %s=>%s >' % \
-            (self.__class__.__name__, self.name, srcs, dests)
-
     def start(self):
         if self.running: return
         super().start()
-        self.completed = set()
+        self.completed_sources = set()
         for source in self.sources:
             erouter.add_listener(self,CompletionEvent,source)
 
     def handle_event(self,event):
-        print(self,'is handling',event)
         if not self.running: return
+        if TRACE.trace_level >= TRACE.listener_invocation:
+            print('TRACE:',self,'is handling',event)
         super().handle_event(event)
         if isinstance(event,CompletionEvent):
-            self.completed.add(event.source)
-            if len(self.completed) >= (self.count or len(self.sources)):
+            self.completed_sources.add(event.source)
+            if len(self.completed_sources) >= (self.count or len(self.sources)):
                 self.fire(event)
         else:
             raise ValueError("CompletionTrans can't handle %s" % event)
@@ -43,21 +43,32 @@ class CompletionTrans(Transition):
 
 class TimerTrans(Transition):
     """Transition fires when the timer has expired."""
-    def __init__(self,duration):
+    def __init__(self,duration=None):
+        if not isinstance(duration, (int, float)) or duration < 0:
+            raise ValueError("TimerTrans requires a positive number for duration, not %s" % duration)
         super().__init__()
-        self.duration = duration
+        self.set_polling_interval(duration)
 
-    def start(self):
-        super().start()
-        self.handle = get_robot().loop.call_later(self.duration, self.fire)
+    def poll(self):
+        self.fire()
 
-    def stop(self):
-        super().stop()
 
-    def fire(self):
-        print(self.name,'trying to fire')
-        if not self.running: return
-        super().fire()
+class TapTrans(Transition):
+    """Transition fires when a cube is tapped."""
+    def __init__(self,cube=None):
+        super().__init__()
+        self.cube = cube
+
+    def start(self,event):
+        if self.running: return
+        super().start(event)
+        erouter.add_listener(self,TapEvent,cube)
+
+    def handle_event(self,event):
+        if self.cube:
+            self.fire(event)
+        else:
+            self.handle = get_robot().loop.call_later(0.1, self.fire, event)
 
 
 class SignalTrans(Transition):
@@ -67,14 +78,10 @@ class SignalTrans(Transition):
         self.value = value
 
     def start(self):
+        if self.running: return
         super().start()
         for source in self.sources:
             erouter.add_listener(self,DataEvent,self.value)
-
-    def stop(self):
-        for source in self.sources:
-            erouter.remove_listener(self,DataEvent,source)
-        super.stop()
 
     def handle_event(self,event):
         super().handle_event(event)
