@@ -134,6 +134,7 @@ Changelog
 import threading
 import socket
 import socketserver
+import signal
 import sys
 import platform
 import code
@@ -294,8 +295,12 @@ def reconnect():
         sys.exit("A connection error occurred: %s" % e)
 
 
+def signal_handler(signal, frame):
+        print('Please use "exit" to quit.')
 
 if __name__ == '__main__':
+
+    signal.signal(signal.SIGINT, signal_handler)
 
     # Fair warning
     if os_version == 'Darwin':
