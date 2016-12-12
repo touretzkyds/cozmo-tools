@@ -52,6 +52,7 @@ class StateNode(EventListener):
             raise Exception('parent already set')
         self.parent = parent
         parent.children.append(self)
+        return self
 
     def post_completion(self):
         if TRACE.trace_level > TRACE.statenode_startstop:

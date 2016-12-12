@@ -24,6 +24,8 @@ class Event:
     """Base class for all events."""
     def __init__(self):
         self.source = None
+    cozmo_evt_type = None
+    def generator(self,cozmo_evt): pass
 
 
 #________________ Event Router ________________
@@ -31,21 +33,24 @@ class Event:
 class EventRouter:
     """An event router drives the state machine."""
     def __init__(self):
-        self.dispatch_table = dict()      # indexed by event class
-        self.listener_registry = dict()   # indexed by listener
-
-    def start(self):
-        pass
-        ### TODO: add a handler for cube tap API events
-
-    def stop(self):
-        pass
-        ### TODO: remove all handlers for API events
+        # dispatch_table: event_class -> (source,listener)...
+        self.dispatch_table = dict()
+        # listener_registry: listener -> (event_class, source)...
+        self.listener_registry = dict()
 
     def add_listener(self, listener, event_type, source):
         if not issubclass(event_type, Event):
             raise TypeError('% is not an Event' % event_type)
-        source_dict = self.dispatch_table.get(event_type, dict())
+        source_dict = self.dispatch_table.get(event_type)
+        if source_dict is None:
+            source_dict = dict()
+            # start a cozmo event handler if this event type requires one
+            if event_type.cozmo_evt_type:
+                type = event_type.cozmo_evt_type
+                if not issubclass(type, cozmo.event.Event):
+                    raise ValueError('%s cozmo_evt_type %s not a subclass of cozmo.event.Event' % (event_type, type))
+                world = get_robot().world
+                world.add_event_handler(type, event_class.generator)
         handlers = source_dict.get(source, [])
         handlers.append(listener.handle_event)
         source_dict[source] = handlers
@@ -57,14 +62,23 @@ class EventRouter:
     def remove_listener(self, listener, event_type, source):
         if not issubclass(event_type, Event):
             raise TypeError('% is not an Event' % event_type)
-        source_dict = self.dispatch_table.get(event_type, None)
+        source_dict = self.dispatch_table.get(event_type)
         if source_dict is None: return
-        handlers = source_dict.get(source, None)
+        handlers = source_dict.get(source)
         if handlers is None: return
         try:
             # print('erouter removing',listener,'for',event_type,source)
             handlers.remove(listener.handle_event)
         except: pass
+        if handlers == []:
+            del source_dict[source]
+        if len(source_dict) == 0:   # no one listening for this event
+            del self.dispatch_table[event_type]
+            # remove the cozmo event handler if there was one
+            if event_type.cozmo_evt_type:
+                world = get_robot().world
+                type = event_type.cozmo_evt_type
+                world.remove_event_handler(type, event_class.generator)
 
     def remove_all_listener_entries(self, listener):
         for event_type, source in erouter.listener_registry.get(listener,[]):
@@ -111,7 +125,10 @@ class EventListener:
         return '<%s %s>' % (self.__class__.__name__, self.name)
 
     def set_name(self,name):
+        if not isinstance(name,str):
+            raise ValueError('name must be a string, not %s' % name)
         self.name = name
+        return self
 
     def start(self):
         self.running = True

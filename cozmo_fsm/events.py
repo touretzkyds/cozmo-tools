@@ -29,15 +29,21 @@ class FailureEvent(Event):
         return '<%s for %s: %s>' % (self.__class__.__name__, self.source.name, reason)
 
 class DataEvent(Event):
-    """Signals a data item broadcase by the node."""
+    """Signals a data item broadcasted by the node."""
     def __init__(self,value):
         super().__init__()
         self.source = value
 
+#________________ Cozmo-generated events ________________
+
 class TapEvent(Event):
-    """Signals detection of a tap on a light cube."""
-    def __init__(self,cube,intensity,duration):
+    """Signals detection of a tap on an object."""
+    def __init__(self,cozmo_evt):
         super().__init__()
-        self.source = cube
-        self.intensity = intensity
-        self.duration = duration
+        self.cozmo_evt = cozmo_evt
+        #self.intensity = intensity
+        #self.duration = duration
+    cozmo_evt_type = cozmo.event.EvtObjectTapped
+    def generator(self,cozmo_event):
+        our_event = TapEvent(cozmo_evt)
+        erouter.post(our_event)
