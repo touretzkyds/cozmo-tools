@@ -1,3 +1,8 @@
+"""
+  This FSM demo shows Cozmo responding to cube tap events. The
+  TapTrans transition is used to set up an event listener for taps.
+"""
+
 try:
     from cozmo_fsm import *
 except:
