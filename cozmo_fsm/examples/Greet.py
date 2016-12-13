@@ -1,3 +1,9 @@
+"""
+  This FSM demo makes Cozmo say 'Greetings, human!'  After he's
+  finished speaking, he waits 5 seconds, and then say 'Bye-bye now'.
+  This demonstrates the CompletionTrans and TimerTrans transitions.
+"""
+
 try:
     from cozmo_fsm import *
 except:
