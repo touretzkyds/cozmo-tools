@@ -176,7 +176,6 @@ os_version = platform.system()
 del platform
 
 
-global res, ans, RUNNING
 res = 0
 ans = None
 RUNNING = True
@@ -201,14 +200,18 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
                          ):
     pass
 
-# runfsm('myfsm') will import or reload myfsm and then do myfsm.run(robot)
+running_fsm = None
+
 def runfsm(module_name, running_modules=dict()):
-    """runfsm('modname') reloads that module and calls its run() function."""
+    """runfsm('modname') reloads that module and calls its setup_fsm() function."""
+    global running_fsm
     try:
         reload(running_modules[module_name])
     except:
         running_modules[module_name] = __import__(module_name)
-    running_modules[module_name].run(robot)
+    running_fsm = running_modules[module_name].setup_fsm(robot)
+    robot.loop.call_soon(running_fsm.start)
+    return running_fsm
 
 
 def run(sdk_conn):
@@ -229,8 +232,8 @@ def cli_loop(robot):
     cube3 = light_cubes[3]
     charger = robot.world.charger
     exec("print();print('Variables:', dir())")
-
     cli_loop._console = code.InteractiveConsole()
+
     while True:
         if RUNNING == False:
             return
@@ -242,15 +245,19 @@ def cli_loop(robot):
                     cli_loop.charger_warned = True
             else:
                 cli_loop.charger_warned = False
-            if os_version == 'Darwin':   # Tkinter breaks console on Macs
-                print('c> ', end='')
-                cli_loop._line = sys.stdin.readline().strip()
-            else:
-                cli_loop._line = cli_loop._console.raw_input('C> ').strip()
+            try:
+                if os_version == 'Darwin':   # Tkinter breaks console on Macs
+                    print('c> ', end='')
+                    cli_loop._line = sys.stdin.readline().strip()
+                else:
+                    cli_loop._line = cli_loop._console.raw_input('C> ').strip()
+            except EOFError:
+                print("EOF.\nType 'exit' to exit.\n")
+                continue
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
-           cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
-           cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
+               cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
+               cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
             # Can't use assignment to capture a return value, so None.
             ans = None
         elif cli_loop._line[0:6] == 'await ':
@@ -267,15 +274,18 @@ def cli_loop(robot):
         else:
             cli_loop._line = 'global ans, res; ans=' + cli_loop._line
         try:
+            print("Executing '%s'" % cli_loop._line)
             exec(cli_loop._line)
             if cli_loop._do_await:
                 print("Can't use await outside of an async def.")
                 ans = None # ans = await ans
             if not ans is None:
                 print(ans,end='\n\n')
+        except KeyboardInterrupt: raise
         except Exception:
             traceback.print_exc()
             print()
+
 
 logging_is_setup = False
 
@@ -319,5 +329,13 @@ if __name__ == '__main__':
     
     # Start doing nothing until not anymore ...
     while RUNNING:
-        time.sleep(1)
-
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            if running_fsm:
+                print('\nKeyboardInterrupt: stopping', running_fsm.name)
+                running_fsm.stop()
+                running_fsm = None
+            else:
+                print("\nKeyboardInterrupt. Type 'exit' to exit.")
+            print('\nC> ',end='')

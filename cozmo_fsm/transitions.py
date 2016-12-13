@@ -7,9 +7,9 @@ class NullTrans(Transition):
     def __init__(self):
         super().__init__()
 
-    def start(self):
+    def start(self,event=None):
         if self.running: return
-        super().start()
+        super().start(event)
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
         get_robot().loop.call_soon(self.fire)
@@ -21,9 +21,9 @@ class CompletionTrans(Transition):
         super().__init__()
         self.count = count
 
-    def start(self):
+    def start(self,event=None):
         if self.running: return
-        super().start()
+        super().start(event)
         self.completed_sources = set()
         for source in self.sources:
             erouter.add_listener(self,CompletionEvent,source)
@@ -62,7 +62,7 @@ class TapTrans(Transition):
     def start(self,event):
         if self.running: return
         super().start(event)
-        erouter.add_listener(self,TapEvent,cube)
+        erouter.add_listener(self,TapEvent,self.cube)
 
     def handle_event(self,event):
         if self.cube:

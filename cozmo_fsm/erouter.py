@@ -6,6 +6,8 @@
 
 """
 
+import cozmo
+
 from .trace import TRACE
 
 def set_robot(_robot):
@@ -46,11 +48,11 @@ class EventRouter:
             source_dict = dict()
             # start a cozmo event handler if this event type requires one
             if event_type.cozmo_evt_type:
-                type = event_type.cozmo_evt_type
-                if not issubclass(type, cozmo.event.Event):
-                    raise ValueError('%s cozmo_evt_type %s not a subclass of cozmo.event.Event' % (event_type, type))
+                coztype = event_type.cozmo_evt_type
+                if not issubclass(coztype, cozmo.event.Event):
+                    raise ValueError('%s cozmo_evt_type %s not a subclass of cozmo.event.Event' % (event_type, coztype))
                 world = get_robot().world
-                world.add_event_handler(type, event_class.generator)
+                world.add_event_handler(coztype, event_type.generator)
         handlers = source_dict.get(source, [])
         handlers.append(listener.handle_event)
         source_dict[source] = handlers
@@ -77,8 +79,8 @@ class EventRouter:
             # remove the cozmo event handler if there was one
             if event_type.cozmo_evt_type:
                 world = get_robot().world
-                type = event_type.cozmo_evt_type
-                world.remove_event_handler(type, event_class.generator)
+                coztype = event_type.cozmo_evt_type
+                world.remove_event_handler(coztype, event_type.generator)
 
     def remove_all_listener_entries(self, listener):
         for event_type, source in erouter.listener_registry.get(listener,[]):

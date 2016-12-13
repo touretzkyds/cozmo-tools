@@ -26,7 +26,7 @@ class StateNode(EventListener):
         # may post an event that we're listening for (like completion).
         for t in self.transitions:
             # print(self,'starting',t)
-            t.start()
+            t.start(event)
         if self.children:
             self.children[0].start()
 
@@ -97,7 +97,7 @@ class Transition(EventListener):
         self._sibling_check(node)
         self.destinations.append(node)
 
-    def start(self):
+    def start(self,event):
         if self.running: return
         if TRACE.trace_level >= TRACE.transition_startstop:
             print('TRACE%d:' % TRACE.transition_startstop, self, 'starting')
