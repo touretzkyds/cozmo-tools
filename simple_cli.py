@@ -70,7 +70,12 @@ Available CLI commands:
         world_viewer documentation for a list of commands.
 
     runfsm(module_name)
-        Imports or reloads a state machine module and runs the state machine.
+        Imports or reloads a state machine module and runs the
+        state machine.
+
+    tracefsm(trace_level)
+        Sets the FSM tracing level (0-9). With no argument, returns
+        the current level.
 
 *********
 
@@ -81,52 +86,57 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+* 12/13/2016: More cozmo_fsm development
+    Dave Touretzky
+        - Changed TRACE to tracefsm
+        - Rewrote runfsm to match changes in cozmo_fsm
+
 * 12/11/2016: Imported TRACE from cozmo_fsm.trace
-        Dave Touretzky
-            - Allows user to set TRACE.trace_level before calling runfsm
+    Dave Touretzky
+        - Allows user to set TRACE.trace_level before calling runfsm
 
 * 12/10/2016:  Add runfsm('myfsm') to re-load and run a state machine.
-        Real Ouellet and Dave Touretzky
-            - Imports the module if it's not already loaded, else reloads it.
-            - Then does myfsm.run(robot) to run the state machine.
+    Real Ouellet and Dave Touretzky
+        - Imports the module if it's not already loaded, else reloads it.
+        - Then does myfsm.run(robot) to run the state machine.
 
 * 12/04/2016:  Provide useful user-visible variables.
-        Dave Touretzky
-            - Added charger, cube1-cube3, light_cubes, and world.
-            - Announce these variables on start-up.
-            - Removed bogus call to world_viewer.init()
+    Dave Touretzky
+        - Added charger, cube1-cube3, light_cubes, and world.
+        - Announce these variables on start-up.
+        - Removed bogus call to world_viewer.init()
 
 *   Healthier exit code to allow quitting without drama
-        Real Ouellet
-            - Push Cozmo's code in a daemon thread
-            - Use 'return' genereously
-            - Forbid exiting from the GL window with 'ESC': it messes up the host console
-            - Add some doc
+    Real Ouellet
+        - Push Cozmo's code in a daemon thread
+        - Use 'return' genereously
+        - Forbid exiting from the GL window with 'ESC': it messes up the host console
+        - Add some doc
 
-*   Added OS test because Tkinter breaks console input
-        Dave Touretzky
-            - Use sys.stdin.readline() on Macs as a workaround, although
-              this means we don't get command line editing.
+* Added OS test because Tkinter breaks console input
+    Dave Touretzky
+        - Use sys.stdin.readline() on Macs as a workaround, although
+          this means we don't get command line editing.
 
-*   Added world_viewer
-        Dave Touretzky
-            - Imports the world_viewer module.  Do viewer(robot) to start it.
+* Added world_viewer
+    Dave Touretzky
+        - Imports the world_viewer module.  Do viewer(robot) to start it.
 
-*   Added event moniitoring
-        Dave Touretzky
-            - Imports monitor and unmonitor functions from event_monitor.py
-            - Also restored the -i switch on line 1 to prevent unwanted exits
+* Added event moniitoring
+    Dave Touretzky
+        - Imports monitor and unmonitor functions from event_monitor.py
+        - Also restored the -i switch on line 1 to prevent unwanted exits
 
-*   TCP socket interface + 'exit' command + optional 'tk' mode
-        Real Ouellet, ABB inc.
-            - TCP socket listens on port 4242
-            - Added new command 'exit' to close socket cleanly
-            - Removed the '-i' for a better python exit
-            - Do not start in tk mode if an argument is passed
+* TCP socket interface + 'exit' command + optional 'tk' mode
+    Real Ouellet, ABB inc.
+        - TCP socket listens on port 4242
+        - Added new command 'exit' to close socket cleanly
+        - Removed the '-i' for a better python exit
+        - Do not start in tk mode if an argument is passed
 
-*   Synchronous instead of async calls. 
-        Dave Touretzky
-            - Not thread-safe but works much more smoothly.
+* Synchronous instead of async calls. 
+    Dave Touretzky
+        - Not thread-safe but works much more smoothly.
 
 """
 
@@ -153,8 +163,9 @@ from cozmo.util import *
 from event_monitor import monitor, unmonitor
 
 try:
-    from cozmo_fsm.trace import TRACE
-except: pass
+    import cozmo_fsm
+    from cozmo_fsm import tracefsm
+except: raise
 
 try:
     import world_viewer
@@ -176,7 +187,6 @@ os_version = platform.system()
 del platform
 
 
-global res, ans, RUNNING
 res = 0
 ans = None
 RUNNING = True
@@ -201,14 +211,22 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
                          ):
     pass
 
-# runfsm('myfsm') will import or reload myfsm and then do myfsm.run(robot)
+running_fsm = None
+
 def runfsm(module_name, running_modules=dict()):
-    """runfsm('modname') reloads that module and calls its run() function."""
+    """runfsm('modname') reloads that module and calls its setup_fsm() function."""
+    global cozmo_fsm, running_fsm
+    cozmo_fsm.evbase.robot_for_loading = robot
     try:
         reload(running_modules[module_name])
     except:
         running_modules[module_name] = __import__(module_name)
-    running_modules[module_name].run(robot)
+    # Call the parent node class's constructor; it must match the module name
+    parent_node = running_modules[module_name].__getattribute__(module_name)
+    running_fsm = parent_node()
+    cozmo_fsm.evbase.robot_for_loading = None   # discard temporary pointer
+    robot.loop.call_soon(running_fsm.start)
+    return running_fsm
 
 
 def run(sdk_conn):
@@ -216,6 +234,10 @@ def run(sdk_conn):
     robot = sdk_conn.wait_for_robot()
     if len(sys.argv) <= 1:
         time.sleep(1.5) # allow time for Tk to set up the window
+    try:
+        robot.erouter = cozmo_fsm.evbase.EventRouter()
+        robot.erouter.robot = robot
+    except: pass
     cli_loop(robot)
 
 def cli_loop(robot):
@@ -223,14 +245,14 @@ def cli_loop(robot):
     cli_loop.charger_warned = False
 
     world = robot.world
-    light_cubes = robot.world.light_cubes
+    light_cubes = world.light_cubes
     cube1 = light_cubes[1]
     cube2 = light_cubes[2]
     cube3 = light_cubes[3]
     charger = robot.world.charger
     exec("print();print('Variables:', dir())")
-
     cli_loop._console = code.InteractiveConsole()
+
     while True:
         if RUNNING == False:
             return
@@ -242,15 +264,19 @@ def cli_loop(robot):
                     cli_loop.charger_warned = True
             else:
                 cli_loop.charger_warned = False
-            if os_version == 'Darwin':   # Tkinter breaks console on Macs
-                print('c> ', end='')
-                cli_loop._line = sys.stdin.readline().strip()
-            else:
-                cli_loop._line = cli_loop._console.raw_input('C> ').strip()
+            try:
+                if os_version == 'Darwin':   # Tkinter breaks console on Macs
+                    print('c> ', end='')
+                    cli_loop._line = sys.stdin.readline().strip()
+                else:
+                    cli_loop._line = cli_loop._console.raw_input('C> ').strip()
+            except EOFError:
+                print("EOF.\nType 'exit' to exit.\n")
+                continue
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
-           cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
-           cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
+               cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
+               cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
             # Can't use assignment to capture a return value, so None.
             ans = None
         elif cli_loop._line[0:6] == 'await ':
@@ -273,9 +299,11 @@ def cli_loop(robot):
                 ans = None # ans = await ans
             if not ans is None:
                 print(ans,end='\n\n')
+        except KeyboardInterrupt: raise
         except Exception:
             traceback.print_exc()
             print()
+
 
 logging_is_setup = False
 
@@ -319,5 +347,13 @@ if __name__ == '__main__':
     
     # Start doing nothing until not anymore ...
     while RUNNING:
-        time.sleep(1)
-
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            if running_fsm:
+                print('\nKeyboardInterrupt: stopping', running_fsm.name)
+                running_fsm.stop()
+                running_fsm = None
+            else:
+                print("\nKeyboardInterrupt. Type 'exit' to exit.")
+            print('\nC> ',end='')

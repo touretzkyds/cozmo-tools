@@ -8,6 +8,16 @@ from .events import *
 
 #________________ Ordinary Nodes ________________
 
+class ParentCompletes(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop,
+                  '%s is causing %s to complete' % (self, self.parent))
+        if parent:
+            self.parent.post_completion()
+
+
 class DriveWheels(StateNode):
     def __init__(self,l_wheel_speed,r_wheel_speed):
         super().__init__()
@@ -17,13 +27,14 @@ class DriveWheels(StateNode):
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        robot = get_robot()
-        self.task_handle = robot.loop.create_task(robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed))
+        cor = self.robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed)
+        self.handle = self.robot.loop.create_task(cor)
 
     def stop(self):
-        self.task_handle.cancel()
-        robot = get_robot()
-        robot.loop.create_task(robot.drive_wheels(0, 0))
+        if not self.running: return
+        self.handle.cancel()
+        cor = self.robot.drive_wheels(0, 0)
+        self.handle = self.robot.loop.create_task(cor)
         super().stop()
 
 
@@ -39,12 +50,12 @@ class DriveForward(DriveWheels):
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        self.start_position = get_robot().pose.position
+        self.start_position = self.robot.pose.position
 
     def poll(self):
         """See how far we've traveled"""
         p0 = self.start_position
-        p1 = get_robot().pose.position
+        p1 = self.robot.pose.position
         diff = (p1.x - p0.x, p1.y - p0.y)
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
@@ -67,13 +78,12 @@ class ActionNode(StateNode):
         self.launch_or_retry()
 
     def launch_or_retry(self):
-        robot = get_robot()
         try:
-            result = self.action_launcher(robot)
+            result = self.action_launcher(self.robot)
         except cozmo.exceptions.RobotBusy:
             if TRACE.trace_level >= TRACE.statenode_startstop:
                 print('TRACE%d:' % TRACE.statenode_startstop, self, 'launch_action raised RobotBusy')
-            self.handle = robot.loop.call_later(self.relaunch_delay, self.launch_or_retry)
+            self.handle = self.robot.loop.call_later(self.relaunch_delay, self.launch_or_retry)
             return
         if isinstance(result, cozmo.action.Action):
             self.cozmo_action_handle = result
@@ -85,7 +95,7 @@ class ActionNode(StateNode):
         raise Exception('%s lacks an action_launcher() method' % self)
     
     def post_when_complete(self):
-       get_robot().loop.create_task(self.wait_for_completion())
+       self.robot.loop.create_task(self.wait_for_completion())
 
     async def wait_for_completion(self):
         async_task = self.cozmo_action_handle.wait_for_completed()
@@ -111,7 +121,7 @@ class ActionNode(StateNode):
 
 class Say(ActionNode):
     """Speaks some text, then posts a completion event."""
-    def __init__(self, text, **kwargs):
+    def __init__(self, text="I'm speechless", **kwargs):
         super().__init__()
         self.text = text
         self.kwargs = kwargs
@@ -156,7 +166,7 @@ class Turn(ActionNode):
         self.kwargs = kwargs
 
     def action_launcher(self,robot):
-        return robot().turn_in_place(self.angle, **self.kwargs)
+        return self.robot.turn_in_place(self.angle, **self.kwargs)
 
 
 class AnimationNode(StateNode):

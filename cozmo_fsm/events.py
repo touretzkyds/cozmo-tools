@@ -3,7 +3,9 @@
     All other events are defined here.
 """
 
-from .erouter import Event
+import cozmo
+
+from .evbase import Event
 
 class CompletionEvent(Event):
     """Signals completion of a state node's action."""
@@ -29,15 +31,26 @@ class FailureEvent(Event):
         return '<%s for %s: %s>' % (self.__class__.__name__, self.source.name, reason)
 
 class DataEvent(Event):
-    """Signals a data item broadcase by the node."""
-    def __init__(self,value):
+    """Signals a data item broadcasted by the node."""
+    def __init__(self,source,value):
         super().__init__()
         self.source = value
 
+#________________ Cozmo-generated events ________________
+
+# TODO: make an @cozmo_event(evt_type) decorator to auto generate?
+
 class TapEvent(Event):
-    """Signals detection of a tap on a light cube."""
-    def __init__(self,cube,intensity,duration):
+    """Signals detection of a tap on an object."""
+    cozmo_evt_type = cozmo.objects.EvtObjectTapped
+    def __init__(self,source,params):
         super().__init__()
-        self.source = cube
-        self.intensity = intensity
-        self.duration = duration
+        self.source = source
+        self.params = params
+
+    # Note that the argument list has SELF as the second arg because
+    # we're going to curry this function to supply the erouter as the
+    # first arg.
+    def generator(erouter,SELF,obj,**kwargs):
+        our_event = TapEvent(obj,kwargs)
+        erouter.post(our_event)

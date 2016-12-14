@@ -1,4 +1,3 @@
-from .erouter import get_robot
 from .base import *
 from .events import *
 
@@ -7,12 +6,12 @@ class NullTrans(Transition):
     def __init__(self):
         super().__init__()
 
-    def start(self):
+    def start(self,event=None):
         if self.running: return
-        super().start()
+        super().start(event)
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
-        get_robot().loop.call_soon(self.fire)
+        self.robot.loop.call_soon(self.fire)
 
 
 class CompletionTrans(Transition):
@@ -21,12 +20,12 @@ class CompletionTrans(Transition):
         super().__init__()
         self.count = count
 
-    def start(self):
+    def start(self,event=None):
         if self.running: return
-        super().start()
+        super().start(event)
         self.completed_sources = set()
         for source in self.sources:
-            erouter.add_listener(self,CompletionEvent,source)
+            self.robot.erouter.add_listener(self,CompletionEvent,source)
 
     def handle_event(self,event):
         if not self.running: return
@@ -62,13 +61,14 @@ class TapTrans(Transition):
     def start(self,event):
         if self.running: return
         super().start(event)
-        erouter.add_listener(self,TapEvent,cube)
+        self.robot.erouter.add_listener(self,TapEvent,self.cube)
 
     def handle_event(self,event):
         if self.cube:
             self.fire(event)
         else:
-            self.handle = get_robot().loop.call_later(0.1, self.fire, event)
+            self.handle = \
+                self.robot.loop.call_later(Transition.default_value_delay, self.fire, event)
 
 
 class SignalTrans(Transition):
@@ -81,7 +81,7 @@ class SignalTrans(Transition):
         if self.running: return
         super().start()
         for source in self.sources:
-            erouter.add_listener(self,DataEvent,self.value)
+            self.robot.erouter.add_listener(self,DataEvent,self.value)
 
     def handle_event(self,event):
         super().handle_event(event)
@@ -89,6 +89,6 @@ class SignalTrans(Transition):
             if self.value is not None:
                 self.fire(event)
             else: # wildcard case: fire only if nothing else does
-                self.handle = get_robot().loop.call_later(0.1, self.fire, event)
+                self.handle = self.robot.loop.call_later(0.1, self.fire, event)
         else:
             raise TypeError('%s is not a DataEvent' % event)
