@@ -10,10 +10,10 @@ to a robot. Run it by typing:  python3 simple_cli
 Type monitor(robot) to start monitoring.  See doc for more options.
 
 * __world_viewer.py__ is an OpenGL viewer for Cozmo's world map.
-Requires the PyOpenGL and PyOpenGL_accelerate packages (from pip),
-and freeglut3. Run it by typing: viewer(robot); type 'h' in the
-graphics window for a list of commands. May not work on Macs
-due to Tkinter brokenness.
+Requires the PyOpenGL and PyOpenGL_accelerate packages (from pip), and
+freeglut3. (On Linux you can install freeglut3 via apt-get). Run it by
+typing: viewer(robot); type 'h' in the graphics window for a list of
+commands. May not work on Macs due to Tkinter brokenness.
 
 * __cozmo_fsm__ is a Finite State Machine package for Cozmo programming.
 It's currently in early beta release.

@@ -12,7 +12,7 @@
     launcher: StateNode() =N=> {driver, speaker}
     driver: DriveForward(-100,10)
     speaker: Say('beep',duration_scalar=0.8)
-    {speaker,driver} =C=> finisher: Say('Safety first!')
+    {driver,speaker} =C=> finisher: Say('Safety first!')
 """
 
 try:
