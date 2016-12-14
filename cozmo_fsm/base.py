@@ -6,7 +6,7 @@
 """
 
 from .trace import TRACE
-from .erouter import EventListener, erouter, get_robot, set_robot
+from .erouter import EventListener, erouter
 from .events import CompletionEvent, FailureEvent
 
 class StateNode(EventListener):
@@ -131,7 +131,7 @@ class Transition(EventListener):
             src.stop()
         self.stop()
         action_cancel_delay = 0.001  # wait for source node action cancellations to take effect
-        get_robot().loop.call_later(action_cancel_delay, self.fire2,event)
+        self.robot.loop.call_later(action_cancel_delay, self.fire2,event)
 
     def fire2(self,event):
         for dest in self.destinations:

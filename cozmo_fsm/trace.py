@@ -32,3 +32,9 @@ class TRACE:
     def event_posted(self): return 8
 
 TRACE = TRACE()
+
+def fsmtrace(level=None):
+    if level:
+        type(TRACE).trace_level = level
+    else:
+        return TRACE.trace_level

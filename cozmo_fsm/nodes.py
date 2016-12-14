@@ -17,12 +17,10 @@ class DriveWheels(StateNode):
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        robot = get_robot()
         self.task_handle = robot.loop.create_task(robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed))
 
     def stop(self):
         self.task_handle.cancel()
-        robot = get_robot()
         robot.loop.create_task(robot.drive_wheels(0, 0))
         super().stop()
 
@@ -39,12 +37,12 @@ class DriveForward(DriveWheels):
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        self.start_position = get_robot().pose.position
+        self.start_position = self.robot.pose.position
 
     def poll(self):
         """See how far we've traveled"""
         p0 = self.start_position
-        p1 = get_robot().pose.position
+        p1 = self.robot.pose.position
         diff = (p1.x - p0.x, p1.y - p0.y)
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
@@ -67,9 +65,8 @@ class ActionNode(StateNode):
         self.launch_or_retry()
 
     def launch_or_retry(self):
-        robot = get_robot()
         try:
-            result = self.action_launcher(robot)
+            result = self.action_launcher(self.robot)
         except cozmo.exceptions.RobotBusy:
             if TRACE.trace_level >= TRACE.statenode_startstop:
                 print('TRACE%d:' % TRACE.statenode_startstop, self, 'launch_action raised RobotBusy')
@@ -85,7 +82,7 @@ class ActionNode(StateNode):
         raise Exception('%s lacks an action_launcher() method' % self)
     
     def post_when_complete(self):
-       get_robot().loop.create_task(self.wait_for_completion())
+       self.robot.loop.create_task(self.wait_for_completion())
 
     async def wait_for_completion(self):
         async_task = self.cozmo_action_handle.wait_for_completed()

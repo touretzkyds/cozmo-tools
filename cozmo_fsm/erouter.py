@@ -10,16 +10,6 @@ import cozmo
 
 from .trace import TRACE
 
-def set_robot(_robot):
-    global robot
-    robot = _robot
-
-def get_robot():
-    if robot:
-        return robot
-    else:
-        raise Exception("Don't have a robot.")
-
 #________________ Event base class ________________
 
 class Event:
@@ -51,7 +41,7 @@ class EventRouter:
                 coztype = event_type.cozmo_evt_type
                 if not issubclass(coztype, cozmo.event.Event):
                     raise ValueError('%s cozmo_evt_type %s not a subclass of cozmo.event.Event' % (event_type, coztype))
-                world = get_robot().world
+                world = self.robot.world
                 world.add_event_handler(coztype, event_type.generator)
         handlers = source_dict.get(source, [])
         handlers.append(listener.handle_event)
@@ -78,8 +68,8 @@ class EventRouter:
             del self.dispatch_table[event_type]
             # remove the cozmo event handler if there was one
             if event_type.cozmo_evt_type:
-                world = get_robot().world
                 coztype = event_type.cozmo_evt_type
+                world = self.robot.world
                 world.remove_event_handler(coztype, event_type.generator)
 
     def remove_all_listener_entries(self, listener):
@@ -108,7 +98,7 @@ class EventRouter:
         for listener in self._get_listeners(event):
             if TRACE.trace_level >= TRACE.listener_invocation:
                 print('TRACE%d:' % TRACE.listener_invocation, self, 'receiving', event)
-            get_robot().loop.call_soon(listener,event)
+            self.robot.loop.call_soon(listener,event)
 
 erouter = EventRouter()
 
@@ -139,7 +129,7 @@ class EventListener:
                 self._robot = self.parent.robot  # recursive call
             else:
                 print('dir=',dir())
-                self._robot = robot_for_loading # robot_for_loading
+                self._robot = robot_for_loading # global in erouter
             if not isinstance(self._robot, cozmo.robot.Robot):
                 raise ValueError('No robot in parent or cozmo_fsm.erouter.robot_for_loading.')
         return self._robot
@@ -196,7 +186,7 @@ class EventListener:
     def next_poll(self):
         """Call this to schedule the next polling interval."""
         self.poll_handle = \
-            get_robot().loop.call_later(self.polling_interval, self.poll)
+            self.robot.loop.call_later(self.polling_interval, self.poll)
 
     def poll(self):
         """Dummy polling function in case sublass neglects to supply one."""

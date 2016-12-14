@@ -1,4 +1,3 @@
-from .erouter import get_robot
 from .base import *
 from .events import *
 
@@ -12,7 +11,7 @@ class NullTrans(Transition):
         super().start(event)
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
-        get_robot().loop.call_soon(self.fire)
+        self.robot.loop.call_soon(self.fire)
 
 
 class CompletionTrans(Transition):
@@ -68,7 +67,7 @@ class TapTrans(Transition):
         if self.cube:
             self.fire(event)
         else:
-            self.handle = get_robot().loop.call_later(0.1, self.fire, event)
+            self.handle = self.robot.loop.call_later(0.1, self.fire, event)
 
 
 class SignalTrans(Transition):
@@ -89,6 +88,6 @@ class SignalTrans(Transition):
             if self.value is not None:
                 self.fire(event)
             else: # wildcard case: fire only if nothing else does
-                self.handle = get_robot().loop.call_later(0.1, self.fire, event)
+                self.handle = self.robot.loop.call_later(0.1, self.fire, event)
         else:
             raise TypeError('%s is not a DataEvent' % event)
