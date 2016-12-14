@@ -81,52 +81,57 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+* 12/13/2016: More cozmo_fsm development
+    Dave Touretzky
+        - Changed TRACE to fsmtrace
+        - Rewrote runfsm to match changes in cozmo_fsm
+
 * 12/11/2016: Imported TRACE from cozmo_fsm.trace
-        Dave Touretzky
-            - Allows user to set TRACE.trace_level before calling runfsm
+    Dave Touretzky
+        - Allows user to set TRACE.trace_level before calling runfsm
 
 * 12/10/2016:  Add runfsm('myfsm') to re-load and run a state machine.
-        Real Ouellet and Dave Touretzky
-            - Imports the module if it's not already loaded, else reloads it.
-            - Then does myfsm.run(robot) to run the state machine.
+    Real Ouellet and Dave Touretzky
+        - Imports the module if it's not already loaded, else reloads it.
+        - Then does myfsm.run(robot) to run the state machine.
 
 * 12/04/2016:  Provide useful user-visible variables.
-        Dave Touretzky
-            - Added charger, cube1-cube3, light_cubes, and world.
-            - Announce these variables on start-up.
-            - Removed bogus call to world_viewer.init()
+    Dave Touretzky
+        - Added charger, cube1-cube3, light_cubes, and world.
+        - Announce these variables on start-up.
+        - Removed bogus call to world_viewer.init()
 
 *   Healthier exit code to allow quitting without drama
-        Real Ouellet
-            - Push Cozmo's code in a daemon thread
-            - Use 'return' genereously
-            - Forbid exiting from the GL window with 'ESC': it messes up the host console
-            - Add some doc
+    Real Ouellet
+        - Push Cozmo's code in a daemon thread
+        - Use 'return' genereously
+        - Forbid exiting from the GL window with 'ESC': it messes up the host console
+        - Add some doc
 
-*   Added OS test because Tkinter breaks console input
-        Dave Touretzky
-            - Use sys.stdin.readline() on Macs as a workaround, although
-              this means we don't get command line editing.
+* Added OS test because Tkinter breaks console input
+    Dave Touretzky
+        - Use sys.stdin.readline() on Macs as a workaround, although
+          this means we don't get command line editing.
 
-*   Added world_viewer
-        Dave Touretzky
-            - Imports the world_viewer module.  Do viewer(robot) to start it.
+* Added world_viewer
+    Dave Touretzky
+        - Imports the world_viewer module.  Do viewer(robot) to start it.
 
-*   Added event moniitoring
-        Dave Touretzky
-            - Imports monitor and unmonitor functions from event_monitor.py
-            - Also restored the -i switch on line 1 to prevent unwanted exits
+* Added event moniitoring
+    Dave Touretzky
+        - Imports monitor and unmonitor functions from event_monitor.py
+        - Also restored the -i switch on line 1 to prevent unwanted exits
 
-*   TCP socket interface + 'exit' command + optional 'tk' mode
-        Real Ouellet, ABB inc.
-            - TCP socket listens on port 4242
-            - Added new command 'exit' to close socket cleanly
-            - Removed the '-i' for a better python exit
-            - Do not start in tk mode if an argument is passed
+* TCP socket interface + 'exit' command + optional 'tk' mode
+    Real Ouellet, ABB inc.
+        - TCP socket listens on port 4242
+        - Added new command 'exit' to close socket cleanly
+        - Removed the '-i' for a better python exit
+        - Do not start in tk mode if an argument is passed
 
-*   Synchronous instead of async calls. 
-        Dave Touretzky
-            - Not thread-safe but works much more smoothly.
+* Synchronous instead of async calls. 
+    Dave Touretzky
+        - Not thread-safe but works much more smoothly.
 
 """
 
@@ -153,7 +158,8 @@ from cozmo.util import *
 from event_monitor import monitor, unmonitor
 
 try:
-    from cozmo_fsm.trace import TRACE
+    import cozmo_fsm
+    from cozmo_fsm import fsmtrace
 except: pass
 
 try:
