@@ -70,7 +70,12 @@ Available CLI commands:
         world_viewer documentation for a list of commands.
 
     runfsm(module_name)
-        Imports or reloads a state machine module and runs the state machine.
+        Imports or reloads a state machine module and runs the
+        state machine.
+
+    tracefsm(trace_level)
+        Sets the FSM tracing level (0-9). With no argument, returns
+        the current level.
 
 *********
 
@@ -83,7 +88,7 @@ Changelog
 =========
 * 12/13/2016: More cozmo_fsm development
     Dave Touretzky
-        - Changed TRACE to fsmtrace
+        - Changed TRACE to tracefsm
         - Rewrote runfsm to match changes in cozmo_fsm
 
 * 12/11/2016: Imported TRACE from cozmo_fsm.trace
@@ -159,8 +164,8 @@ from event_monitor import monitor, unmonitor
 
 try:
     import cozmo_fsm
-    from cozmo_fsm import fsmtrace
-except: pass
+    from cozmo_fsm import tracefsm
+except: raise
 
 try:
     import world_viewer
@@ -210,15 +215,16 @@ running_fsm = None
 
 def runfsm(module_name, running_modules=dict()):
     """runfsm('modname') reloads that module and calls its setup_fsm() function."""
-    global running_fsm
+    global cozmo_fsm, running_fsm
+    cozmo_fsm.evbase.robot_for_loading = robot
     try:
         reload(running_modules[module_name])
     except:
         running_modules[module_name] = __import__(module_name)
-    cozmo_fsm.erouter.robot_for_loading = robot  # temporary for FSM construction
     # Call the parent node class's constructor; it must match the module name
-    running_fsm = running_modules[module_name].get_attribute(module_name)()
-    cozmo_fsm.erouter.robot_for_loading = None   # discard temporary pointer
+    parent_node = running_modules[module_name].__getattribute__(module_name)
+    running_fsm = parent_node()
+    cozmo_fsm.evbase.robot_for_loading = None   # discard temporary pointer
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
@@ -228,6 +234,10 @@ def run(sdk_conn):
     robot = sdk_conn.wait_for_robot()
     if len(sys.argv) <= 1:
         time.sleep(1.5) # allow time for Tk to set up the window
+    try:
+        robot.erouter = cozmo_fsm.evbase.EventRouter()
+        robot.erouter.robot = robot
+    except: pass
     cli_loop(robot)
 
 def cli_loop(robot):
@@ -235,7 +245,7 @@ def cli_loop(robot):
     cli_loop.charger_warned = False
 
     world = robot.world
-    light_cubes = robot.world.light_cubes
+    light_cubes = world.light_cubes
     cube1 = light_cubes[1]
     cube2 = light_cubes[2]
     cube3 = light_cubes[3]
@@ -283,7 +293,6 @@ def cli_loop(robot):
         else:
             cli_loop._line = 'global ans, res; ans=' + cli_loop._line
         try:
-            print("Executing '%s'" % cli_loop._line)
             exec(cli_loop._line)
             if cli_loop._do_await:
                 print("Can't use await outside of an async def.")
