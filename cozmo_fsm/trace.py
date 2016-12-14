@@ -30,10 +30,12 @@ class TRACE:
     def await_satisfied(self): return 7
     @property
     def event_posted(self): return 8
+    @property
+    def task_cancel(self): return 9
 
 TRACE = TRACE()
 
-def fsmtrace(level=None):
+def tracefsm(level=None):
     if level:
         type(TRACE).trace_level = level
     else:

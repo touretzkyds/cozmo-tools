@@ -5,7 +5,7 @@
 
 import cozmo
 
-from .erouter import Event, erouter
+from .evbase import Event
 
 class CompletionEvent(Event):
     """Signals completion of a state node's action."""
@@ -47,6 +47,10 @@ class TapEvent(Event):
         super().__init__()
         self.source = source
         self.params = params
-    def generator(self,obj,**kwargs):
+
+    # Note that the argument list has SELF as the second arg because
+    # we're going to curry this function to supply the erouter as the
+    # first arg.
+    def generator(erouter,SELF,obj,**kwargs):
         our_event = TapEvent(obj,kwargs)
         erouter.post(our_event)

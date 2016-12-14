@@ -1,8 +1,9 @@
 """
   The Greet demo illustrates the use of CompletionTrans and TimerTrans
-  transitions.  Cozmo starts out by saying 'Greetings, human!'. After
-  his speech has completed, he waits 5 seconds, then says 'Bye-bye
-  now'.
+  transitions.
+
+  Behavior: Cozmo starts out by saying 'Greetings, human!'. After his
+  speech has completed, he waits 5 seconds, then says 'Bye-bye now'.
 
   Shorthand version (using the chaining-style notation):
     say: Say('Greetings, human!') =C=>

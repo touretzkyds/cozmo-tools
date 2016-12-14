@@ -5,19 +5,34 @@
 
 """
 
+import cozmo
+
 from .trace import TRACE
-from .erouter import EventListener, erouter
+from .evbase import EventListener
 from .events import CompletionEvent, FailureEvent
 
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self):
+        super().__init__()
         self.parent = None
         self.children = []
         self.transitions = []
-        # call super init last because it will call self.setup(),
-        # which requires self.children to exist
-        super().__init__()
+        self.setup()
+
+    # Cache 'robot' in the instance because we could have two state
+    # machine instances controlling different robots.
+    @property
+    def robot(self):
+        """if not self._robot:
+            if self.parent:
+                self._robot = self.parent.robot  # recursive call
+            else:
+                self._robot = erouter.robot_for_loading
+            if not isinstance(self._robot, cozmo.robot.Robot):
+                raise ValueError('%s _robot attribute is %s, not a cozmo.robot.Robot' %
+                                 (self, self._robot))"""
+        return self._robot
 
     def start(self,event=None):
         if self.running: return
@@ -59,12 +74,13 @@ class StateNode(EventListener):
     def post_completion(self):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting completion')
-        erouter.post(CompletionEvent(self))
+        self.robot.erouter.post(CompletionEvent(self))
 
     def post_failure(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
-            print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting failure', details)
-        erouter.post(FailureEvent(self,details))
+            print('TRACE%d:' % TRACE.statenode_startstop,
+                  self, 'posting failure', details)
+        self.robot.erouter.post(FailureEvent(self,details))
 
 
 class Transition(EventListener):
@@ -80,6 +96,16 @@ class Transition(EventListener):
         dests = ','.join(node.name for node in self.destinations)
         return '<%s %s: %s=>%s >' % \
             (self.__class__.__name__, self.name, srcs, dests)
+
+    @property
+    def robot(self):
+        return self._robot
+        """if not self._robot:
+            if len(self.sources) > 0:
+                self._robot = self.sources.robot
+                return self._robot
+            else:
+                raise Exception('Transition %s has no sources.' % self)"""
 
     def _sibling_check(self,node):
         for sibling in self.sources + self.destinations:
@@ -116,7 +142,8 @@ class Transition(EventListener):
         if TRACE.trace_level >= TRACE.transition_startstop:
             print('TRACE%d:' % TRACE.transition_startstop, self, 'stopping')
         if self.handle:
-            print('****',self.name,'cancelling',self.handle)
+            if TRACE.trace_level >= TRACE.task_cancel:
+                print('TRACE%d:' % TRACE.task_cancel, self.handle, 'cancelled')
             self.handle.cancel()
         super().stop()
 
@@ -137,3 +164,6 @@ class Transition(EventListener):
         for dest in self.destinations:
             # print(self,'fire2 is starting',dest)
             dest.start(event)
+
+    default_value_delay = 0.1  # delay before wildcard match will fire
+

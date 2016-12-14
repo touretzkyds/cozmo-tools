@@ -1,26 +1,36 @@
 """
   The TapSpeak demo shows Cozmo responding to cube tap events. A
-  TapTrans transition is used to set up an event listener for taps on
-  cube 1. Cozmo starts out by saying 'Tap cube 1'. Then, every time
-  the cube is tapped, Cozmo says 'Tap!' and goes back to listening for
-  more tap events.
+  TapTrans transition is used to set up a handler for taps. The
+  example also illustrates how the TapTrans transition does wildcard
+  matching if not given an argument. By passing a cube as an argument
+  to the TapTrans constructor can use it to look for taps on a
+  specific cube.
+
+  Behavior: Cozmo starts out by saying 'Tap a cube'. Then, every time
+  a cube is tapped, Cozmo says the cube name and goes back to
+  listening for more tap events.
 
   Shorthand version:
-    intro: Say('Tap cube 1') =C=> wait
-    wait: StateNode() =Tap(self.cube1)=> speak
-    speak: Say('tap',duration_scalar=0.8,voice_pitch=1) =C=> wait
+    intro: Say('Tap a cube.') =C=> wait
+    wait: StateNode() =Tap()=> speak
+    speak: SayCube() =C=> wait
 """
 
-try:
-    from cozmo_fsm import *
-except:
-    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+from cozmo_fsm import *
 
-class TapSpeak(EventListener):
+class SayCube(Say):
+    def start(self, event=None, \
+              cube_names = ['paperclip', 'anglepoise lamp', 'deli slicer']):
+        cube_number = next(k for k,v in self.robot.world.light_cubes.items() \
+                               if v == event.source)
+        self.text = cube_names[cube_number-1]
+        super().start(event)
+
+class TapSpeak(StateNode):
     def setup(self):
         self.set_name("tapspeak")
 
-        intro = Say("Tap cube 1")
+        intro = Say("Tap a cube")
         intro.set_name("intro")
         intro.set_parent(self)
 
@@ -28,7 +38,7 @@ class TapSpeak(EventListener):
         wait.set_name("wait")
         wait.set_parent(self)
 
-        speak = Say("tap",duration_scalar=0.8,voice_pitch=1)
+        speak = SayCube()
         speak.set_name("speak")
         speak.set_parent(self)
 
@@ -37,7 +47,7 @@ class TapSpeak(EventListener):
         t1.add_source(intro)
         t1.add_destination(wait)
 
-        t2 = TapTrans(self.cube1)   # cube1 is a property inherited from EventListener
+        t2 = TapTrans()
         t2.set_name("t2")
         t2.add_source(wait)
         t2.add_destination(speak)
