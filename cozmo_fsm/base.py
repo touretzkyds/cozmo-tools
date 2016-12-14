@@ -12,10 +12,12 @@ from .events import CompletionEvent, FailureEvent
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self):
-        super().__init__()
         self.parent = None
         self.children = []
         self.transitions = []
+        # call super init last because it will call self.setup(),
+        # which requires self.children to exist
+        super().__init__()
 
     def start(self,event=None):
         if self.running: return

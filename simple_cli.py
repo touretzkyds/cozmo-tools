@@ -209,7 +209,10 @@ def runfsm(module_name, running_modules=dict()):
         reload(running_modules[module_name])
     except:
         running_modules[module_name] = __import__(module_name)
-    running_fsm = running_modules[module_name].setup_fsm(robot)
+    cozmo_fsm.erouter.robot_for_loading = robot  # temporary for FSM construction
+    # Call the parent node class's constructor; it must match the module name
+    running_fsm = running_modules[module_name].get_attribute(module_name)()
+    cozmo_fsm.erouter.robot_for_loading = None   # discard temporary pointer
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 

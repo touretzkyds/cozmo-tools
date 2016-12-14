@@ -114,6 +114,8 @@ erouter = EventRouter()
 
 #________________ Event Listener ________________
 
+robot_for_loading = None
+
 class EventListener:
     """Parent class for both StateNode and Transition."""
     def __init__(self):
@@ -122,9 +124,46 @@ class EventListener:
         self.name = rep[1+rep.rfind(' '):-1]  # name defaults to hex address
         self.polling_interval = None
         self.poll_handle = None
+        self._robot = None
+        self.setup()
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.name)
+
+    # Cache 'robot' in the instance because we could have two state
+    # machine instances controlling different robots.
+    @property
+    def robot(self):
+        if not self._robot:
+            if self.parent:
+                self._robot = self.parent.robot  # recursive call
+            else:
+                print('dir=',dir())
+                self._robot = robot_for_loading # robot_for_loading
+            if not isinstance(self._robot, cozmo.robot.Robot):
+                raise ValueError('No robot in parent or cozmo_fsm.erouter.robot_for_loading.')
+        return self._robot
+
+    @robot.setter
+    def robot(self,value):
+        if not isinstance(value, cozmo.robot.Robot):
+            raise ValueError('robot value must be an instance of cozmo.robot.Robot')
+        self._robot = value
+
+    @property
+    def world(self): return self.robot.world
+
+    @property
+    def cube1(self): return self.world.light_cubes[1]
+
+    @property
+    def cube2(self): return self.world.light_cubes[2]
+
+    @property
+    def cube3(self): return self.world.light_cubes[3]
+
+    @property
+    def charger(self): return self.world.charger
 
     def set_name(self,name):
         if not isinstance(name,str):
@@ -132,18 +171,18 @@ class EventListener:
         self.name = name
         return self
 
+    def setup(self): pass
+
     def start(self):
         self.running = True
         if self.polling_interval:
             self.next_poll()
-        #print(self,'running')
 
     def stop(self):
         if not self.running: return
         self.running = False
         if self.poll_handle: self.poll_handle.cancel()
         erouter.remove_all_listener_entries(self)
-        #print(self,'stopped')
 
     def handle_event(self, event):
         pass
