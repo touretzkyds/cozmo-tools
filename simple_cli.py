@@ -216,7 +216,7 @@ running_fsm = None
 def runfsm(module_name, running_modules=dict()):
     """runfsm('modname') reloads that module and calls its setup_fsm() function."""
     global cozmo_fsm, running_fsm
-    cozmo_fsm.evbase.robot_for_loading = robot
+    #cozmo_fsm.evbase.robot_for_loading = robot
     try:
         reload(running_modules[module_name])
     except:
@@ -224,7 +224,7 @@ def runfsm(module_name, running_modules=dict()):
     # Call the parent node class's constructor; it must match the module name
     parent_node = running_modules[module_name].__getattribute__(module_name)
     running_fsm = parent_node()
-    cozmo_fsm.evbase.robot_for_loading = None   # discard temporary pointer
+    #cozmo_fsm.evbase.robot_for_loading = None   # discard temporary pointer
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
@@ -237,6 +237,7 @@ def run(sdk_conn):
     try:
         robot.erouter = cozmo_fsm.evbase.EventRouter()
         robot.erouter.robot = robot
+        cozmo_fsm.evbase.robot_for_loading = robot
     except: pass
     cli_loop(robot)
 
@@ -246,9 +247,9 @@ def cli_loop(robot):
 
     world = robot.world
     light_cubes = world.light_cubes
-    cube1 = light_cubes[1]
-    cube2 = light_cubes[2]
-    cube3 = light_cubes[3]
+    cube1 = light_cubes[cozmo.objects.LightCube1Id]
+    cube2 = light_cubes[cozmo.objects.LightCube2Id]
+    cube3 = light_cubes[cozmo.objects.LightCube3Id]
     charger = robot.world.charger
     exec("print();print('Variables:', dir())")
     cli_loop._console = code.InteractiveConsole()
@@ -276,6 +277,7 @@ def cli_loop(robot):
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
                cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
+               cli_loop._line[0:4] == 'for ' or \
                cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
             # Can't use assignment to capture a return value, so None.
             ans = None
