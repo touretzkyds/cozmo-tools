@@ -1,4 +1,4 @@
-'''
+"""
 
 OpenGL world viewer for Cozmo's world map.
 ====================================
@@ -57,7 +57,7 @@ To Do:
 * Replace cubes and robot body with texture-mapped images
 * Add a floor to the world
 
-'''
+"""
 
 from math import sin, cos, radians
 import sys
@@ -332,9 +332,9 @@ def make_shapes():
     # gaze point
     gazepoint = make_gazepoint()
     # light cubes
-    cube1 = make_light_cube(1)
-    cube2 = make_light_cube(2)
-    cube3 = make_light_cube(3)
+    cube1 = make_light_cube(cozmo.objects.LighCube1Id)
+    cube2 = make_light_cube(cozmo.objects.LighCube2Id)
+    cube3 = make_light_cube(cozmo.objects.LighCube3Id)
     # charger
     charger = make_charger()
     # cozmo robot
