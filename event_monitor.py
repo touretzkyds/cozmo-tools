@@ -1,4 +1,4 @@
-'''
+"""
 
 Event Monitor Tool for Cozmo
 ============================
@@ -28,7 +28,7 @@ ChangeLog
 *   Created
         Dave Touretzky
 
-'''
+"""
 
 import re
 
@@ -56,7 +56,7 @@ def monitor_generic(evt, **kwargs):
     if 'action' in kwargs:
         action = kwargs['action']
         if isinstance(action, cozmo.anim.Animation):
-            print(action.animation_name, '', end='')
+            print(action.anim_name, '', end='')
         elif isinstance(action, cozmo.anim.AnimationTrigger):
             print(action.trigger.name, '', end='')
     print(set(kwargs.keys()))
