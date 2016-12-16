@@ -40,17 +40,22 @@ class DriveWheels(StateNode):
 
 class DriveForward(DriveWheels):
     def __init__(self, distance=50, speed=50):
+        if isinstance(distance, cozmo.util.Distance):
+            distance = distance.distance_mm
+        if isinstance(speed, cozmo.util.Speed):
+            speed = speed.speed_mmps
         if distance < 0:
             distance = -distance
             speed = -speed
         super().__init__(speed,speed)
         self.distance = distance
+        self.speed = speed
         self.polling_interval = 0.1
 
     def start(self,event=None):
         if self.running: return
-        super().start(event)
         self.start_position = self.robot.pose.position
+        super().start(event)
 
     def poll(self):
         """See how far we've traveled"""
@@ -166,12 +171,28 @@ class Turn(ActionNode):
         self.kwargs = kwargs
 
     def action_launcher(self,robot):
-        return self.robot.turn_in_place(self.angle, **self.kwargs)
+        return robot.turn_in_place(self.angle, **self.kwargs)
+
+#________________ Animations ________________
 
 
-class AnimationNode(StateNode):
-    pass  # TODO
+class AnimationNode(ActionNode):
+    def __init__(self, anim_name='anim_bored_01'):
+        super().__init__()
+        self.anim_name = anim_name
 
+    def action_launcher(self,robot):
+        return robot.play_anim(self.anim_name)
+
+class AnimationTriggerNode(ActionNode):
+    def __init__(self, trigger=cozmo.anim.Triggers.CubePouncePounceNormal):
+        if not isinstance(trigger, cozmo.anim._AnimTrigger):
+            raise TypeError('%s is not an instance of cozmo.anim._AnimTrigger' % repr(trigger))
+        super().__init__()
+        self.trigger = trigger
+
+    def action_launcher(self,robot):
+        return robot.play_anim_trigger(self.trigger)
 
 class BehaviorNode(StateNode):
     pass # TODO

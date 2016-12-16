@@ -38,19 +38,19 @@ class DataEvent(Event):
 
 #________________ Cozmo-generated events ________________
 
-# TODO: make an @cozmo_event(evt_type) decorator to auto generate?
-
-class TapEvent(Event):
-    """Signals detection of a tap on an object."""
-    cozmo_evt_type = cozmo.objects.EvtObjectTapped
+class CozmoGeneratedEvent(Event):
     def __init__(self,source,params):
         super().__init__()
         self.source = source
         self.params = params
+    # Note regarding generator(): we're going to curry this function
+    # to supply EROUTER and EVENT_CLASS as the first two arguments.
+    def generator(EROUTER, EVENT_CLASS, cozmo_event, obj, **kwargs):
+        our_event = EVENT_CLASS(obj,kwargs)
+        EROUTER.post(our_event)
 
-    # Note that the argument list has SELF as the second arg because
-    # we're going to curry this function to supply the erouter as the
-    # first arg.
-    def generator(erouter,SELF,obj,**kwargs):
-        our_event = TapEvent(obj,kwargs)
-        erouter.post(our_event)
+class TapEvent(CozmoGeneratedEvent):
+    cozmo_evt_type = cozmo.objects.EvtObjectTapped
+
+class FaceEvent(CozmoGeneratedEvent):
+    cozmo_evt_type = cozmo.faces.EvtFaceAppeared
