@@ -165,7 +165,7 @@ from event_monitor import monitor, unmonitor
 try:
     import cozmo_fsm
     from cozmo_fsm import tracefsm
-except: raise
+except: pass
 
 try:
     import world_viewer
@@ -216,7 +216,6 @@ running_fsm = None
 def runfsm(module_name, running_modules=dict()):
     """runfsm('modname') reloads that module and calls its setup_fsm() function."""
     global cozmo_fsm, running_fsm
-    #cozmo_fsm.evbase.robot_for_loading = robot
     try:
         reload(running_modules[module_name])
     except:
@@ -224,7 +223,6 @@ def runfsm(module_name, running_modules=dict()):
     # Call the parent node class's constructor; it must match the module name
     parent_node = running_modules[module_name].__getattribute__(module_name)
     running_fsm = parent_node()
-    #cozmo_fsm.evbase.robot_for_loading = None   # discard temporary pointer
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 

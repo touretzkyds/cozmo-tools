@@ -84,7 +84,7 @@ class StateNode(EventListener):
 
     def now(self):
         """Use now() to execute this node from the command line instead of as part of a state machine."""
-        if not robot:
+        if not self.robot:
             raise ValueError('Node %s has no robot designated.' % self)
         self.robot.loop.call_soon(self.start)
 

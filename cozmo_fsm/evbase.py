@@ -107,8 +107,6 @@ class EventRouter:
     
 #________________ Event Listener ________________
 
-robot_for_loading = 37
-
 class EventListener:
     """Parent class for both StateNode and Transition."""
     def __init__(self):
