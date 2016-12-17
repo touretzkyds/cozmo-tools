@@ -332,9 +332,9 @@ def make_shapes():
     # gaze point
     gazepoint = make_gazepoint()
     # light cubes
-    cube1 = make_light_cube(cozmo.objects.LighCube1Id)
-    cube2 = make_light_cube(cozmo.objects.LighCube2Id)
-    cube3 = make_light_cube(cozmo.objects.LighCube3Id)
+    cube1 = make_light_cube(cozmo.objects.LightCube1Id)
+    cube2 = make_light_cube(cozmo.objects.LightCube2Id)
+    cube3 = make_light_cube(cozmo.objects.LightCube3Id)
     # charger
     charger = make_charger()
     # cozmo robot
