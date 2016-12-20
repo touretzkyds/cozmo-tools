@@ -272,10 +272,11 @@ def parser1(lex_tokens):
         if lex_tokens[0].isEqual():
             p1tokens.append(lex_tokens[0])
             del lex_tokens[0]
-            # Special handling for transitions: convert "identifier :"
-            # to labelref and "identifier =>" to constructor call with
-            # no arguments. Otherwise just continue and we'll process
-            # "identifier (" on the next iteration.
+            # Special handling for transitions: convert identifier to
+            # labelref if followed by ":" or to constructor call with
+            # no arguments if followed by "=>". Otherwise just
+            # continue and we'll process "identifier (" on the next
+            # iteration.
             if len(lex_tokens) < 2:
                 report_line_error('Syntax error in transition near %s' %
                                   (lex_tokens[0] if len(lex_tokens) > 0 else 'end of line'))
@@ -357,9 +358,13 @@ def parser2(p1tokens):
             continue
         # Pass along an identifier list without modification
         if p1tokens[0].isIdentifierList() or p1tokens[0].isLabelRef():
-            p2tokens.append(p1tokens.pop(0))
+            p2tokens.append(p1tokens[0])
+            del p1tokens[0]
             continue
-        raise Exception('Something is wrong in parser2: %s' % p1tokens[0])
+        else:
+            report_line_error("A %s token is not legal in this context." % p1tokens[0])
+            del p1tokens[0]
+            continue
     return p2tokens
 
 transition_names = dict(
@@ -420,7 +425,8 @@ def parser3(p2tokens):
             p3tokens.append(p2tokens[0])
             del p2tokens[0]
         elif must_transition:
-            report_line_error('Expected a transition here, not %s.' % p2tokens[0])
+            report_line_error("Expected a transition after '%s', not %s." %
+                              (','.join(current_node), p2tokens[0]))
             del p2tokens[0]
             continue
         while p2tokens and p2tokens[0].isNewline():
@@ -520,14 +526,15 @@ def emit_line(line):
     out_f.write((' '*indent_level) + line + '\n')
             
 def process_file():
-    global current_line, starting_line, indent_level
+    global line_cache, current_line, starting_line, indent_level
+    line_cache = [None] # dummy line 0
     current_line = 0
     r_setup = re.compile('^\s*\$setup\s*(\"\"\")|(\'\'\')$')
-    r_end = re.compile('^\s*(\"\"\")|(\'\'\')')
     r_indent = re.compile('^\s*')
     while True:
         line = in_f.readline()
         if not line: break
+        line_cache.append(line)
         current_line += 1
         # echo regular lines to output file until we reach a $setup line
         if line.find('$setup') == -1:
@@ -536,6 +543,8 @@ def process_file():
         if not r_setup.match(line):
             report_line_error("Incorrect $setup syntax: '%s'" % line.strip())
             continue
+        delim = line[-2]
+        r_end = re.compile('^\s*' + delim*3)
 
         # collect the lines of the state machine
         starting_line = current_line + 1
@@ -543,7 +552,11 @@ def process_file():
         lines = []
         while True:
             line = in_f.readline()
+            if not line:
+                report_line_error("File ended without closing %s." + delim*3)
+                break
             current_line += 1
+            line_cache.append(line)
             if r_end.match(line): break
             lines.append(line)
         generate_machine(lines)
@@ -552,7 +565,8 @@ found_error = False
 
 def report_line_error(error_text):
     global found_error
-    sys.stderr.write('Line %d: %s\n' % (current_line, error_text))
+    sys.stderr.write(line_cache[current_line])
+    sys.stderr.write('Line %d: %s\n\n' % (current_line, error_text))
     found_error = True
 
 def report_global_error(error_text):
