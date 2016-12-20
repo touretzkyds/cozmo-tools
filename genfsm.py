@@ -1,11 +1,38 @@
 #!/usr/bin/env python3
 
 """
-  Finite State Machine generator for the cozmo_fsm package.
-  Modeled after the Tekkotsu stateparser tool.
+Finite State Machine generator for the cozmo_fsm package.
+Modeled after the Tekkotsu stateparser tool.
 
-  Author: David S. Touretzky, Carnegie Mellon University
+Usage:  genfsm [infile.fsm | -] [outfile.py | -]
 
+Use '-' to indicate standard input or standard output.  If a
+second argument is not supplied, writes to infile.py, or to
+standard output if the input was '-'.
+
+To enter state machine notation use a line that contains
+just $setup ''', followed by the lines of the state machine,
+and ending with a line contaning just '''. This will result
+in a definition of a setup() method for the state node class
+you are defining. Example:
+
+  class MyNode(StateNode):
+      $setup '''
+          Say("Hello") =C=> Forward(50)
+      '''
+
+See the cozmo_fsm/examples directory for examples of .fsm files
+and the .py files they generate.
+
+Author: David S. Touretzky, Carnegie Mellon University
+=======
+
+Changelog:
+==========
+
+* 12/20/2016
+    Dave Touretzky
+        - Created.  Converted cozmo_fsm/examples to use this.
 """
 
 import sys, time, re
