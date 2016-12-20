@@ -536,7 +536,7 @@ def process_file():
         if not line: break
         line_cache.append(line)
         current_line += 1
-        # echo regular lines to output file until we reach a $setup line
+        # Echo lines to the output file until we reach a $setup line.
         if line.find('$setup') == -1:
             out_f.write(line)
             continue
@@ -546,7 +546,7 @@ def process_file():
         delim = line[-2]
         r_end = re.compile('^\s*' + delim*3)
 
-        # collect the lines of the state machine
+        # Collect the lines of the state machine.
         starting_line = current_line + 1
         indent_level = r_indent.match(line).span()[1]
         lines = []
@@ -560,6 +560,7 @@ def process_file():
             line_cache.append(line)
             if r_end.match(line): break
             lines.append(line)
+        # Now parse the collected lines and generate code.
         generate_machine(lines)
 
 found_error = False
