@@ -141,15 +141,12 @@ Changelog
 """
 
 # All that stuff we really need in order to get going.
-import threading
-import socket
-import socketserver
-import sys
-import platform
+import threading, socket, socketserver
+import sys, os, platform
 import code
-import traceback
 import time
-import os 
+import traceback
+import re
 from importlib import __import__, reload
 
 # This should be in your '.pythonstartup' file, but I put it also here just in case...
@@ -214,15 +211,39 @@ class ThreadedExecServer(socketserver.ThreadingMixIn,
 running_fsm = None
 
 def runfsm(module_name, running_modules=dict()):
-    """runfsm('modname') reloads that module and calls its setup_fsm() function."""
-    global cozmo_fsm, running_fsm
+    """runfsm('modname') reloads that module and expects it to contain
+    a class of the same name. It calls that class's constructor and then
+    calls the instance's start() method."""
+    global running_fsm
+
+    r_py = re.compile('.*\.py$')
+    if r_py.match(module_name):
+        print("\n'%s' is not a module name. Trying '%s' instead.\n" %
+              (module_name, module_name[0:-3]))
+        module_name = module_name[0:-3]
+
+    found = False
     try:
         reload(running_modules[module_name])
-    except:
-        running_modules[module_name] = __import__(module_name)
-    # Call the parent node class's constructor; it must match the module name
-    parent_node = running_modules[module_name].__getattribute__(module_name)
-    running_fsm = parent_node()
+        found = True
+    except: pass
+    if not found:
+        try:
+            running_modules[module_name] = __import__(module_name)
+        except:
+            print("Could not find module '%s'. Check your search path.\n" %
+                  module_name)
+            return
+
+    # The parent node class's constructor must match the module name.
+    the_module = running_modules[module_name]
+    the_class = the_module.__getattribute__(module_name) \
+                if module_name in dir(the_module) else None
+    if not isinstance(the_class,type) or not issubclass(the_class,cozmo_fsm.StateNode):
+        print("Module %s does not contain a StateNode class named %s.\n" %
+              (module_name, module_name))
+        return       
+    running_fsm = the_class()
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
@@ -314,13 +335,16 @@ def reconnect():
         logging_is_setup = True
     cozmo.robot.Robot.drive_off_charger_on_connect = False
     try:
-        if len(sys.argv) <= 1:
-            cozmo.connect_with_tkviewer(run)
+        if len(sys.argv) >= 2:
+            if sys.argv[1] == "VIEWER":
+                cozmo.connect_with_tkviewer(run)
+            else:
+                print("\nUnrecognized argument '%s'. Use VIEWER instead.\n" % sys.argv[1])
+                cozmo.connect(run)
         else:
             cozmo.connect(run)
     except cozmo.ConnectionError as e:
         sys.exit("A connection error occurred: %s" % e)
-
 
 
 if __name__ == '__main__':

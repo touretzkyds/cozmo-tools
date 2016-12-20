@@ -497,7 +497,7 @@ def generate_machine(lines):
                     labels[ref] = None
 
     # Write out the state machine source as a comment
-    emit_line('def setup():')
+    emit_line('def setup(self):')
     indent_level += 4
     emit_line('"""')
     indent_level += 4
