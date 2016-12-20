@@ -190,6 +190,10 @@ def lexer (string):
             continue
         # If we reach here, we've found something indigestible.
         report_line_error("syntax error at '%s'" % error_fragment(string))
+        next_line = string.find('\n')
+        if next_line > -1:
+            string = string[next_line:]
+            continue
         break
     return tokens
 
@@ -580,7 +584,10 @@ def error_fragment(string):
     s = string.strip()
     p = s.find('\n')
     if p == -1: p = len(s)
-    return s[0:min(p,20)]
+    fragment = s[0:min(p,20)]
+    if len(fragment) < p:
+        fragment += "..."
+    return fragment
 
 if __name__ == '__main__':
     if len(sys.argv) < 2 or len(sys.argv) > 3:
