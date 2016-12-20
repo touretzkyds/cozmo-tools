@@ -86,6 +86,12 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+* 12/20/2016 Command line changes
+    Dave Touretzky:
+        - Renamed simple_cli.py to simple_cli
+        - Changed behavior to default to no tkviewer. Invoke with
+          VIEWER as the first argument if a viewer is desired.
+
 * 12/13/2016: More cozmo_fsm development
     Dave Touretzky
         - Changed TRACE to tracefsm
