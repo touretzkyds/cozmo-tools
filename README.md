@@ -17,6 +17,6 @@ commands. May not work on Macs due to Tkinter brokenness.
 
 * __cozmo_fsm__ is a Finite State Machine package for Cozmo programming.
 
-* __genfsm.py__ is a preprocessor that converts .fsm files written in
+* __genfsm__ is a preprocessor that converts .fsm files written in
 the cozmo_fsm notation to .py files that are ready to run.
 
