@@ -16,4 +16,8 @@ typing: viewer(robot); type 'h' in the graphics window for a list of
 commands. May not work on Macs due to Tkinter brokenness.
 
 * __cozmo_fsm__ is a Finite State Machine package for Cozmo programming.
-It's currently in early beta release.
+It's currently in beta release.a
+
+* _genfsm.py_ is a preprocessor that converts .fsm files written in
+the cozmo_fsm notation to .py files that are ready to run.
+
