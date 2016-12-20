@@ -314,7 +314,7 @@ def parser2(p1tokens):
         if p1tokens[0].isLabelDef():
             label = p1tokens[0].label
             # labeled constructor call
-            if len(p1tokens) > 1 and p1tokens[1].isConstructorCall():
+            if p1tokens[1].isConstructorCall():
                 call = p1tokens[1]
                 p2tokens.append(NodeDefinition(label, call.name, call.arglist))
                 del p1tokens[0:2]
@@ -553,8 +553,9 @@ def process_file():
         while True:
             line = in_f.readline()
             if not line:
-                report_line_error("File ended without closing %s." + delim*3)
-                break
+                report_line_error("State machine at line %s ended without closing %s." %
+                                  (starting_line-1, (delim*3)))
+                return
             current_line += 1
             line_cache.append(line)
             if r_end.match(line): break
