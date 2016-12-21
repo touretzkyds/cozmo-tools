@@ -1,0 +1,25 @@
+"""
+  The Nested demo shows the use of nested state machines. We define a
+  new node class DingDong that has a three-node state machine inside
+  it. We then define the main class, Nested, whose state machine
+  contains two instances of DingDong. DingDong uses a ParentCompletes
+  node to cause DinDong to post a completion event, which allows
+  Nested's first DingDong instance 'dd1' to move on to the next state,
+  which is 'bridge'. (The 'dd2' instance of DingDong also posts a
+  completion event, but nothing is listening for it.)
+
+  Behavior: Cozmo says 'ding', then 'dong', then says 'once again'
+  (that's the bridge), then 'ding', and then 'dong'.
+"""
+
+from cozmo_fsm import *
+
+class DingDong(StateNode):
+    $setup """
+        ding: Say('ding') =C=> dong: Say('dong') =C=> ParentCompletes()
+    """
+
+class Nested(StateNode):
+    $setup """
+        dd1: DingDong() =C=> bridge: Say('once again') =C=> dd2: DingDong()
+    """
