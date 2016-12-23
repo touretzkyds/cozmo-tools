@@ -228,7 +228,7 @@ def make_light_cube(cube_number):
         # make solid cube and highlight if visible
         make_cube((s,s,s), highlight=lcube.is_visible, color=color)
     else:
-        # make wireframe cube if coords no longer valid
+        # make wireframe cube if coords no longer comparable
         make_cube((s,s,s), body=False, highlight=True, color=color)
     glPopMatrix()
     glEndList()
@@ -237,9 +237,8 @@ def make_light_cube(cube_number):
 def make_charger():
     charger = robot.world.charger
     if not charger.pose.is_valid: return None
-    # Bug: charger.pose.origin_id doesn't always update when on charger
     comparable = charger.pose.is_comparable(robot.pose)
-    high = charger.is_visible or (robot.is_on_charger and comparable)
+    highlight = charger.is_visible or (robot.is_on_charger and comparable)
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
     p = charger.pose.position.x_y_z
@@ -250,7 +249,7 @@ def make_charger():
                     -charger_bed_size_mm[2]/2*wscale)
     glRotatef(180, 0, 1, 0) # charger "front" is opposite robot "front"
     if comparable:
-        make_cube(charger_bed_size_mm, highlight=high)
+        make_cube(charger_bed_size_mm, highlight=highlight)
     else:
         make_cube(charger_bed_size_mm, body=False, \
                   highlight=False, color=color_white)
@@ -258,7 +257,7 @@ def make_charger():
            (charger_back_size_mm[1]-charger_bed_size_mm[1])/2*wscale, \
            charger_bed_size_mm[2]/2*wscale)
     if comparable:
-        make_cube(charger_back_size_mm, highlight=high)
+        make_cube(charger_back_size_mm, highlight=highlight)
     else:
         make_cube(charger_back_size_mm, body=False, \
                   highlight=False, color=color_white)
