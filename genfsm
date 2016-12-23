@@ -131,6 +131,10 @@ class Transition(Token):
 
     def __repr__(self):
         label = self.label+':' if self.label else ''
+        try:
+            len(self.sources)
+        except:
+            print('self=',self.label,'sources:',type(self.sources))
         if len(self.sources) == 1:
             srcs = self.sources[0]
         else:
@@ -409,7 +413,7 @@ def parser3(p2tokens):
             del p2tokens[0]
         elif p2tokens[0].isIdentifierList():
             must_transition = True
-            current_node = (x.label for x in p2tokens[0].label_refs)
+            current_node = p2tokens[0].label_refs
             del p2tokens[0]
         elif not current_node:
             report_line_error('Node reference expected before this transition: %s' % p2tokens[0])
@@ -493,7 +497,9 @@ def generate_machine(lines):
         if item.isTransition():
             for ref in item.sources + item.destinations:
                 if ref not in labels:
-                    report_global_error("Label '%s' was referenced but never defined." % ref)
+                    hint = (" Should it be %s() ?" % ref) if ref[0].isupper() else ""
+                    report_global_error("Label '%s' was referenced but never defined.%s" %
+                                        (ref,hint))
                     labels[ref] = None
 
     # Write out the state machine source as a comment
@@ -533,7 +539,7 @@ def process_file():
     global line_cache, current_line, starting_line, indent_level
     line_cache = [None] # dummy line 0
     current_line = 0
-    r_setup = re.compile('^\s*\$setup\s*(\"\"\")|(\'\'\')$')
+    r_setup = re.compile('^\s*\$setup\s*((\"\"\")|(\'\'\')|\{)\s*$')
     r_indent = re.compile('^\s*')
     while True:
         line = in_f.readline()
@@ -548,7 +554,12 @@ def process_file():
             report_line_error("Incorrect $setup syntax: '%s'" % line.strip())
             continue
         delim = line[-2]
-        r_end = re.compile('^\s*' + delim*3)
+        if delim == '{':
+            close_delim = '}'
+            r_end = re.compile('\s*\}\s*$')
+        else:
+            close_delim = delim * 3
+            r_end = re.compile('^\s*' + close_delim)
 
         # Collect the lines of the state machine.
         starting_line = current_line + 1
@@ -558,7 +569,7 @@ def process_file():
             line = in_f.readline()
             if not line:
                 report_line_error("State machine at line %s ended without closing %s." %
-                                  (starting_line-1, (delim*3)))
+                                  (starting_line-1, close_delim))
                 return
             current_line += 1
             line_cache.append(line)
@@ -616,6 +627,8 @@ if __name__ == '__main__':
                               (outfile_name if outfile_name != '-' else 'standard output'))
             except Exception as e:
                 print('Error opening output file: %s' % e)
+                import traceback
+                traceback.print_exc()
                 sys.exit(1)
     except Exception as e:
         print('Error opening input file: %s' % e)

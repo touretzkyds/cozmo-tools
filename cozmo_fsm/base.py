@@ -9,30 +9,32 @@ import cozmo
 
 from .trace import TRACE
 from .evbase import EventListener
-from .events import CompletionEvent, FailureEvent
+from .events import CompletionEvent, SuccessEvent, FailureEvent
 
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self):
         super().__init__()
         self.parent = None
-        self.children = []
+        self.children = {}
         self.transitions = []
+        self.start_node = None
         self.setup()
+        self.setup2()
 
     # Cache 'robot' in the instance because we could have two state
     # machine instances controlling different robots.
     @property
     def robot(self):
-        """if not self._robot:
-            if self.parent:
-                self._robot = self.parent.robot  # recursive call
-            else:
-                self._robot = erouter.robot_for_loading
-            if not isinstance(self._robot, cozmo.robot.Robot):
-                raise ValueError('%s _robot attribute is %s, not a cozmo.robot.Robot' %
-                                 (self, self._robot))"""
         return self._robot
+
+    def setup(self):
+        """Redefine this to set up a child state machine."""
+        pass
+
+    def setup2(self):
+        """Redefine this if post-setup processing s required."""
+        pass
 
     def start(self,event=None):
         if self.running: return
@@ -40,12 +42,11 @@ class StateNode(EventListener):
             print('TRACE%d:' % TRACE.statenode_start, self, 'starting')
         super().start()
         # Start transitions before children, because children
-        # may post an event that we're listening for (like completion).
+        # may post an event that we're listening for (such as completion).
         for t in self.transitions:
-            # print(self,'starting',t)
             t.start(event)
-        if self.children:
-            self.children[0].start()
+        if self.start_node:
+            self.start_node.start()
 
     def stop(self):
         if not self.running: return
@@ -54,7 +55,7 @@ class StateNode(EventListener):
         super().stop()
         # Stop children before transitions, because a child's stop()
         # method could post an event we want to handle.
-        for c in self.children: c.stop()
+        for c in self.children.values(): c.stop()
         for t in self.transitions: t.stop()
 
     def add_transition(self, trans):
@@ -68,13 +69,22 @@ class StateNode(EventListener):
         if self.parent:
             raise Exception('parent already set')
         self.parent = parent
-        parent.children.append(self)
+        parent.children[self.name] = self
+        # First-declared child is the default start node.
+        if not parent.start_node:
+            parent.start_node = self
         return self
 
     def post_completion(self):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting completion')
         self.robot.erouter.post(CompletionEvent(self))
+
+    def post_success(self,details=None):
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop,
+                  self, 'posting success', details)
+        self.robot.erouter.post(SuccessEvent(self,details))
 
     def post_failure(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
@@ -87,6 +97,7 @@ class StateNode(EventListener):
         if not self.robot:
             raise ValueError('Node %s has no robot designated.' % self)
         self.robot.loop.call_soon(self.start)
+        return self
 
 
 class Transition(EventListener):

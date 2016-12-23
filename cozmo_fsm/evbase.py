@@ -16,11 +16,17 @@ from .trace import TRACE
 
 class Event:
     """Base class for all events."""
-    def __init__(self):
-        self.source = None
+    def __init__(self, source=None):
+        self.source = source
     cozmo_evt_type = None
     def generator(self,erouter,cozmo_evt): pass
 
+    def __repr__(self):
+        try:
+            src_string = self.source.name
+        except:
+            src_string = repr(self.src)
+        return '<%s for %s>' % (self.__class__.__name__, src_string)
 
 #________________ Event Router ________________
 
@@ -141,12 +147,10 @@ class EventListener:
         self.name = name
         return self
 
-    def setup(self): pass
-
     def start(self):
         self.running = True
         if self.polling_interval:
-            self.next_poll()
+            self._next_poll()
 
     def stop(self):
         if not self.running: return
@@ -163,10 +167,12 @@ class EventListener:
         else:
             raise TypeError('interval must be a number')
 
-    def next_poll(self):
-        """Call this to schedule the next polling interval."""
-        self.poll_handle = \
-            self.robot.loop.call_later(self.polling_interval, self.poll)
+    def _next_poll(self):
+        """Called to poll the node and then schedule the next polling interval."""
+        self.poll()
+        if self.running and self.polling_interval:
+            self.poll_handle = \
+                self.robot.loop.call_later(self.polling_interval, self._next_poll)
 
     def poll(self):
         """Dummy polling function in case sublass neglects to supply one."""

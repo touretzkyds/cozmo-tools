@@ -1,0 +1,59 @@
+try:
+    from cozmo_fsm import *
+except:
+    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+
+class ZeroFaceCounts(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        Peekaboo.amountOfFacesNotFound = 0
+        Peekaboo.amountOfFacesFound = 0
+
+class FaceChecker(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        numberOfFaces = self.robot.world.visible_face_count()
+        if numberOfFaces == 0:
+            Peekaboo.amountOfFacesNotFound += 1
+        else:
+            Peekaboo.amountOfFacesFound += 1
+
+class SearchForPlayer(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        numberOfFaces = self.robot.world.visible_face_count()
+        if numberOfFaces > 0 and Peekaboo.amountOfFacesFound > 3:
+            post_success();
+
+class CheckPlayerHidden(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        numberOfFaces = self.robot.world.visible_face_count()
+        if numberOfFaces == 0 and Peekaboo.amountOfFacesNotFound > 2:
+            post_success();
+
+class Peekaboo(StateNode):
+    face_delay = 0.2
+    $setup {
+        start: ZeroFaceCounts() =N=> greet
+
+        search: SearchForPlayer()
+        search =T(self.face_delay)=> FaceChecker() =N=> search
+        search =S=> greet
+        
+        greet: AnimationNode('anim_freeplay_reacttoface_identified_01_head_angle_40')
+              =C=> SetHeadAngle(cozmo.robot.MIN_HEAD_ANGLE)
+              =C=> SetHeadAngle(cozmo.robot.MAX_HEAD_ANGLE)
+              =C=> ZeroFaceCounts
+              =N=> player_hides
+
+        player_hides: CheckPlayerHidden()
+        player_hides =T(self.face_delay)=> FaceChecker() =N=> player_hides
+        player_hides =S=> AnimationNode('anim_hiking_observe_01')
+                     =C=> {move_lift, move_head}
+
+        move_lift: MoveLift(-3)
+        move_head: SetHeadAngle(cozmo.robot.MAX_HEAD_ANGLE)
+
+        {move_lift,move_head} =C(1)=> start
+    }

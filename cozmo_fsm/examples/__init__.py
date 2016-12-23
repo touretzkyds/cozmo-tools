@@ -3,6 +3,7 @@
 """
 
 from . import BackItUp
+from . import Boo
 from . import Greet
 from . import Nested
 from . import TapSpeak

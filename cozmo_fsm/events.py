@@ -9,18 +9,18 @@ from .evbase import Event
 
 class CompletionEvent(Event):
     """Signals completion of a state node's action."""
-    def __init__(self,source):
-        super().__init__()
-        self.source = source
+    pass
 
-    def __repr__(self):
-        return '<%s for %s>' % (self.__class__.__name__, self.source.name)
+class SuccessEvent(Event):
+    """Signals success of a state node's action."""
+    def __init__(self,source,details):
+        super().__init__(source)
+        self.details = details
 
 class FailureEvent(Event):
     """Signals failure of a state node's action."""
     def __init__(self,source,details):
-        super().__init__()
-        self.source = source
+        super().__init__(source)
         self.details = details
 
     def __repr__(self):

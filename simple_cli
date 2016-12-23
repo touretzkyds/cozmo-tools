@@ -257,8 +257,8 @@ def runfsm(module_name, running_modules=dict()):
 def run(sdk_conn):
     global robot
     robot = sdk_conn.wait_for_robot()
-    if len(sys.argv) <= 1:
-        time.sleep(1.5) # allow time for Tk to set up the window
+    if len(sys.argv) > 1 and sys.argv[1] == "VIEWER":
+        time.sleep(1.5) # allow time for Tk to set up the viewer window
     try:
         robot.erouter = cozmo_fsm.evbase.EventRouter()
         robot.erouter.robot = robot
@@ -314,6 +314,8 @@ def cli_loop(robot):
             try:
                 world_viewer.exited = True
             except: pass
+            if running_fsm:
+                running_fsm.stop()
             server.shutdown()
             server.socket.close()
             RUNNING=False
