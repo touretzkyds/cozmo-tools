@@ -11,6 +11,10 @@ Author:  David S. Touretzky, Carnegie Mellon University
 
 Change Log:
 ===========
+* 12/22/2016: Update for SDK release 0.10
+    Dave Touretzky
+        - Make use of the new Pose.is_valid and Pose.is_comparable() features.
+
 * 12/7/2016: More enhancements.
     Dave Touretzky
         - Display coordinate axes and show the gazepoint as a yellow dot.
@@ -150,10 +154,6 @@ cube_cIndices = array.array('B', \
      4, 5, 6, 7, \
      0, 1, 5, 4 ])
 
-def is_dummy_pose(pose):
-    return pose.position.x_y_z == (0, 0, 0) and \
-           pose.rotation.q0_q1_q2_q3 == (1, 0, 0, 0)
-
 light_cube_size_mm = 44.3
 
 robot_body_size_mm =   (56,   30, 70)
@@ -214,11 +214,7 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
 
 def make_light_cube(cube_number):
     lcube = robot.world.light_cubes[cube_number]
-    # check for dummy pose because of buggy updating of origin_id
-    lcube.is_present = (lcube.pose and lcube.pose.origin_id > 1 and \
-                          not is_dummy_pose(lcube.pose) ) \
-            or lcube.is_visible or lcube.is_present
-    if not lcube.is_present: return None
+    if not lcube.pose.is_valid: return None
     p = lcube.pose.position.x_y_z
     s = light_cube_size_mm
     color = (None, color_red, color_green, color_blue)[cube_number]
@@ -228,9 +224,11 @@ def make_light_cube(cube_number):
     glPushMatrix()
     glTranslatef(-p[1]*wscale, p[2]*wscale, -p[0]*wscale)
     glRotatef(lcube.pose.rotation.angle_z.degrees, 0, 1, 0)
-    if valid_pose:  # make solid cube and highlight if visible
+    if lcube.pose.is_comparable(robot.pose):
+        # make solid cube and highlight if visible
         make_cube((s,s,s), highlight=lcube.is_visible, color=color)
-    else:  # make wireframe if once seen but coords no longer valid
+    else:
+        # make wireframe cube if coords no longer valid
         make_cube((s,s,s), body=False, highlight=True, color=color)
     glPopMatrix()
     glEndList()
@@ -238,13 +236,10 @@ def make_light_cube(cube_number):
 
 def make_charger():
     charger = robot.world.charger
-    charger.is_present = charger.is_present or charger.is_visible or \
-            robot.is_on_charger
-    if not charger.is_present: return None
+    if not charger.pose.is_valid: return None
     # Bug: charger.pose.origin_id doesn't always update when on charger
-    valid_pose = (charger.pose.origin_id == robot.pose.origin_id) and \
-        not is_dummy_pose(charger.pose)
-    high = charger.is_visible or (robot.is_on_charger and valid_pose)
+    comparable = charger.pose.is_comparable(robot.pose)
+    high = charger.is_visible or (robot.is_on_charger and comparable)
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
     p = charger.pose.position.x_y_z
@@ -254,7 +249,7 @@ def make_charger():
     glTranslatef(0., charger_bed_size_mm[1]/2*wscale,
                     -charger_bed_size_mm[2]/2*wscale)
     glRotatef(180, 0, 1, 0) # charger "front" is opposite robot "front"
-    if valid_pose:
+    if comparable:
         make_cube(charger_bed_size_mm, highlight=high)
     else:
         make_cube(charger_bed_size_mm, body=False, \
@@ -262,7 +257,7 @@ def make_charger():
     glTranslatef(0., \
            (charger_back_size_mm[1]-charger_bed_size_mm[1])/2*wscale, \
            charger_bed_size_mm[2]/2*wscale)
-    if valid_pose:
+    if comparable:
         make_cube(charger_back_size_mm, highlight=high)
     else:
         make_cube(charger_back_size_mm, body=False, \
@@ -497,7 +492,7 @@ global RUNNING
 RUNNING = False
 
 def viewer(_robot):
-    global RUNNING
+    global RUNNING, robot
     if not isinstance(_robot,cozmo.robot.Robot):
         raise TypeError('Argument must be a cozmo.robot.Robot instance.')
     if RUNNING:
@@ -505,18 +500,7 @@ def viewer(_robot):
         return
     else:
         RUNNING = True
-    global robot
     robot = _robot
-    # Missing lightcubes are still in world.light_cubes but not in
-    # world._objects. Being overly inclusive here in case more
-    # object types are added later.
-    for obj in set(robot.world._objects.values()) \
-            .union(set(robot.world.light_cubes.values())) \
-                .union(set([robot.world.charger])):
-        try:
-            obj.is_present = obj.is_visible
-        except:
-            pass
     th = threading.Thread(target=init_display)
     th.start()
 
