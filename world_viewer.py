@@ -475,7 +475,7 @@ def init_display():
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(window_width, window_height)
     # glutInitWindowPosition(100, 100)
-    GLwindow = glutCreateWindow("Cozmo's World")
+    GLwindow = glutCreateWindow(b"Cozmo's World")
     glClearColor(0, 0, 0, 0)
     glEnable(GL_DEPTH_TEST)
     glShadeModel(GL_SMOOTH)
