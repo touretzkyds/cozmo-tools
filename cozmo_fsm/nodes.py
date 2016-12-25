@@ -276,12 +276,13 @@ class AnimationTriggerNode(ActionNode):
 #________________ Behaviors ________________
 
 class StartBehavior(StateNode):
-    def __init__(self, behavior=None):
+    def __init__(self, behavior=None, stop_on_exit=True):
         if not isinstance(behavior, cozmo.behavior._BehaviorType):
             raise ValueError("'%s' isn't an instance of cozmo.behavior._BehaviorType" %
                              repr(behavior))
         self.behavior = behavior
         self.behavior_handle = None
+        self.stop_on_exit = stop_on_exit
         super().__init__()
 
     def __repr__(self):
@@ -298,12 +299,17 @@ class StartBehavior(StateNode):
             if self.robot.behavior_handle:
                 self.robot.behavior_handle.stop()
         except: pass
+        finally:
+            self.robot.behavior_handle = None
         self.behavior_handle = self.robot.start_behavior(self.behavior)
         self.robot.behavior_handle = self.behavior_handle
         self.post_completion()
 
     def stop(self):
         if not self.running: return
+        if self.stop_on_exit and self.behavior_handle is self.robot.behavior_handle:
+            self.robot.behavior_handle.stop()
+            self.robot.behavior_handle = None
         super().stop()
 
 class StopBehavior(StateNode):
@@ -318,25 +324,25 @@ class StopBehavior(StateNode):
         self.post_completion()
 
 class FindFaces(StartBehavior):
-    def __init__(self):
-        super().__init__(cozmo.robot.behavior.BehaviorTypes.FindFaces)
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.FindFaces,stop_on_exit)
 
 class KnockOverCubes(StartBehavior):
-    def __init__(self):
-        super().__init__(cozmo.robot.behavior.BehaviorTypes.KnockOverCubes)
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.KnockOverCubes,stop_on_exit)
 
 class LookAroundInPlace(StartBehavior):
-    def __init__(self):
-        super().__init__(cozmo.robot.behavior.BehaviorTypes.LookAroundInPlace)
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.LookAroundInPlace,stop_on_exit)
 
 class PounceOnMotion(StartBehavior):
-    def __init__(self):
-        super().__init__(cozmo.robot.behavior.BehaviorTypes.PounceOnMotion)
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.PounceOnMotion,stop_on_exit)
 
 class RollBlock(StartBehavior):
-    def __init__(self):
-        super().__init__(cozmo.robot.behavior.BehaviorTypes.RollBlock)
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.RollBlock,stop_on_exit)
 
 class stackBlocks(StartBehavior):
-    def __init__(self):
-        super().__init__(cozmo.robot.behavior.BehaviorTypes.StackBlocks)
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.StackBlocks,stop_on_exit)
