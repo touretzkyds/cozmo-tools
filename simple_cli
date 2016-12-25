@@ -162,6 +162,7 @@ import atexit
 
 import cozmo
 from cozmo.util import *
+from cozmo._clad import _clad_to_engine_iface  # fix charger pose bug
 
 from event_monitor import monitor, unmonitor
 
@@ -286,6 +287,10 @@ def cli_loop(robot):
         while cli_loop._line == '':
             if robot.is_on_charger:
                 if not cli_loop.charger_warned:
+                    # next two lines are a bug fix from mwesley @ anki
+                    msg = _clad_to_engine_iface.RequestAvailableObjects()
+                    robot.world.conn.send_msg(msg)
+                    # end bug fix
                     print("On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
                     cli_loop.charger_warned = True
             else:
