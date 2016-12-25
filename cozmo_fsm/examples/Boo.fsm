@@ -42,6 +42,7 @@ class HeadAndLiftGesture(StateNode):
     """Move head and lift simultaneously. Finish when head movement completes."""
     $setup {
         launch: StateNode() =N=> {move_head, move_lift}
+
         move_head: SetHeadAngle(cozmo.robot.MAX_HEAD_ANGLE)
         move_lift: MoveLift(-3)
 
@@ -49,7 +50,7 @@ class HeadAndLiftGesture(StateNode):
     }
 
 class Boo(StateNode):
-    $setup{
+    $setup {
         launch: Say("Let's play")
                 =C=> SetHeadAngle(30)
                 =C=> player_appears
