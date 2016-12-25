@@ -1,0 +1,17 @@
+"""
+  Example of starting a behavior and indicating that it should not be
+  automatically stopped when the behavior node is exited. We later
+  use StopBehavior() to stop the behavior.
+"""
+
+try:
+    from cozmo_fsm import *
+except:
+    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+
+class Look5(StateNode):
+    $setup {
+        LookAroundInPlace(stop_on_exit=False)
+            =T(5)=> Say("I'm almost done")
+            =T(5)=> StopBehavior()
+    }

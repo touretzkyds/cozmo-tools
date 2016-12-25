@@ -4,7 +4,7 @@
   This version is coded using the cozmo_fsm package and illustrates
   features such as repetitive polling, nested state machines, and a
   completion transition that uses one completing source node to
-  terminate a second source that doesn't complete.
+  terminate a second source (MoveHead) that doesn't complete.
 """
 
 try:
@@ -15,7 +15,7 @@ except:
 class WaitForPlayer(StateNode):
     """Wait for player's face to appear and remain visible for a little while."""
     def start(self,event=None):
-        self.polling_interval = 0.2
+        self.set_polling_interval(0.2)
         self.faces_found = 0  # initialize before polling starts
         super().start(event)
 
@@ -28,7 +28,7 @@ class WaitForPlayer(StateNode):
 class WaitForHide(StateNode):
     """Wait for player's face to disappear and remain not visible for a little while."""
     def start(self,event=None):
-        self.polling_interval = 0.2
+        self.set_polling_interval(0.2)
         self.faces_not_found = 0  # initialize before polling starts
         super().start(event)
 
