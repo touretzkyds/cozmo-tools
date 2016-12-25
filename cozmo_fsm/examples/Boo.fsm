@@ -1,0 +1,75 @@
+"""
+  Peek-A-Boo game inspired by the Boo game of Pablo Barros.
+
+  This version is coded using the cozmo_fsm package and illustrates
+  features such as repetitive polling, nested state machines, and a
+  completion transition that uses one completing source node to
+  terminate a second source (MoveHead) that doesn't complete.
+"""
+
+try:
+    from cozmo_fsm import *
+except:
+    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+
+class WaitForPlayer(StateNode):
+    """Wait for player's face to appear and remain visible for a little while."""
+    def start(self,event=None):
+        self.set_polling_interval(0.2)
+        self.faces_found = 0  # initialize before polling starts
+        super().start(event)
+
+    def poll(self):
+        if self.robot.world.visible_face_count() == 0: return
+        self.faces_found += 1
+        if self.faces_found > 3:
+            self.post_completion()
+
+class WaitForHide(StateNode):
+    """Wait for player's face to disappear and remain not visible for a little while."""
+    def start(self,event=None):
+        self.set_polling_interval(0.2)
+        self.faces_not_found = 0  # initialize before polling starts
+        super().start(event)
+
+    def poll(self):
+        if self.robot.world.visible_face_count() > 0: return
+        self.faces_not_found += 1
+        if self.faces_not_found > 2:
+            self.post_completion()
+
+class HeadAndLiftGesture(StateNode):
+    """Move head and lift simultaneously. Finish when head movement completes."""
+    $setup {
+        launch: StateNode() =N=> {move_head, move_lift}
+
+        move_head: SetHeadAngle(cozmo.robot.MAX_HEAD_ANGLE)
+        move_lift: MoveLift(-3)
+
+        {move_head, move_lift} =C(1)=> ParentCompletes()
+    }
+
+class Boo(StateNode):
+    $setup {
+        launch: Say("Let's play")
+                =C=> SetHeadAngle(30)
+                =C=> player_appears
+
+        player_appears: WaitForPlayer()
+            =C=> AnimationNode('anim_freeplay_reacttoface_identified_01_head_angle_40')
+            =C=> SetHeadAngle(cozmo.robot.MIN_HEAD_ANGLE)
+            =C=> SetHeadAngle(cozmo.robot.MAX_HEAD_ANGLE)
+            =C=> player_hides
+
+        player_hides: WaitForHide()
+            =C=> AnimationNode('anim_hiking_observe_01')
+            =C=> HeadAndLiftGesture()
+            =C=> player_reappears
+
+        player_reappears: WaitForPlayer()
+            =C=> AnimationNode('anim_freeplay_reacttoface_like_01')
+            =C=> HeadAndLiftGesture()
+            =C=> Say("play again")
+            =C=> SetHeadAngle(30)
+            =C=> player_hides
+    }

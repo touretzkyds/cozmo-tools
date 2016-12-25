@@ -1,3 +1,5 @@
+import time
+import inspect
 from math import sqrt
 
 import cozmo
@@ -14,32 +16,86 @@ class ParentCompletes(StateNode):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop,
                   '%s is causing %s to complete' % (self, self.parent))
-        if parent:
+        if self.parent:
             self.parent.post_completion()
 
+class ParentSucceeds(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop,
+                  '%s is causing %s to succeed' % (self, self.parent))
+        if self.parent:
+            self.parent.post_success()
 
-class DriveWheels(StateNode):
-    def __init__(self,l_wheel_speed,r_wheel_speed):
+class ParentFails(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop,
+                  '%s is causing %s to fail' % (self, self.parent))
+        if self.parent:
+            self.parent.post_failure()
+
+class MoveLift(StateNode):
+    def __init__(self,speed):
         super().__init__()
-        self.l_wheel_speed = l_wheel_speed
-        self.r_wheel_speed = r_wheel_speed
+        self.speed = speed
 
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        cor = self.robot.drive_wheels(self.l_wheel_speed, self.r_wheel_speed)
-        self.handle = self.robot.loop.create_task(cor)
+        self.robot.move_lift(self.speed)
 
     def stop(self):
         if not self.running: return
-        self.handle.cancel()
-        cor = self.robot.drive_wheels(0, 0)
-        self.handle = self.robot.loop.create_task(cor)
+        self.robot.move_lift(0)
+        super().stop()
+
+#________________ Coroutine Nodes ________________
+
+class CoroutineNode(StateNode):
+    def __init__(self):
+        super().__init__()
+        self.handle = None
+
+    def start(self,event=None):
+        super().start(event)
+        cor = self.coroutine_launcher()
+        if inspect.iscoroutine(cor):
+            self.handle = self.robot.loop.create_task(cor)
+        else:
+            print('cor=',cor,'type=',type(cor))
+            raise ValueError("Result of %s launch_couroutine() is %s, not a coroutine." %
+                             (self,cor))
+
+    def coroutine_launcher(self):
+        raise Exception('%s lacks a coroutine_launcher() method' % self)
+    
+    def stop(self):
+        if not self.running: return
+        if self.handle: self.handle.cancel()
         super().stop()
 
 
+class DriveWheels(CoroutineNode):
+    def __init__(self,l_wheel_speed,r_wheel_speed,**kwargs):
+        super().__init__()
+        self.l_wheel_speed = l_wheel_speed
+        self.r_wheel_speed = r_wheel_speed
+        self.kwargs = kwargs
+
+    def coroutine_launcher(self):
+        return self.robot.drive_wheels(self.l_wheel_speed,self.r_wheel_speed,**self.kwargs)
+
+    def stop(self):
+        if not self.running: return
+        super().stop()        
+        cor = self.robot.drive_wheels(0,0)
+        self.handle = self.robot.loop.create_task(cor)
+
 class DriveForward(DriveWheels):
-    def __init__(self, distance=50, speed=50):
+    def __init__(self, distance=50, speed=50, **kwargs):
         if isinstance(distance, cozmo.util.Distance):
             distance = distance.distance_mm
         if isinstance(speed, cozmo.util.Speed):
@@ -47,9 +103,10 @@ class DriveForward(DriveWheels):
         if distance < 0:
             distance = -distance
             speed = -speed
-        super().__init__(speed,speed)
         self.distance = distance
         self.speed = speed
+        self.kwargs = kwargs
+        super().__init__(speed,speed,**self.kwargs)
         self.polling_interval = 0.1
 
     def start(self,event=None):
@@ -65,8 +122,8 @@ class DriveForward(DriveWheels):
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
             self.post_completion()
-        else:
-            self.next_poll()
+            # shut down manually in case no one was listening for the completion
+            self.stop()
 
 
 #________________ Action Nodes ________________
@@ -75,7 +132,10 @@ class ActionNode(StateNode):
     relaunch_delay = 0.050 # 50 milliseconds
 
     def __init__(self):
+        """Call this only after the subclass __init__ has set self.kwargs"""
         super().__init__()
+        if 'in_parallel' not in self.kwargs:
+            self.kwargs['in_parallel'] = True
         self.cozmo_action_handle = None
 
     def start(self,event=None):
@@ -84,7 +144,7 @@ class ActionNode(StateNode):
 
     def launch_or_retry(self):
         try:
-            result = self.action_launcher(self.robot)
+            result = self.action_launcher()
         except cozmo.exceptions.RobotBusy:
             if TRACE.trace_level >= TRACE.statenode_startstop:
                 print('TRACE%d:' % TRACE.statenode_startstop, self, 'launch_action raised RobotBusy')
@@ -93,10 +153,11 @@ class ActionNode(StateNode):
         if isinstance(result, cozmo.action.Action):
             self.cozmo_action_handle = result
         else:
-            raise ValueError("Result of %s launch_action() is not a cozmo.action.Action", self)
+            raise ValueError("Result of %s launch_action() is %s, not a cozmo.action.Action." %
+                             (self,result))
         self.post_when_complete()
 
-    def action_launcher(self,robot):
+    def action_launcher(self):
         raise Exception('%s lacks an action_launcher() method' % self)
     
     def post_when_complete(self):
@@ -113,7 +174,8 @@ class ActionNode(StateNode):
             if self.cozmo_action_handle.state == 'action_succeeded':
                 self.post_completion()
             elif self.cozmo_action_handle.failure_reason[0] == 'cancelled':
-                return
+                print('CANCELLED: ***>',self,self.cozmo_action_handle)
+                self.post_completion()
             else:
                 self.post_failure(self.cozmo_action_handle)
 
@@ -127,23 +189,22 @@ class ActionNode(StateNode):
 class Say(ActionNode):
     """Speaks some text, then posts a completion event."""
     def __init__(self, text="I'm speechless", **kwargs):
-        super().__init__()
         self.text = text
         self.kwargs = kwargs
+        super().__init__()
 
     def start(self,event=None):
         if self.running: return
         super().start(event)
         print("Speaking: '",self.text,"'",sep='')
 
-    def action_launcher(self,robot):
-        return robot.say_text(self.text,**self.kwargs)
+    def action_launcher(self):
+        return self.robot.say_text(self.text,**self.kwargs)
 
 
 class Forward(ActionNode):
     def __init__(self, distance=distance_mm(50),
                  speed=speed_mmps(50), **kwargs):
-        super().__init__()
         if isinstance(distance, (int,float)):
             distance = distance_mm(distance)
         elif not isinstance(distance, cozmo.util.Distance):
@@ -155,46 +216,133 @@ class Forward(ActionNode):
         self.distance = distance
         self.speed = speed
         self.kwargs = kwargs
+        super().__init__()  # must come last because checks self.kwargs
 
-    def action_launcher(self,robot):
-        return robot.drive_straight(self.distance, self.speed, **self.kwargs)
+    def action_launcher(self):
+        return self.robot.drive_straight(self.distance, self.speed, **self.kwargs)
 
 
 class Turn(ActionNode):
     def __init__(self, angle=degrees(90), **kwargs):
-        super().__init__()
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
         elif not isinstance(angle, cozmo.util.Angle):
             raise ValueError('%s angle must be a number or a cozmo.util.Angle' % self)
         self.angle = angle
         self.kwargs = kwargs
+        super().__init__()
 
-    def action_launcher(self,robot):
-        return robot.turn_in_place(self.angle, **self.kwargs)
+    def action_launcher(self):
+        return self.robot.turn_in_place(self.angle, **self.kwargs)
+
+class SetHeadAngle(ActionNode):
+    def __init__(self, angle=degrees(0), **kwargs):
+        if isinstance(angle, (int,float)):
+            angle = degrees(angle)
+        elif not isinstance(angle, cozmo.util.Angle):
+            raise ValueError('%s angle must be a number or a cozmo.util.Angle' % self)
+        self.angle = angle
+        self.kwargs = kwargs
+        super().__init__()
+
+    def action_launcher(self):
+        return self.robot.set_head_angle(self.angle, **self.kwargs)
+
 
 #________________ Animations ________________
 
 
 class AnimationNode(ActionNode):
-    def __init__(self, anim_name='anim_bored_01'):
-        super().__init__()
+    def __init__(self, anim_name='anim_bored_01', **kwargs):
         self.anim_name = anim_name
+        self.kwargs = kwargs
+        super().__init__()
 
-    def action_launcher(self,robot):
-        return robot.play_anim(self.anim_name)
+    def action_launcher(self):
+        return self.robot.play_anim(self.anim_name)
 
 class AnimationTriggerNode(ActionNode):
-    def __init__(self, trigger=cozmo.anim.Triggers.CubePouncePounceNormal):
+    def __init__(self, trigger=cozmo.anim.Triggers.CubePouncePounceNormal, **kwargs):
         if not isinstance(trigger, cozmo.anim._AnimTrigger):
-            raise TypeError('%s is not an instance of cozmo.anim._AnimTrigger' % repr(trigger))
-        super().__init__()
+            raise TypeError('%s is not an instance of cozmo.anim._AnimTrigger' %
+                            repr(trigger))
         self.trigger = trigger
+        self.kwargs = kwargs
+        super().__init__()
 
-    def action_launcher(self,robot):
-        return robot.play_anim_trigger(self.trigger)
+    def action_launcher(self):
+        return self.robot.play_anim_trigger(self.trigger)
 
-class BehaviorNode(StateNode):
-    pass # TODO
+#________________ Behaviors ________________
 
+class StartBehavior(StateNode):
+    def __init__(self, behavior=None, stop_on_exit=True):
+        if not isinstance(behavior, cozmo.behavior._BehaviorType):
+            raise ValueError("'%s' isn't an instance of cozmo.behavior._BehaviorType" %
+                             repr(behavior))
+        self.behavior = behavior
+        self.behavior_handle = None
+        self.stop_on_exit = stop_on_exit
+        super().__init__()
 
+    def __repr__(self):
+        if self.behavior_handle:
+            return '<%s %s active=%s>' % \
+                   (self.__class__.__name__, self.name, self.behavior_handle.is_active)
+        else:
+            return super().__repr__()        
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        try:
+            if self.robot.behavior_handle:
+                self.robot.behavior_handle.stop()
+        except: pass
+        finally:
+            self.robot.behavior_handle = None
+        self.behavior_handle = self.robot.start_behavior(self.behavior)
+        self.robot.behavior_handle = self.behavior_handle
+        self.post_completion()
+
+    def stop(self):
+        if not self.running: return
+        if self.stop_on_exit and self.behavior_handle is self.robot.behavior_handle:
+            self.robot.behavior_handle.stop()
+            self.robot.behavior_handle = None
+        super().stop()
+
+class StopBehavior(StateNode):
+    def start(self,event=None):
+        if self. running: return
+        super().start(event)
+        try:
+            if self.robot.behavior_handle:
+                self.robot.behavior_handle.stop()
+        except: pass
+        self.robot.behavior_handle = None
+        self.post_completion()
+
+class FindFaces(StartBehavior):
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.FindFaces,stop_on_exit)
+
+class KnockOverCubes(StartBehavior):
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.KnockOverCubes,stop_on_exit)
+
+class LookAroundInPlace(StartBehavior):
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.LookAroundInPlace,stop_on_exit)
+
+class PounceOnMotion(StartBehavior):
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.PounceOnMotion,stop_on_exit)
+
+class RollBlock(StartBehavior):
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.RollBlock,stop_on_exit)
+
+class stackBlocks(StartBehavior):
+    def __init__(self,stop_on_exit=True):
+        super().__init__(cozmo.robot.behavior.BehaviorTypes.StackBlocks,stop_on_exit)

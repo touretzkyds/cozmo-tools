@@ -162,6 +162,7 @@ import atexit
 
 import cozmo
 from cozmo.util import *
+from cozmo._clad import _clad_to_engine_iface  # fix charger pose bug
 
 from event_monitor import monitor, unmonitor
 
@@ -257,8 +258,8 @@ def runfsm(module_name, running_modules=dict()):
 def run(sdk_conn):
     global robot
     robot = sdk_conn.wait_for_robot()
-    if len(sys.argv) <= 1:
-        time.sleep(1.5) # allow time for Tk to set up the window
+    if len(sys.argv) > 1 and sys.argv[1] == "VIEWER":
+        time.sleep(1.5) # allow time for Tk to set up the viewer window
     try:
         robot.erouter = cozmo_fsm.evbase.EventRouter()
         robot.erouter.robot = robot
@@ -286,6 +287,10 @@ def cli_loop(robot):
         while cli_loop._line == '':
             if robot.is_on_charger:
                 if not cli_loop.charger_warned:
+                    # next two lines are a bug fix from mwesley @ anki
+                    msg = _clad_to_engine_iface.RequestAvailableObjects()
+                    robot.world.conn.send_msg(msg)
+                    # end bug fix
                     print("On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
                     cli_loop.charger_warned = True
             else:
@@ -314,6 +319,8 @@ def cli_loop(robot):
             try:
                 world_viewer.exited = True
             except: pass
+            if running_fsm:
+                running_fsm.stop()
             server.shutdown()
             server.socket.close()
             RUNNING=False

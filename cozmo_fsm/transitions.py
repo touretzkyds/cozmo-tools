@@ -14,31 +14,46 @@ class NullTrans(Transition):
         self.robot.loop.call_soon(self.fire)
 
 
-class CompletionTrans(Transition):
-    """Transition fires when a source node completes."""
-    def __init__(self,count=None):
+class CSFEventBase(Transition):
+    """Base class for Completion, Success, and Failure Events"""
+    def __init__(self,event_type,count=None):
         super().__init__()
+        self.event_type = event_type
         self.count = count
 
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        self.completed_sources = set()
+        self.observed_sources = set()
         for source in self.sources:
-            self.robot.erouter.add_listener(self,CompletionEvent,source)
+            self.robot.erouter.add_listener(self, self.event_type, source)
 
     def handle_event(self,event):
         if not self.running: return
         if TRACE.trace_level >= TRACE.listener_invocation:
             print('TRACE:',self,'is handling',event)
         super().handle_event(event)
-        if isinstance(event,CompletionEvent):
-            self.completed_sources.add(event.source)
-            if len(self.completed_sources) >= (self.count or len(self.sources)):
+        if isinstance(event, self.event_type):
+            self.observed_sources.add(event.source)
+            if len(self.observed_sources) >= (self.count or len(self.sources)):
                 self.fire(event)
         else:
-            raise ValueError("CompletionTrans can't handle %s" % event)
+            raise ValueError("%s can't handle %s" % (self.event_type, event))
 
+class CompletionTrans(CSFEventBase):
+    """Transition fires when a source node completes."""
+    def __init__(self,count=None):
+        super().__init__(CompletionEvent,count)
+
+class SuccessTrans(CSFEventBase):
+    """Transition fires when a source node succeeds."""
+    def __init__(self,count=None):
+        super().__init__(SuccessEvent,count)
+
+class FailureTrans(CSFEventBase):
+    """Transition fires when a source node fails."""
+    def __init__(self,count=None):
+        super().__init__(FailureEvent,count)
 
 class TimerTrans(Transition):
     """Transition fires when the timer has expired."""
