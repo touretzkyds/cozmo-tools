@@ -150,7 +150,8 @@ class EventListener:
     def start(self):
         self.running = True
         if self.polling_interval:
-            self._next_poll()
+            self.poll_handle = \
+                self.robot.loop.call_later(self.polling_interval, self._next_poll)
 
     def stop(self):
         if not self.running: return
