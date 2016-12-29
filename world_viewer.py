@@ -428,6 +428,7 @@ def del_shapes():
     if cube3: glDeleteLists(cube3,1)
     if charger: glDeleteLists(charger,1)
     if custom_objects: glDeleteLists(custom_objects,1)
+    if floor: glDeleteLists(floor,1)
     glDeleteLists(cozmo_robot,1)
 
 initial_fixation_point = [100, -25, 0]
