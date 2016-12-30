@@ -205,10 +205,13 @@ def lexer (string):
     return tokens
 
 def lexer_skip_comment(string):
-        pos = string.find('\r')
-        if pos == -1:
-            pos = string.find('\n')
-        return string[pos:]
+    """String begins with '#'. Skip everything from there to the first newline."""
+    pos = string.find('\r')
+    if pos == -1:
+        pos = string.find('\n')
+    if pos == -1:
+        raise Exception('Missing newline at end of comment.')
+    return string[pos:]
 
 def lexer_build_arglist(string):
     """Helper for lexer.  Parses an argument list and returns it plus the remainder of the string."""
