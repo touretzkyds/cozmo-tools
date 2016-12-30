@@ -182,6 +182,9 @@ def lexer (string):
                 was_in_table = True
                 break
         if was_in_table: continue
+        if string[0] == '#':
+            string = lexer_skip_comment(string)
+            continue
         if string[0] == '(':
             arglist, string = lexer_build_arglist(string)
             tokens.append(arglist)
@@ -200,6 +203,12 @@ def lexer (string):
             continue
         break
     return tokens
+
+def lexer_skip_comment(string):
+        pos = string.find('\r')
+        if pos == -1:
+            pos = string.find('\n')
+        return string[pos:]
 
 def lexer_build_arglist(string):
     """Helper for lexer.  Parses an argument list and returns it plus the remainder of the string."""
