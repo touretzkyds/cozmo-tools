@@ -1,11 +1,10 @@
+import random
+
 from .base import *
 from .events import *
 
 class NullTrans(Transition):
     """Transition fires immediately; does not require an event to trigger it."""
-    def __init__(self):
-        super().__init__()
-
     def start(self,event=None):
         if self.running: return
         super().start(event)
@@ -31,7 +30,8 @@ class CSFEventBase(Transition):
     def handle_event(self,event):
         if not self.running: return
         if TRACE.trace_level >= TRACE.listener_invocation:
-            print('TRACE:',self,'is handling',event)
+            print('TRACE%d: %s is handling %s' %
+                  (TRACE.listener_invocation, self,event))
         super().handle_event(event)
         if isinstance(event, self.event_type):
             self.observed_sources.add(event.source)
@@ -54,6 +54,7 @@ class FailureTrans(CSFEventBase):
     """Transition fires when a source node fails."""
     def __init__(self,count=None):
         super().__init__(FailureEvent,count)
+
 
 class TimerTrans(Transition):
     """Transition fires when the timer has expired."""
@@ -85,25 +86,55 @@ class TapTrans(Transition):
             self.handle = \
                 self.robot.loop.call_later(Transition.default_value_delay, self.fire, event)
 
-
-class SignalTrans(Transition):
-    """Transition fires when value matches."""
-    def __init__(self,value=None):
+class DataTrans(Transition):
+    """Transition fires when data matches."""
+    def __init__(self,data=None):
         super().__init__()
-        self.value = value
+        self.data = data
 
-    def start(self):
+    def start(self,event=None):
         if self.running: return
-        super().start()
+        super().start(event)
         for source in self.sources:
-            self.robot.erouter.add_listener(self,DataEvent,self.value)
+            self.robot.erouter.add_listener(self, DataEvent, source)
 
     def handle_event(self,event):
         super().handle_event(event)
         if isinstance(event,DataEvent):
-            if self.value is not None:
+            if self.data is None or self.data == event.data: 
                 self.fire(event)
-            else: # wildcard case: fire only if nothing else does
-                self.handle = self.robot.loop.call_later(0.1, self.fire, event)
         else:
             raise TypeError('%s is not a DataEvent' % event)
+
+class TextMsgTrans(Transition):
+    """Transition fires when message matches."""
+    def __init__(self,message=None):
+        super().__init__()
+        self.source = message
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        # The 'source' is the message text.
+        self.robot.erouter.add_listener(self, TextMsgEvent, self.source)
+
+    def handle_event(self,event):
+        super().handle_event(event)
+        if isinstance(event,TextMsgEvent): # erouter checked for match
+            self.fire(event)
+        else:
+            raise TypeError('%s is not a TextMsgEvent' % event)
+
+class RandomTrans(Transition):
+    """Picks a destination node at random."""
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        # Don't fire immediately on start because the source node(s) may
+        # have other startup calls to make. Give them time to finish.
+        self.robot.loop.call_soon(self.fire)  # okay to use Transition.fire
+
+    def fire2(self,event):
+        """Overrides Transition.fire2 to only start one randomly-chosen destination node."""
+        dest = random.choice(self.destinations)
+        dest.start(event)

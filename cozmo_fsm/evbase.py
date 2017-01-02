@@ -25,7 +25,7 @@ class Event:
         try:
             src_string = self.source.name
         except:
-            src_string = repr(self.src)
+            src_string = repr(self.source)
         return '<%s for %s>' % (self.__class__.__name__, src_string)
 
 #________________ Event Router ________________
@@ -106,9 +106,12 @@ class EventRouter:
     def post(self,event):
         if not isinstance(event,Event):
             raise TypeError('%s is not an Event' % event)
-        for listener in self._get_listeners(event):
+        listeners = self._get_listeners(event)
+        cnt = 0
+        for listener in listeners:
+            cnt += 1
             if TRACE.trace_level >= TRACE.listener_invocation:
-                print('TRACE%d:' % TRACE.listener_invocation, self, 'receiving', event)
+                print('TRACE%d:' % TRACE.listener_invocation, listener.__class__, 'receiving', event)
             self.robot.loop.call_soon(listener,event)
     
 #________________ Event Listener ________________

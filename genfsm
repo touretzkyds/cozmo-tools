@@ -340,8 +340,12 @@ def parser2(p1tokens):
                 del p1tokens[0:2]
                 continue
             else:
-                report_line_error("Label '%s:' should be followed by a node definition, not %s."
-                                  % (label, p1tokens[1]))
+                if p1tokens[1].isLabelRef() and p1tokens[1].label[0].isupper():
+                    hint = "\n\tDid you mean '%s()' ?" % p1tokens[1].label
+                else:
+                    hint = ""
+                report_line_error("Label '%s:' should be followed by a node definition, not %s.%s"
+                                  % (label, p1tokens[1], hint))
                 del p1tokens[0]
                 continue
         if p1tokens[0].isConstructorCall():
@@ -393,6 +397,9 @@ transition_names = dict(
     C = 'CompletionTrans',
     S = 'SuccessTrans',
     F = 'FailureTrans',
+    D = 'DataTrans',
+    TM = 'TextMsgTrans',
+    RND = 'RandomTrans',
     Tap = 'TapTrans',
     )
 

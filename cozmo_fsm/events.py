@@ -30,11 +30,20 @@ class FailureEvent(Event):
             reason = details
         return '<%s for %s: %s>' % (self.__class__.__name__, self.source.name, reason)
 
+
 class DataEvent(Event):
     """Signals a data item broadcasted by the node."""
-    def __init__(self,source,value):
+    def __init__(self,source,data):
         super().__init__()
-        self.source = value
+        self.source = source
+        self.data = data
+
+
+class TextMsgEvent(Event):
+    """Signals a text message broadcasted to the state machine."""
+    def __init__(self,message):
+        super().__init__()
+        self.source = message
 
 #________________ Cozmo-generated events ________________
 

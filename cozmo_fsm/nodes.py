@@ -1,5 +1,6 @@
 import time
 import inspect
+import random
 from math import sqrt
 
 import cozmo
@@ -195,11 +196,19 @@ class Say(ActionNode):
 
     def start(self,event=None):
         if self.running: return
+        utterance = self.text
+        if isinstance(event,DataEvent):
+                utterance = event.data
+        if isinstance(utterance, (list,tuple)):
+            utterance = random.choice(utterance)
+        if not isinstance(utterance, str):
+            utterance = repr(utterance)
+        self.utterance = utterance
         super().start(event)
-        print("Speaking: '",self.text,"'",sep='')
+        print("Speaking: '",utterance,"'",sep='')
 
     def action_launcher(self):
-        return self.robot.say_text(self.text,**self.kwargs)
+        return self.robot.say_text(self.utterance,**self.kwargs)
 
 
 class Forward(ActionNode):
