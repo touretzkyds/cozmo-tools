@@ -80,6 +80,9 @@ Available CLI commands:
     tm message
         Sends 'message' as a text message to the currently running
         state machine.
+
+    show active
+        Shows active state nodes and transitions.
 *********
 
 
