@@ -9,7 +9,7 @@ import cozmo
 
 from .trace import TRACE
 from .evbase import EventListener
-from .events import CompletionEvent, SuccessEvent, FailureEvent
+from .events import CompletionEvent, SuccessEvent, FailureEvent, DataEvent
 
 class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
@@ -83,13 +83,13 @@ class StateNode(EventListener):
     def post_success(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop,
-                  self, 'posting success', details)
+                  self, 'posting success, details=%s' % details)
         self.robot.erouter.post(SuccessEvent(self,details))
 
     def post_failure(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop,
-                  self, 'posting failure', details)
+                  self, 'posting failure, details=%s' % details)
         self.robot.erouter.post(FailureEvent(self,details))
 
     def post_data(self,value):
@@ -169,7 +169,7 @@ class Transition(EventListener):
         if TRACE.trace_level >= TRACE.transition_startstop:
             print('TRACE%d:' % TRACE.transition_startstop, self, 'stopping')
         if self.handle:
-            if TRACE.trace_level >= TRACE.task_cancel:
+            if True or TRACE.trace_level >= TRACE.task_cancel:
                 print('TRACE%d:' % TRACE.task_cancel, self.handle, 'cancelled')
             self.handle.cancel()
         super().stop()
@@ -178,6 +178,7 @@ class Transition(EventListener):
         """Shut down source nodes and schedule start of destination nodes.
         Lets the stack unwind by returning before destinations are started.
         Delay also gives time for Cozmo action cancellation to take effect."""
+        if not self.running: return
         if TRACE.trace_level >= TRACE.transition_fire:
             if event == None:
                 evt_desc = ''
@@ -187,7 +188,7 @@ class Transition(EventListener):
         for src in self.sources:
             src.stop()
         self.stop()
-        action_cancel_delay = 0.001  # wait for source node action cancellations to take effect
+        action_cancel_delay = 0.01  # wait for source node action cancellations to take effect
         self.robot.loop.call_later(action_cancel_delay, self.fire2,event)
 
     def fire2(self,event):

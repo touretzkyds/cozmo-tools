@@ -30,7 +30,8 @@ class CSFEventBase(Transition):
     def handle_event(self,event):
         if not self.running: return
         if TRACE.trace_level >= TRACE.listener_invocation:
-            print('TRACE:',self,'is handling',event)
+            print('TRACE%d: %s is handling %s' %
+                  (TRACE.listener_invocation, self,event))
         super().handle_event(event)
         if isinstance(event, self.event_type):
             self.observed_sources.add(event.source)
@@ -86,18 +87,22 @@ class TapTrans(Transition):
                 self.robot.loop.call_later(Transition.default_value_delay, self.fire, event)
 
 class DataTrans(Transition):
-    """Transition fires when value matches."""
-    def __init__(self,value=None):
+    """Transition fires when data matches."""
+    def __init__(self,data=None):
         super().__init__()
-        self.value = value
+        self.data = data
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        for source in self.sources:
+            self.robot.erouter.add_listener(self, DataEvent, source)
 
     def handle_event(self,event):
         super().handle_event(event)
         if isinstance(event,DataEvent):
-            if self.value is not None:
-                if self.value == event.value: self.fire(event)
-            else: # wildcard case: fire only if nothing else does
-                self.handle = self.robot.loop.call_later(0.1, self.fire, event)
+            if self.data is None or self.data == event.data: 
+                self.fire(event)
         else:
             raise TypeError('%s is not a DataEvent' % event)
 
@@ -107,13 +112,16 @@ class TextMsgTrans(Transition):
         super().__init__()
         self.source = message
 
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        # The 'source' is the message text.
+        self.robot.erouter.add_listener(self, TextMsgEvent, self.source)
+
     def handle_event(self,event):
         super().handle_event(event)
-        if isinstance(event,TextMsgEvent):
-            if self.source is not None:   # erouter checked that source matched
-                self.fire(event)
-            else: # wildcard case: fire only if nothing else does
-                self.handle = self.robot.loop.call_later(0.1, self.fire, event)
+        if isinstance(event,TextMsgEvent): # erouter checked for match
+            self.fire(event)
         else:
             raise TypeError('%s is not a TextMsgEvent' % event)
 

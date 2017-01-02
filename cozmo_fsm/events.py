@@ -33,13 +33,13 @@ class FailureEvent(Event):
 
 class DataEvent(Event):
     """Signals a data item broadcasted by the node."""
-    def __init__(self,source,value):
+    def __init__(self,source,data):
         super().__init__()
         self.source = source
-        self.value = value
+        self.data = data
 
 
-class TextMessageEvent(Event):
+class TextMsgEvent(Event):
     """Signals a text message broadcasted to the state machine."""
     def __init__(self,message):
         super().__init__()
