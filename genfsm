@@ -381,6 +381,9 @@ transition_names = dict(
     C = 'CompletionTrans',
     S = 'SuccessTrans',
     F = 'FailureTrans',
+    D = 'DataTrans',
+    TM = 'TextMsgTrans',
+    RND = 'RandomTrans',
     Tap = 'TapTrans',
     )
 

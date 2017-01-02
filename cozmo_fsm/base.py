@@ -92,6 +92,12 @@ class StateNode(EventListener):
                   self, 'posting failure', details)
         self.robot.erouter.post(FailureEvent(self,details))
 
+    def post_data(self,value):
+        if TRACE.trace_level > TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop,
+                  self, 'posting data', value)
+        self.robot.erouter.post(DataEvent(self,value))
+
     def now(self):
         """Use now() to execute this node from the command line instead of as part of a state machine."""
         if not self.robot:
@@ -169,6 +175,9 @@ class Transition(EventListener):
         super().stop()
 
     def fire(self,event=None):
+        """Shut down source nodes and schedule start of destination nodes.
+        Lets the stack unwind by returning before destinations are started.
+        Delay also gives time for Cozmo action cancellation to take effect."""
         if TRACE.trace_level >= TRACE.transition_fire:
             if event == None:
                 evt_desc = ''
@@ -183,7 +192,6 @@ class Transition(EventListener):
 
     def fire2(self,event):
         for dest in self.destinations:
-            # print(self,'fire2 is starting',dest)
             dest.start(event)
 
     default_value_delay = 0.1  # delay before wildcard match will fire

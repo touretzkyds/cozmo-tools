@@ -77,6 +77,9 @@ Available CLI commands:
         Sets the FSM tracing level (0-9). With no argument, returns
         the current level.
 
+    tm message
+        Sends 'message' as a text message to the currently running
+        state machine.
 *********
 
 
@@ -254,6 +257,16 @@ def runfsm(module_name, running_modules=dict()):
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
+def text_message(msg):
+    if not running_fsm:
+        print('No state machine running. Use runfsm(module_name) to start a state machine.')
+        return
+    try:
+        running_fsm.robot.erouter.post(TextMessageEvent(msg))
+    except KeyboardInterrupt: raise
+    except Exception as e:
+        traceback.print_exc()
+        print()
 
 def run(sdk_conn):
     global robot
@@ -291,7 +304,7 @@ def cli_loop(robot):
                     msg = _clad_to_engine_iface.RequestAvailableObjects()
                     robot.world.conn.send_msg(msg)
                     # end bug fix
-                    print("On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
+                    print("** On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
                     cli_loop.charger_warned = True
             else:
                 cli_loop.charger_warned = False
@@ -304,6 +317,9 @@ def cli_loop(robot):
             except EOFError:
                 print("EOF.\nType 'exit' to exit.\n")
                 continue
+        id cli_loop._line[0:3] == 'tm ':
+            text_message(line[3:])
+            continue
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
                cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
