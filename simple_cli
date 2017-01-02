@@ -89,6 +89,11 @@ Author:     David S. Touretzky, Carnegie Mellon University
 
 Changelog
 =========
+* 01/01/2017
+    Dave Touretzky
+        - Fixed problems with ^C handling
+        - Added "show active" command for state machine status.
+
 * 12/20/2016 Command line changes
     Dave Touretzky:
         - Renamed simple_cli.py to simple_cli
@@ -172,6 +177,7 @@ from event_monitor import monitor, unmonitor
 try:
     import cozmo_fsm
     from cozmo_fsm import tracefsm
+    from cozmo_fsm.events import TextMsgEvent
 except: pass
 
 try:
@@ -262,11 +268,27 @@ def text_message(msg):
         print('No state machine running. Use runfsm(module_name) to start a state machine.')
         return
     try:
-        running_fsm.robot.erouter.post(TextMessageEvent(msg))
+        running_fsm.robot.erouter.post(TextMsgEvent(msg))
     except KeyboardInterrupt: raise
     except Exception as e:
         traceback.print_exc()
         print()
+
+def show_stuff(spec):
+    if not running_fsm:
+        print('No state machine running.')
+        return
+    if spec == 'active':
+        show_active(running_fsm,0)
+    else:
+        print('Invalid option.  Type "show active".')
+
+def show_active(node,depth):
+    if node.running: print('  '*depth, node)
+    for child in node.children.values():
+        show_active(child, depth+1)
+    for trans in node.transitions:
+        if trans.running: print('  '*(depth+1), trans)
 
 def run(sdk_conn):
     global robot
@@ -278,11 +300,11 @@ def run(sdk_conn):
         robot.erouter.robot = robot
         cozmo_fsm.evbase.robot_for_loading = robot
     except: pass
-    cli_loop(robot)
+    cli_loop(robot,True)
 
-def cli_loop(robot):
-    global ans, RUNNING
-    cli_loop.charger_warned = False
+def cli_loop(robot,intro_msg):
+    global ans, RUNNING, running_fsm
+    cli_loop.charger_warned = intro_msg
 
     world = robot.world
     light_cubes = world.light_cubes
@@ -290,7 +312,8 @@ def cli_loop(robot):
     cube2 = light_cubes[cozmo.objects.LightCube2Id]
     cube3 = light_cubes[cozmo.objects.LightCube3Id]
     charger = robot.world.charger
-    exec("print();print('Variables:', dir())")
+    if intro_msg:
+        exec("print();print('Variables:', dir())")
     cli_loop._console = code.InteractiveConsole()
 
     while True:
@@ -310,15 +333,18 @@ def cli_loop(robot):
                 cli_loop.charger_warned = False
             try:
                 if os_version == 'Darwin':   # Tkinter breaks console on Macs
-                    print('c> ', end='')
+                    print('C> ', end='')
                     cli_loop._line = sys.stdin.readline().strip()
                 else:
                     cli_loop._line = cli_loop._console.raw_input('C> ').strip()
             except EOFError:
                 print("EOF.\nType 'exit' to exit.\n")
                 continue
-        id cli_loop._line[0:3] == 'tm ':
-            text_message(line[3:])
+        if cli_loop._line[0:3] == 'tm ' or cli_loop._line == 'tm':
+            text_message(cli_loop._line[3:])
+            continue
+        elif cli_loop._line[0:5] == 'show ' or cli_loop._line == 'show':
+            show_stuff(cli_loop._line[5:])
             continue
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
@@ -409,4 +435,9 @@ if __name__ == '__main__':
                 running_fsm = None
             else:
                 print("\nKeyboardInterrupt. Type 'exit' to exit.")
-            print('\nC> ',end='')
+            COZMO_server._reset_internal_locks(True)
+            print('\nC> ', end='', flush=True)
+            #COZMO_server._stop()
+            #COZMO_server = threading.Thread(target=reconnect)
+            #COZMO_server.setDaemon(True)  # don't hang on exit
+            #COZMO_server.start()
