@@ -4,7 +4,7 @@ import random
 from math import sqrt
 
 import cozmo
-from cozmo.util import distance_mm, speed_mmps, degrees
+from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 
 from .base import *
 from .events import *
@@ -132,11 +132,13 @@ class DriveForward(DriveWheels):
 class ActionNode(StateNode):
     relaunch_delay = 0.050 # 50 milliseconds
 
-    def __init__(self):
-        """Call this only after the subclass __init__ has set self.kwargs"""
+    def __init__(self, abort_on_stop=True):
+        """Call this method only after the subclass __init__ has set
+        up self.action_kwargs"""
+        self.abort_on_stop = abort_on_stop
         super().__init__()
-        if 'in_parallel' not in self.kwargs:
-            self.kwargs['in_parallel'] = True
+        if 'in_parallel' not in self.action_kwargs:
+            self.action_kwargs['in_parallel'] = True
         self.cozmo_action_handle = None
 
     def start(self,event=None):
@@ -182,17 +184,19 @@ class ActionNode(StateNode):
 
     def stop(self):
         if not self.running: return
-        if self.cozmo_action_handle and self.cozmo_action_handle.is_running:
+        if self.cozmo_action_handle and self.abort_on_stop and \
+                self.cozmo_action_handle.is_running:
             self.cozmo_action_handle.abort()
         super().stop()
 
 
 class Say(ActionNode):
     """Speaks some text, then posts a completion event."""
-    def __init__(self, text="I'm speechless", **kwargs):
+    def __init__(self, text="I'm speechless",
+                 abort_on_stop=False, **action_kwargs):
         self.text = text
-        self.kwargs = kwargs
-        super().__init__()
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop)
 
     def start(self,event=None):
         if self.running: return
@@ -208,12 +212,12 @@ class Say(ActionNode):
         print("Speaking: '",utterance,"'",sep='')
 
     def action_launcher(self):
-        return self.robot.say_text(self.utterance,**self.kwargs)
+        return self.robot.say_text(self.utterance,**self.action_kwargs)
 
 
 class Forward(ActionNode):
     def __init__(self, distance=distance_mm(50),
-                 speed=speed_mmps(50), **kwargs):
+                 speed=speed_mmps(50), abort_on_stop=True, **action_kwargs):
         if isinstance(distance, (int,float)):
             distance = distance_mm(distance)
         elif not isinstance(distance, cozmo.util.Distance):
@@ -224,38 +228,42 @@ class Forward(ActionNode):
             raise ValueError('%s speed must be a number or a cozmo.util.Speed' % self)
         self.distance = distance
         self.speed = speed
-        self.kwargs = kwargs
-        super().__init__()  # must come last because checks self.kwargs
+        if 'should_play_anim' not in action_kwargs:
+            action_kwargs['should_play_anim'] = False
+        self.action_kwargs = action_kwargs
+        # super's init must come last because it checks self.action_kwargs
+        super().__init__(abort_on_stop)
 
     def action_launcher(self):
-        return self.robot.drive_straight(self.distance, self.speed, **self.kwargs)
+        return self.robot.drive_straight(self.distance, self.speed,
+                                         **self.action_kwargs)
 
 
 class Turn(ActionNode):
-    def __init__(self, angle=degrees(90), **kwargs):
+    def __init__(self, angle=degrees(90), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
         elif not isinstance(angle, cozmo.util.Angle):
             raise ValueError('%s angle must be a number or a cozmo.util.Angle' % self)
         self.angle = angle
-        self.kwargs = kwargs
-        super().__init__()
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop)
 
     def action_launcher(self):
-        return self.robot.turn_in_place(self.angle, **self.kwargs)
+        return self.robot.turn_in_place(self.angle, **self.action_kwargs)
 
 class SetHeadAngle(ActionNode):
-    def __init__(self, angle=degrees(0), **kwargs):
+    def __init__(self, angle=degrees(0), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
         elif not isinstance(angle, cozmo.util.Angle):
             raise ValueError('%s angle must be a number or a cozmo.util.Angle' % self)
         self.angle = angle
-        self.kwargs = kwargs
-        super().__init__()
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop)
 
     def action_launcher(self):
-        return self.robot.set_head_angle(self.angle, **self.kwargs)
+        return self.robot.set_head_angle(self.angle, **self.action_kwargs)
 
 
 #________________ Animations ________________
