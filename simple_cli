@@ -245,14 +245,16 @@ def runfsm(module_name, running_modules=dict()):
     try:
         reload(running_modules[module_name])
         found = True
-    except: pass
+    except KeyError: pass
+    except: raise
     if not found:
         try:
             running_modules[module_name] = __import__(module_name)
-        except:
+        except ImportError:
             print("Could not find module '%s'. Check your search path.\n" %
                   module_name)
             return
+        except: raise
 
     # The parent node class's constructor must match the module name.
     the_module = running_modules[module_name]
@@ -267,7 +269,7 @@ def runfsm(module_name, running_modules=dict()):
     return running_fsm
 
 def text_message(msg):
-    if not running_fsm:
+    if not running_fsm or not running_fsm.running:
         print('No state machine running. Use runfsm(module_name) to start a state machine.')
         return
     try:
@@ -282,7 +284,10 @@ def show_stuff(spec):
         print('No state machine running.')
         return
     if spec == 'active':
-        show_active(running_fsm,0)
+        if not running_fsm.running:
+            print('State machine is not running.')
+        else:
+            show_active(running_fsm,0)
     else:
         print('Invalid option.  Type "show active".')
 
@@ -435,7 +440,6 @@ if __name__ == '__main__':
             if running_fsm:
                 print('\nKeyboardInterrupt: stopping', running_fsm.name)
                 running_fsm.stop()
-                running_fsm = None
             else:
                 print("\nKeyboardInterrupt. Type 'exit' to exit.")
             COZMO_server._reset_internal_locks(True)
