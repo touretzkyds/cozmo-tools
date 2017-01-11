@@ -30,6 +30,10 @@ Author: David S. Touretzky, Carnegie Mellon University
 Changelog:
 ==========
 
+* 01/11/2017
+    Dave Touretzky
+        - Add colored messages using termcolor.cprint
+
 * 12/20/2016
     Dave Touretzky
         - Created.  Converted cozmo_fsm/examples to use this.
