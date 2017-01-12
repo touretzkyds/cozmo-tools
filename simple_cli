@@ -83,6 +83,9 @@ Available CLI commands:
 
     show active
         Shows active state nodes and transitions.
+
+    !cmd
+        Runs 'cmd' in a shell and prints the result.
 *********
 
 
@@ -159,7 +162,7 @@ Changelog
 
 # All that stuff we really need in order to get going.
 import threading, socket, socketserver
-import sys, os, platform
+import sys, os, platform, subprocess
 import code
 import time
 import traceback
@@ -298,6 +301,12 @@ def show_active(node,depth):
     for trans in node.transitions:
         if trans.running: print('  '*(depth+1), trans)
 
+def do_shell_command(cmd):
+    try:
+        subprocess.call(cmd, shell=True)
+    except Exception as e:
+        print(e)
+
 def run(sdk_conn):
     global robot
     robot = sdk_conn.wait_for_robot()
@@ -348,6 +357,9 @@ def cli_loop(robot,intro_msg):
             except EOFError:
                 print("EOF.\nType 'exit' to exit.\n")
                 continue
+        if cli_loop._line[0] == '!':
+            do_shell_command(cli_loop._line[1:])
+            continue
         if cli_loop._line[0:3] == 'tm ' or cli_loop._line == 'tm':
             text_message(cli_loop._line[3:])
             continue
