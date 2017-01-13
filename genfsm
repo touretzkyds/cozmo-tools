@@ -44,7 +44,7 @@ import sys, time, re
 try:
     from termcolor import cprint
 except:
-    def cprint(string, color=None):
+    def cprint(string, color=None, file=None):
         print(string)
 
 
@@ -610,13 +610,13 @@ found_error = False
 
 def report_line_error(error_text):
     global found_error
-    cprint(line_cache[current_line].rstrip(), color='red')
-    cprint('Line %d: %s\n\n' % (current_line, error_text), color='red')
+    cprint(line_cache[current_line].rstrip(), color='red', file=sys.stderr)
+    cprint('Line %d: %s\n' % (current_line, error_text), color='red', file=sys.stderr)
     found_error = True
 
 def report_global_error(error_text):
     global found_error
-    cprint('Error: %s\n' % error_text, color='red')
+    cprint('Error: %s\n' % error_text, color='red', file=sys.stderr)
     found_error = True
 
 def error_fragment(string):
