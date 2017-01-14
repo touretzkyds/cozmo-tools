@@ -164,10 +164,16 @@ Changelog
 import threading, socket, socketserver
 import sys, os, platform, subprocess
 import code
-import time
+import time, datetime
 import traceback
 import re
 from importlib import __import__, reload
+
+try:
+    from termcolor import cprint
+except:
+    def cprint(string,color=None):
+        print(string)
 
 # This should be in your '.pythonstartup' file, but I put it also here just in case...
 import readline 
@@ -200,7 +206,7 @@ try:
 except IOError: 
     pass 
 atexit.register(readline.write_history_file, histfile) 
-del os, histfile, readline, rlcompleter
+del histfile, readline, rlcompleter
 
 os_version = platform.system()
 del platform
@@ -243,6 +249,14 @@ def runfsm(module_name, running_modules=dict()):
         print("\n'%s' is not a module name. Trying '%s' instead.\n" %
               (module_name, module_name[0:-3]))
         module_name = module_name[0:-3]
+
+    try:
+        fsm_time = datetime.datetime.fromtimestamp(os.path.getmtime(module_name+".fsm"))
+        py_time = datetime.datetime.fromtimestamp(os.path.getmtime(module_name+".py"))
+        if py_time < fsm_time:
+            cprint('Warning: %s.py is older than %s.fsm. Should you run genfsm?' %
+                   (module_name,module_name), color="yellow")
+    except: pass
 
     found = False
     try:
