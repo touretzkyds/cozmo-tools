@@ -9,7 +9,7 @@ try:
 except:
     raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
 
-class Look5(StateNode):
+class Look5(StateMachineProgram):
     $setup {
         LookAroundInPlace(stop_on_exit=False)
             =T(5)=> Say("I'm almost done")

@@ -41,7 +41,7 @@ class RandomTurn(Turn):
         self.angle = degrees(angle) if random.random()>=0.5 else degrees(-angle)
         super().start(event)
 
-class Randomness(StateNode):
+class Randomness(StateMachineProgram):
     $setup {
         startnode: StateNode() =RND=> {fwd, fwd, turn, turn, joke}
 

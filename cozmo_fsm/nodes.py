@@ -9,6 +9,10 @@ from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 from .base import *
 from .events import *
 
+#________________ Parent for all State Machine Programs ________________
+
+class StateMachineProgram(StateNode): pass
+
 #________________ Ordinary Nodes ________________
 
 class ParentCompletes(StateNode):
@@ -360,6 +364,6 @@ class RollBlock(StartBehavior):
     def __init__(self,stop_on_exit=True):
         super().__init__(cozmo.robot.behavior.BehaviorTypes.RollBlock,stop_on_exit)
 
-class stackBlocks(StartBehavior):
+class StackBlocks(StartBehavior):
     def __init__(self,stop_on_exit=True):
         super().__init__(cozmo.robot.behavior.BehaviorTypes.StackBlocks,stop_on_exit)

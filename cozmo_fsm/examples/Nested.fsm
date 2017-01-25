@@ -15,11 +15,11 @@
 from cozmo_fsm import *
 
 class DingDong(StateNode):
-    $setup """
+    $setup {
         ding: Say('ding') =C=> dong: Say('dong') =C=> ParentCompletes()
-    """
+    }
 
-class Nested(StateNode):
-    $setup """
+class Nested(StateMachineProgram):
+    $setup {
         dd1: DingDong() =C=> bridge: Say('once again') =C=> dd2: DingDong()
-    """
+    }

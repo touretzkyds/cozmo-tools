@@ -12,7 +12,7 @@ try:
 except:
     raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
 
-class WaitForPlayer(StateNode):
+class WaitForPlayer(StateMachineProgram):
     """Wait for player's face to appear and remain visible for a little while."""
     def start(self,event=None):
         self.set_polling_interval(0.2)

@@ -1,0 +1,15 @@
+from cozmo_fsm import *
+
+class Junk(StateNode):
+    $setup{
+        startnode: StateNode()
+        startnode =TM('1')=> do_null
+        startnode =TM('2')=> do_time
+        startnode =TM('3')=> do_comp
+
+        do_null: Say("Full steam ahead") =N=> Forward(20) =C=> startnode
+
+        do_time: Say("Full steam ahead") =T(2)=> Forward(20) =C=> startnode
+
+        do_comp: Say("Full steam ahead") =C=> Forward(20) =C=> startnode
+    }

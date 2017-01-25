@@ -11,7 +11,7 @@ try:
 except:
     raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
 
-class Greet(StateNode):
+class Greet(StateMachineProgram):
     $setup """
         say: Say('Greetings, human!') =C=>
           wait: StateNode() =T(5)=>

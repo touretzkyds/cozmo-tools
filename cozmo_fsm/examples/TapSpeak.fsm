@@ -27,11 +27,11 @@ class SayCube(Say):
         self.text = cube_names[cube_number-1]
         super().start(event)
 
-class TapSpeak(StateNode):
-    $setup """
+class TapSpeak(StateMachineProgram):
+    $setup {
         intro: Say('Tap a cube.') =C=> wait
 
         wait: StateNode() =Tap()=> speak
 
         speak: SayCube() =C=> wait
-    """
+    }

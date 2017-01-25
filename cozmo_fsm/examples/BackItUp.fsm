@@ -14,12 +14,12 @@ try:
 except ImportError:
     raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
 
-class BackItUp(StateNode):
+class BackItUp(StateMachineProgram):
     $setup {
         launcher: StateNode() =N=> {driver, speaker}
 
-        driver: DriveForward(-100,10)
-        speaker: Say('beep',duration_scalar=0.8) =C=> speaker
+        driver: Forward(-100,10)
+        speaker: Say('beep',duration_scalar=0.8,abort_on_stop=True) =C=> speaker
 
         {driver,speaker} =C=> finisher: Say('Safety first!')
 
