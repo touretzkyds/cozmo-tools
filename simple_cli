@@ -250,14 +250,6 @@ def runfsm(module_name, running_modules=dict()):
               (module_name, module_name[0:-3]))
         module_name = module_name[0:-3]
 
-    try:
-        fsm_time = datetime.datetime.fromtimestamp(os.path.getmtime(module_name+".fsm"))
-        py_time = datetime.datetime.fromtimestamp(os.path.getmtime(module_name+".py"))
-        if py_time < fsm_time:
-            cprint('Warning: %s.py is older than %s.fsm. Should you run genfsm?' %
-                   (module_name,module_name), color="yellow")
-    except: pass
-
     found = False
     try:
         reload(running_modules[module_name])
@@ -273,15 +265,31 @@ def runfsm(module_name, running_modules=dict()):
             return
         except: raise
 
+    py_filepath = running_modules[module_name].__file__
+    fsm_filepath = py_filepath[0:-2] + 'fsm'
+    try:
+        py_time = datetime.datetime.fromtimestamp(os.path.getmtime(py_filepath))
+        fsm_time = datetime.datetime.fromtimestamp(os.path.getmtime(fsm_filepath))
+        if py_time < fsm_time:
+            cprint('Warning: %s.py is older than %s.fsm. Should you run genfsm?' %
+                   (module_name,module_name), color="yellow")
+    except: pass
+
     # The parent node class's constructor must match the module name.
     the_module = running_modules[module_name]
     the_class = the_module.__getattribute__(module_name) \
                 if module_name in dir(the_module) else None
     if not isinstance(the_class,type) or not issubclass(the_class,cozmo_fsm.StateNode):
-        print("Module %s does not contain a StateNode class named %s.\n" %
-              (module_name, module_name))
+        cprint("Module %s does not contain a StateNode class named %s.\n" %
+              (module_name, module_name), color="red")
         return       
     running_fsm = the_class()
+    the_module.robot = robot
+    the_module.world = robot.world
+    the_module.charger = robot.world.charger
+    the_module.cube1 = robot.world.light_cubes[cozmo.objects.LightCube1Id]
+    the_module.cube2 = robot.world.light_cubes[cozmo.objects.LightCube2Id]
+    the_module.cube3 = robot.world.light_cubes[cozmo.objects.LightCube3Id]
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
