@@ -224,7 +224,7 @@ class ActionNode(StateNode):
                 self.post_completion()
             elif self.cozmo_action_handle.failure_reason[0] == 'retry':
                 print("*** ACTION %s FAILED WITH CODE 'retry': TREATING AS COMPLETE" %
-                      self.cozmo.action_handle)
+                      self.cozmo_action_handle)
                 self.post_completion()
             else:
                 self.post_failure(self.cozmo_action_handle)
