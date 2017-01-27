@@ -211,6 +211,9 @@ del histfile, readline, rlcompleter
 os_version = platform.system()
 del platform
 
+# Put current directory on search path.
+if '.' not in sys.path:
+    sys.path.append('.')
 
 res = 0
 ans = None
