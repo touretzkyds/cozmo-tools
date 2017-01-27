@@ -130,6 +130,45 @@ class DriveForward(DriveWheels):
             # shut down manually in case no one was listening for the completion
             self.stop()
 
+class DriveTurn(DriveWheels):
+    def __init__(self, angle=90, speed=50, **kwargs):
+        if isinstance(angle, cozmo.util.Angle):
+            angle = angle.degrees
+        if isinstance(speed, cozmo.util.Speed):
+            speed = speed.speed_mmps
+        if angle < 0:
+            speed = -speed
+        self.angle = angle
+        self.speed = speed
+        self.kwargs = kwargs
+        super().__init__(-speed,speed,**self.kwargs)
+        self.polling_interval = 0.05
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        self.last_heading = self.robot.pose.rotation.angle_z.degrees
+        self.traveled = 0
+
+    def poll(self):
+        """See how far we've traveled"""
+        p0 = self.last_heading
+        p1 = self.robot.pose.rotation.angle_z.degrees
+        self.last_heading = p1
+        # Assume we're polling quickly enough that diff will be small;
+        # typically only about 1 degree.  So diff will be large only
+        # if the heading has passed through 360 degrees since the last
+        # call to poll().  Use 90 degrees as an arbitrary large threshold.
+        diff = p1 - p0
+        if diff  < -90.0:
+            diff += 360.0
+        elif diff > 90.0:
+            diff -= 360.0
+        self.traveled += diff
+        if abs(self.traveled) > abs(self.angle):
+            self.post_completion()
+            # shut down manually in case no one was listening for the completion
+            self.stop()
 
 #________________ Action Nodes ________________
 
@@ -182,6 +221,10 @@ class ActionNode(StateNode):
                 self.post_completion()
             elif self.cozmo_action_handle.failure_reason[0] == 'cancelled':
                 print('CANCELLED: ***>',self,self.cozmo_action_handle)
+                self.post_completion()
+            elif self.cozmo_action_handle.failure_reason[0] == 'retry':
+                print("*** ACTION %s FAILED WITH CODE 'retry': TREATING AS COMPLETE" %
+                      self.cozmo.action_handle)
                 self.post_completion()
             else:
                 self.post_failure(self.cozmo_action_handle)
