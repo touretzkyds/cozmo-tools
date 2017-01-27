@@ -353,6 +353,9 @@ def cli_loop(robot,intro_msg):
     charger = robot.world.charger
     if intro_msg:
         exec("print();print('Variables:', dir())")
+    try:
+        exec("from cozmo_fsm import *")
+    except: pass
     cli_loop._console = code.InteractiveConsole()
 
     while True:
