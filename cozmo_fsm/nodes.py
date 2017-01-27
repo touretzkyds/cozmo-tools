@@ -93,11 +93,16 @@ class DriveWheels(CoroutineNode):
     def coroutine_launcher(self):
         return self.robot.drive_wheels(self.l_wheel_speed,self.r_wheel_speed,**self.kwargs)
 
+    def stop_wheels(self):
+        async def stopper():
+            await self.robot.drive_wheels(0,0)
+        self.robot.loop.create_task(stopper())
+
     def stop(self):
         if not self.running: return
         super().stop()        
-        cor = self.robot.drive_wheels(0,0)
-        self.handle = self.robot.loop.create_task(cor)
+        self.stop_wheels()
+
 
 class DriveForward(DriveWheels):
     def __init__(self, distance=50, speed=50, **kwargs):
@@ -126,9 +131,8 @@ class DriveForward(DriveWheels):
         diff = (p1.x - p0.x, p1.y - p0.y)
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
+            self.stop_wheels()
             self.post_completion()
-            # shut down manually in case no one was listening for the completion
-            self.stop()
 
 class DriveTurn(DriveWheels):
     def __init__(self, angle=90, speed=50, **kwargs):
@@ -166,9 +170,8 @@ class DriveTurn(DriveWheels):
             diff -= 360.0
         self.traveled += diff
         if abs(self.traveled) > abs(self.angle):
+            self.stop_wheels()
             self.post_completion()
-            # shut down manually in case no one was listening for the completion
-            self.stop()
 
 #________________ Action Nodes ________________
 
