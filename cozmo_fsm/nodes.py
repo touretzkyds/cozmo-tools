@@ -9,10 +9,6 @@ from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 from .base import *
 from .events import *
 
-#________________ Parent for all State Machine Programs ________________
-
-class StateMachineProgram(StateNode): pass
-
 #________________ Ordinary Nodes ________________
 
 class ParentCompletes(StateNode):
