@@ -94,14 +94,14 @@ class DriveWheels(CoroutineNode):
         return self.robot.drive_wheels(self.l_wheel_speed,self.r_wheel_speed,**self.kwargs)
 
     def stop_wheels(self):
-        async def stopper():
-            await self.robot.drive_wheels(0,0)
-        self.robot.loop.create_task(stopper())
+        try:
+            self.robot.drive_wheels(0,0).send(None)
+        except StopIteration: pass
 
     def stop(self):
         if not self.running: return
-        super().stop()        
         self.stop_wheels()
+        super().stop()        
 
 
 class DriveForward(DriveWheels):
@@ -131,6 +131,7 @@ class DriveForward(DriveWheels):
         diff = (p1.x - p0.x, p1.y - p0.y)
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
+            self.poll_handle.cancel()
             self.stop_wheels()
             self.post_completion()
 
@@ -170,6 +171,7 @@ class DriveTurn(DriveWheels):
             diff -= 360.0
         self.traveled += diff
         if abs(self.traveled) > abs(self.angle):
+            self.poll_handle.cancel()
             self.stop_wheels()
             self.post_completion()
 
