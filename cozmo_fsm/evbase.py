@@ -173,10 +173,11 @@ class EventListener:
 
     def _next_poll(self):
         """Called to poll the node and then schedule the next polling interval."""
-        self.poll()
         if self.running and self.polling_interval:
             self.poll_handle = \
                 self.robot.loop.call_later(self.polling_interval, self._next_poll)
+        # schedule the next poll first because self.poll may cancel it
+        self.poll()
 
     def poll(self):
         """Dummy polling function in case sublass neglects to supply one."""
