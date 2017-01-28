@@ -36,7 +36,7 @@ class TRACE:
 TRACE = TRACE()
 
 def tracefsm(level=None):
-    if level:
+    if level is not None:
         type(TRACE).trace_level = level
     else:
         return TRACE.trace_level
