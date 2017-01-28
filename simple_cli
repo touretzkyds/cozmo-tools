@@ -286,13 +286,14 @@ def runfsm(module_name, running_modules=dict()):
         cprint("Module %s does not contain a StateNode class named %s.\n" %
               (module_name, module_name), color="red")
         return       
-    running_fsm = the_class()
     the_module.robot = robot
     the_module.world = robot.world
     the_module.charger = robot.world.charger
     the_module.cube1 = robot.world.light_cubes[cozmo.objects.LightCube1Id]
     the_module.cube2 = robot.world.light_cubes[cozmo.objects.LightCube2Id]
     the_module.cube3 = robot.world.light_cubes[cozmo.objects.LightCube3Id]
+    # Class's __init__ method will call setup, which can reference the above variables.
+    running_fsm = the_class()
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
