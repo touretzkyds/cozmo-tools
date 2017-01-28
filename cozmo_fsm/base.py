@@ -33,7 +33,7 @@ class StateNode(EventListener):
         pass
 
     def setup2(self):
-        """Redefine this if post-setup processing s required."""
+        """Redefine this if post-setup processing is required."""
         pass
 
     def start(self,event=None):
@@ -66,8 +66,12 @@ class StateNode(EventListener):
     def set_parent(self, parent):
         if not isinstance(parent, StateNode):
             raise TypeError('%s is not a StateNode' % parent)
-        if self.parent:
-            raise Exception('parent already set')
+        try:
+            if self.parent:
+                raise Exception('parent already set')
+        except AttributeError:
+            raise Exception("It appears %s's __init__ method did not call super().__init__"
+                            % self.__class__.__name__)
         self.parent = parent
         parent.children[self.name] = self
         # First-declared child is the default start node.
