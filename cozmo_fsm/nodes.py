@@ -9,10 +9,6 @@ from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 from .base import *
 from .events import *
 
-#________________ Parent for all State Machine Programs ________________
-
-class StateMachineProgram(StateNode): pass
-
 #________________ Ordinary Nodes ________________
 
 class ParentCompletes(StateNode):
@@ -95,7 +91,9 @@ class DriveWheels(CoroutineNode):
 
     def stop_wheels(self):
         try:
-            self.robot.drive_wheels(0,0).send(None)
+            driver = self.robot.drive_wheels(0,0)
+            # driver is either a co-routine or None
+            if driver: driver.send(None)  # will raise StopIteration
         except StopIteration: pass
 
     def stop(self):

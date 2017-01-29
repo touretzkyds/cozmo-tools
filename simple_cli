@@ -84,6 +84,9 @@ Available CLI commands:
     show active
         Shows active state nodes and transitions.
 
+    show viewer
+        Displays an OpenCV camera image viewer.
+
     !cmd
         Runs 'cmd' in a shell and prints the result.
 *********
@@ -188,8 +191,7 @@ from event_monitor import monitor, unmonitor
 
 try:
     import cozmo_fsm
-    from cozmo_fsm import tracefsm
-    from cozmo_fsm.events import TextMsgEvent
+    from cozmo_fsm import StateMachineProgram, tracefsm, TextMsgEvent
 except: pass
 
 try:
@@ -309,14 +311,16 @@ def text_message(msg):
         print()
 
 def show_stuff(spec):
-    if not running_fsm:
-        print('No state machine running.')
-        return
+    global running_fsm
     if spec == 'active':
         if not running_fsm.running:
             print('State machine is not running.')
         else:
             show_active(running_fsm,0)
+    elif spec == 'viewer':
+        if running_fsm:
+            running_fsm.stop()
+        running_fsm = StateMachineProgram().set_name("Viewer").now()
     else:
         print('Invalid option.  Type "show active".')
 
@@ -347,7 +351,7 @@ def run(sdk_conn):
 
 def cli_loop(robot,intro_msg):
     global ans, RUNNING, running_fsm
-    cli_loop.charger_warned = intro_msg
+    cli_loop.charger_warned = False
 
     world = robot.world
     light_cubes = world.light_cubes
@@ -478,7 +482,7 @@ if __name__ == '__main__':
         try:
             time.sleep(1)
         except KeyboardInterrupt:
-            if running_fsm:
+            if running_fsm and running_fsm.running:
                 print('\nKeyboardInterrupt: stopping', running_fsm.name)
                 running_fsm.stop()
             else:
