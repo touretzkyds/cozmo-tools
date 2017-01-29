@@ -91,7 +91,9 @@ class DriveWheels(CoroutineNode):
 
     def stop_wheels(self):
         try:
-            self.robot.drive_wheels(0,0).send(None)
+            driver = self.robot.drive_wheels(0,0)
+            # driver is either a co-routine or None
+            if driver: driver.send(None)  # will raise StopIteration
         except StopIteration: pass
 
     def stop(self):

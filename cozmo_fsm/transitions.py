@@ -106,6 +106,24 @@ class DataTrans(Transition):
         else:
             raise TypeError('%s is not a DataEvent' % event)
 
+class ArucoTrans(Transition):
+    """Fires if one of the specified markers is visible"""
+    def __init__(self,markers=None):
+        super().__init__()
+        self.polling_interval = 0.1
+        self.markers = markers
+
+    def poll(self,event=None):
+        if self.markers is None:
+            if self.robot.world.aruco.seenMarkers != []:
+                self.fire()
+        elif isinstance(self.markers,set):
+            if self.markers.intersection(self.robot.world.aruco.seenMarkers) != set():
+                self.fire()
+        elif self.markers in self.robot.world.aruco.seenMarkers:
+            self.fire()
+
+
 class TextMsgTrans(Transition):
     """Transition fires when message matches."""
     def __init__(self,message=None):
