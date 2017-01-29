@@ -63,11 +63,14 @@ class StateMachineProgram(StateNode):
 
         # Annotate and display image if stream enabled.
         if self.windowName is not None:
+            scale_factor = 2
             # Cozmo's anootations
-            annotated_im = numpy.array(event.image.annotate_image()).astype(numpy.uint8)
+            self.robot.img = event.image
+            coz_ann = event.image.annotate_image(scale=scale_factor)
+            annotated_im = numpy.array(coz_ann).astype(numpy.uint8)
             # Aruco annotation
             if self.robot.world.aruco.seenMarkers is not None:
-                annotated_im = self.robot.world.aruco.annotate(annotated_im)
+                annotated_im = self.robot.world.aruco.annotate(annotated_im,scale_factor)
             # Other annotators can run here if the user supplies them.
             #  ...
             # Done with nnotation

@@ -1,4 +1,4 @@
-import cv2
+import cv2, numpy
 
 class ArucoMarker(object):
   def __init__(self,markerID,bbox):
@@ -6,13 +6,11 @@ class ArucoMarker(object):
     self.bbox = bbox
 
   def __str__(self):
-    return "marker %d" % (self.id)
+    return "<ArucoMarker id=%d>" % (self.id)
 
   def __repr__(self):
     return self.__str__()
 
-  def annotated(self,im):
-    return cv2.aruco.drawDetectedMarkers(im,[self.bbox],[self.id])
 
 class Aruco():
     def __init__(self,arucolibname):
@@ -33,6 +31,7 @@ class Aruco():
             self.seenMarkers.append(marker.id)
             self.seenMarkerObjects.append(marker)
 
-    def annotate(self,image):
-        displayim = cv2.aruco.drawDetectedMarkers(image, self.corners, self.ids)
+    def annotate(self, image, scale_factor):
+        scaled_corners = [ numpy.multiply(corner, scale_factor) for corner in self.corners ]
+        displayim = cv2.aruco.drawDetectedMarkers(image, scaled_corners, self.ids)
         return displayim
