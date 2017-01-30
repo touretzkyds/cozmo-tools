@@ -249,6 +249,9 @@ def runfsm(module_name, running_modules=dict()):
     calls the instance's start() method."""
     global running_fsm
 
+    if running_fsm:
+        running_fsm.stop()
+
     r_py = re.compile('.*\.py$')
     if r_py.match(module_name):
         print("\n'%s' is not a module name. Trying '%s' instead.\n" %

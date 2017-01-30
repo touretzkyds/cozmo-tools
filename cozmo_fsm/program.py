@@ -14,6 +14,7 @@ class StateMachineProgram(StateNode):
                  arucolibname=cv2.aruco.DICT_4X4_250):
         super().__init__()
 
+        self.windowName = None
         self.viewer = viewer
         self.aruco = aruco
         if self.aruco:
