@@ -320,7 +320,7 @@ def show_stuff(spec):
             print('State machine is not running.')
         else:
             show_active(running_fsm,0)
-    elif spec == 'viewer':
+    elif spec == 'camview' or spec=='viewer':
         if running_fsm:
             running_fsm.stop()
         running_fsm = StateMachineProgram().set_name("Viewer").now()
