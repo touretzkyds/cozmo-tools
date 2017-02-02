@@ -129,21 +129,6 @@ class EventListener:
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.name)
 
-    @property
-    def world(self): return self.robot.world
-
-    @property
-    def cube1(self): return self.world.light_cubes[1]
-
-    @property
-    def cube2(self): return self.world.light_cubes[2]
-
-    @property
-    def cube3(self): return self.world.light_cubes[3]
-
-    @property
-    def charger(self): return self.world.charger
-
     def set_name(self,name):
         if not isinstance(name,str):
             raise ValueError('name must be a string, not %s' % name)
