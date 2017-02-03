@@ -6,12 +6,15 @@ import cozmo
 
 from .base import StateNode
 from .aruco import *
+from .particle import *
 
 class StateMachineProgram(StateNode):
     def __init__(self,
                  viewer=True,
                  aruco=True,
-                 arucolibname=cv2.aruco.DICT_4X4_250):
+                 arucolibname=cv2.aruco.DICT_4X4_250,
+                 particle_filter = True
+                 ):
         super().__init__()
 
         self.windowName = None
@@ -19,8 +22,18 @@ class StateMachineProgram(StateNode):
         self.aruco = aruco
         if self.aruco:
             self.robot.world.aruco = Aruco(arucolibname)
+        self.particle_filter = particle_filter
 
     def start(self):
+        # Create a particle filter
+        if self.particle_filter:
+            if self.particle_filter is True:
+                self.particle_filter = ParticleFilter(self.robot)
+            self.robot.world.particle_filter = self.particle_filter
+            self.set_polling_interval(0.050)
+        else:
+            self.robot.world.particle_filter = None
+
         # Launch viewer
         if self.viewer:
             self.windowName = self.name
@@ -50,6 +63,10 @@ class StateMachineProgram(StateNode):
         except: pass
         if self.windowName is not None:
             cv2.destroyWindow(self.windowName)
+
+    def poll(self):
+        if self.robot.world.particle_filter:
+            self.robot.world.particle_filter.move()
 
     def process_image(self,event,**kwargs):
         curim = numpy.array(event.image.raw_image).astype(numpy.uint8) #cozmo-raw image
