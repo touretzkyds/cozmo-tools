@@ -198,17 +198,6 @@ class ParticleViewer():
         if(key == b'q'): #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
-        print('Pose = ', self.robot.world.particle_filter.pose_estimate())
-
-
-
-#dummy program to show off viewer
-if __name__ == '__main__':
-    import random,time #just for demo purposes!
-    viewer = OpenGLViewer(bgcolor=(0.4,0.4,0.4)) #create window
-    viewer.startThread() #background window and begin displaying
-    print("main program begins.")
-    while viewer.thread.is_alive():
-      particles.append(Particle(random.random(),random.random(),theta=random.random()*360))
-      time.sleep(1)
-    print("Program terminated")
+        est = self.robot.world.particle_filter.pose_estimate()
+        hdg = math.degrees(est[2])
+        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (est[0], est[1], hdg))
