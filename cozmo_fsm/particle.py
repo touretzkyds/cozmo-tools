@@ -123,7 +123,7 @@ class ParticleFilter():
     def __init__(self, robot, num_particles=500, radius=200,
                  motion_model = "default",
                  sensor_model = "default",
-                 landmarks = None):
+                 landmarks = dict()):
         self.robot = robot
         self.num_particles = num_particles
         if motion_model == "default":
