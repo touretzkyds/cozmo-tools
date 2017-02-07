@@ -208,7 +208,7 @@ try:
 except IOError: 
     pass 
 atexit.register(readline.write_history_file, histfile) 
-del histfile, readline, rlcompleter
+del rlcompleter
 
 os_version = platform.system()
 del platform
@@ -384,6 +384,7 @@ def cli_loop(robot,intro_msg):
                     cli_loop.charger_warned = True
             else:
                 cli_loop.charger_warned = False
+            readline.write_history_file(histfile)
             try:
                 if os_version == 'Darwin':   # Tkinter breaks console on Macs
                     print('C> ', end='')
