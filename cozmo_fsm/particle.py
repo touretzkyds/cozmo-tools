@@ -189,13 +189,15 @@ class ParticleFilter():
     def pose_estimate(self):
         cx = 0; cy = 0
         hsin = 0; hcos = 0
+        weight_sum = 0
         for p in self.particles:
             cx += p.weight * p.x
             cy += p.weight * p.y
-            hsin += sin(p.theta)
-            hcos += cos(p.theta)
-        cx /= self.num_particles
-        cy /= self.num_particles
+            hsin += sin(p.theta) * p.weight
+            hcos += cos(p.theta) * p.weight
+            weight_sum += p.weight
+        cx /= weight_sum
+        cy /= weight_sum
         return (cx, cy, atan2(hsin,hcos))
 
     def weight_variance(self):
