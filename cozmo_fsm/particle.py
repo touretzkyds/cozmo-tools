@@ -2,7 +2,8 @@
 Particle filter localization.
 """
 
-import math, numpy, array, random
+import math, array, random
+import numpy as np
 from math import pi, sqrt, sin, cos, atan2, exp
 
 class Particle():
@@ -16,6 +17,41 @@ class Particle():
     def __repr__(self):
         return '<Particle (%5.2f,%5.2f) %4.1f deg. log_wt=%f>' % \
                (self.x, self.y, self.theta*180/pi, self.log_weight)
+
+#================ Particle Initializers ================
+
+class ParticleInitializer(): pass
+
+class RandomWithinRadius(ParticleInitializer):
+    """ Normally distribute particles within a radius, with random heading. """
+    def __init__(self,radius=200):
+        self.radius = radius
+
+    def initialize(self, particles):
+        for p in particles:
+            qangle = random.random()*2*pi
+            r = random.gauss(0, self.radius/2) + self.radius/1.5
+            p.x = r * cos(qangle)
+            p.y = r * sin(qangle)
+            p.theta = random.random()*2*pi
+
+class RobotPosition(ParticleInitializer):
+    """ Initialize all particles to the robot's current position; the motion model will jitter tjem. """
+    def __init__(self, x=None, y=None, theta=None):
+        self.x = x
+        self.y = y
+        self.theta = theta
+        
+    def initialize(self,particles):
+        if self.x == None:
+            self.x = self.robot.pose.position.x
+            self.y = self.robot.pose.position.y
+            self.theta = self.robot.pose.rotation.angle_z.radians
+        for p in particles:
+            p.x = self.x
+            p.y = self.y
+            p.theta = self.theta
+    
 
 #================ Motion Model ================
 
@@ -78,39 +114,43 @@ class SensorModel():
         self.robot = robot
         self.set_landmarks(landmarks)
         self.last_evaluate_pose = robot.pose
-        self.force_eval = False  # for debugging via jviewer
 
     def set_landmarks(self,landmarks):
         self.landmarks = landmarks
 
-class ArucoDistanceSensorModel(SensorModel):
-    def __init__(self, robot, landmarks=dict(), dist_variance=100):
-        super().__init__(robot,landmarks)
-        self.dist_variance = dist_variance
-
-    def evaluate(self,particles):
-        # Returns true if particles were evaluated.
-
+    def compute_robot_motion(self):
         # How much did we move since last evaluation?
         dx = self.robot.pose.position.x - self.last_evaluate_pose.position.x
         dy = self.robot.pose.position.y - self.last_evaluate_pose.position.y
         dist = sqrt(dx*dx + dy*dy)
         turn_angle = wrap_angle(self.robot.pose.rotation.angle_z.radians -
                                 self.last_evaluate_pose.rotation.angle_z.radians)
+        return (dx,dy,dist,turn_angle)
 
-        # Only evaluate if the robot moved enough for evaluation to be worthwhile,
-        # or the user requested an evaluation (for debugging via force_eval).
-        if not self.force_eval and dist < 5 and abs(turn_angle) < math.radians(5):
+class ArucoDistanceSensorModel(SensorModel):
+    def __init__(self, robot, landmarks=dict(), dist_variance=100):
+        super().__init__(robot,landmarks)
+        self.dist_variance = dist_variance
+
+    def evaluate(self,particles,force=False):
+        # Returns true if particles were evaluated.
+        # Called with force=True from jviewer to force evaluation when no motion.
+
+        # Only evaluate if the robot moved enough for evaluation to be worthwhile.
+        (dx,dy,dist,turn_angle) = self.compute_robot_motion()
+        if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
-        self.force_eval = False  # was set by jviewer
         self.last_evaluate_pose = self.robot.pose
         eta = 0.01   # scale the weights
-        for (id,coords) in self.landmarks.items():
-            if id in self.robot.world.aruco.seenMarkers:
-                sensor_dist = self.robot.world.aruco.seenMarkerObjects[id].translation[2]
+        # cache seenMarkerObjects because vision is in another thread
+        seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
+        for (id,specs) in self.landmarks.items():
+            coords = specs[0]
+            if id in seenMarkerObjects:
+                sensor_dist = seenMarkerObjects[id].camera_distance
                 for p in particles:
-                    dx = p.x - coords[0]
-                    dy = p.y - coords[1]
+                    dx = coords[0] - p.x
+                    dy = coords[1] - p.y
                     predicted_dist = sqrt(dx*dx + dy*dy)
                     error = sensor_dist - predicted_dist
                     p.log_weight -= eta * (error * error) / self.dist_variance
@@ -120,12 +160,14 @@ class ArucoDistanceSensorModel(SensorModel):
 #================ Particle Filter ================
 
 class ParticleFilter():
-    def __init__(self, robot, num_particles=500, radius=200,
+    def __init__(self, robot, num_particles=500,
+                 initializer = RandomWithinRadius(),
                  motion_model = "default",
                  sensor_model = "default",
                  landmarks = dict()):
         self.robot = robot
         self.num_particles = num_particles
+        self.initializer = initializer
         if motion_model == "default":
             motion_model = DefaultMotionModel(robot)
         if sensor_model == "default":
@@ -135,24 +177,7 @@ class ParticleFilter():
         self.motion_model = motion_model
         self.sensor_model = sensor_model
         self.particles = [Particle() for i in range(num_particles)]
-        if radius is None:
-            self.set_particles_to_position()
-        else:
-            self.randomize_particles(radius)
-
-    def randomize_particles(self,radius):
-        for p in self.particles:
-            qangle = random.random()*2*pi
-            r = random.gauss(0,radius/2) + radius/1.5
-            p.x = r * cos(qangle)
-            p.y = r * sin(qangle)
-            p.theta = random.random()*2*pi
-
-    def set_particles_to_position(self):
-        for p in self.particles:
-            p.x = self.robot.pose.position.x
-            p.y = self.robot.pose.position.y
-            p.theta = self.robot.pose.rotation.angle_z.radians
+        self.initializer.initialize(self.particles)
 
     def move(self):
         self.motion_model.move(self.particles)
@@ -162,39 +187,37 @@ class ParticleFilter():
                 self.resample()
 
     def pose_estimate(self):
-        cx = 0
-        cy = 0
-        hsin = 0
-        hcos = 0
+        cx = 0; cy = 0
+        hsin = 0; hcos = 0
         for p in self.particles:
             cx += p.weight * p.x
             cy += p.weight * p.y
             hsin += sin(p.theta)
             hcos += cos(p.theta)
-        cx *= 1/self.num_particles
-        cy *= 1/self.num_particles
+        cx /= self.num_particles
+        cy /= self.num_particles
         return (cx, cy, atan2(hsin,hcos))
 
     def weight_variance(self):
         self.log_weights = array.array('f',[p.log_weight for p in self.particles])
-        self.exp_weights = numpy.exp(self.log_weights)
-        variance = numpy.var(self.exp_weights)
+        self.exp_weights = np.exp(self.log_weights)
+        variance = np.var(self.exp_weights)
         return variance
 
     def resample(self):
         # Compute and normalize the cdf
         exp_weights = self.exp_weights
-        cdf = exp_weights.__copy__()
+        cdf = np.empty(self.num_particles)
         cdf[0] = exp_weights[0]
         for i in range(1,self.num_particles):
             cdf[i] = cdf[i-1] + exp_weights[i]
         cumsum = cdf[-1]
-        cdf = numpy.divide(cdf, cumsum)
+        cdf = np.divide(cdf, cumsum)
 
         # Prepare for resampling
-        new_x = exp_weights.__copy__()
-        new_y = exp_weights.__copy__()
-        new_theta = exp_weights.__copy__()
+        new_x = np.empty(self.num_particles)
+        new_y = np.empty(self.num_particles)
+        new_theta = np.empty(self.num_particles)
         u = random.random() * (1/self.num_particles)
         index = 1
 

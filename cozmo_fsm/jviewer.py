@@ -60,51 +60,33 @@ class ParticleViewer():
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
 
-    def drawRectangle(self,center,width=0.08,height=None,angle=0,color=(1,1,1),fill=True):
-        #default to solid color
+    def drawRectangle(self,center,width=10,height=None,angle=0,color=(1,1,1),fill=True):
+        # Default to solid color and square window
         if len(color)==3:
           color = (color[0],color[1],color[2],1)
-
-        #default to square window
         if height is None:
           height = width
 
-        #calculate offsets
-        w = width/2
-        h = height/2
-        v1 = (-w,-h)
-        v2 = (w,-h)
-        v3 = (w,h)
-        v4 = (-w,h)
+        # Calculate vertices as offsets from center
+        w = width/2; h = height/2
+        v1 = (-w,-h); v2 = (w,-h); v3 = (w,h); v4 = (-w,h)
 
-        #rotate points
-        rad = math.radians(angle)
-        tcos = math.cos(rad)
-        tsin = math.sin(rad)
-        v1 = (tcos*v1[0]-tsin*v1[1],tsin*v1[0]+tcos*v1[1])
-        v2 = (tcos*v2[0]-tsin*v2[1],tsin*v2[0]+tcos*v2[1])
-        v3 = (tcos*v3[0]-tsin*v3[1],tsin*v3[0]+tcos*v3[1])
-        v4 = (tcos*v4[0]-tsin*v4[1],tsin*v4[0]+tcos*v4[1])
-
-        #translate points
-        (cx,cy) = center
-        v1 = (v1[0]+cx,v1[1]+cy)
-        v2 = (v2[0]+cx,v2[1]+cy)
-        v3 = (v3[0]+cx,v3[1]+cy)
-        v4 = (v4[0]+cx,v4[1]+cy)
-
-        #draw rectangle
+        # Draw the rectangle
+        glPushMatrix()
         if fill:
-          glPolygonMode(GL_FRONT_AND_BACK,GL_FILL)
+            glPolygonMode(GL_FRONT_AND_BACK,GL_FILL)
+        else:
+            glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
         glColor4f(color[0],color[1],color[2],color[3])
+        glTranslatef(*center,0)
+        glRotatef(angle,0,0,1)
         glBegin(GL_QUADS)
-        glVertex2f(v1[0],v1[1])
-        glVertex2f(v2[0],v2[1])
-        glVertex2f(v3[0],v3[1])
-        glVertex2f(v4[0],v4[1])
+        glVertex2f(*v1)
+        glVertex2f(*v2)
+        glVertex2f(*v3)
+        glVertex2f(*v4)
         glEnd()
-        if fill:
-          glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
+        glPopMatrix()
 
     def drawTriangle(self,center,scale=1,angle=0,color=(1,1,1),fill=True):
         # Default to solid color
@@ -127,6 +109,25 @@ class ParticleViewer():
         glPopMatrix()
         return
 
+    def draw_landmarks(self):
+        if self.landmarks:
+            for (id,specs) in self.landmarks.items():
+                coords = specs[0]
+                angle = specs[1]
+                glPushMatrix()
+                if id in self.robot.world.aruco.seenMarkers:
+                    color = (0.5, 1, 0.3, 0.75)
+                else:
+                    color = (0, 0.5, 0, 0.75)
+                self.drawRectangle(coords,20,50,angle=angle,color=color)
+                glColor4f(0., 0., 0., 1.)
+                glTranslatef(coords[0], coords[1], 0.)
+                glRotatef(angle-90, 0., 0., 1.)
+                glTranslatef(0., -5., 0.) 
+                glScalef(0.1,0.1,0.1)
+                glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(id)))
+                glPopMatrix()
+
     def display(self):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
@@ -139,21 +140,13 @@ class ParticleViewer():
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+
         # Draw the particles
         for p in self.particles:
+            pscale = 1 - p.weight
+            color=(1,pscale,pscale)
             self.drawTriangle((p.x,p.y), angle=math.degrees(p.theta),
-                              color=(1,0,0), fill=True)
-        # Draw the landmarks
-        if self.landmarks:
-            for (id,coords) in self.landmarks.items():
-                glPushMatrix()
-                self.drawRectangle(coords,50,color=(0,1,0))
-                glColor4f(0., 0., 0., 1.)
-                glTranslatef(coords[0], coords[1], 0.)
-                glRotatef(-90, 0., 0., 1.)
-                glScalef(0.1,0.1,0.1)
-                glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(id)))
-                glPopMatrix()
+                              color=color, fill=True)
 
         # Draw the robot at the best particle location
         est = self.robot.world.particle_filter.pose_estimate()
@@ -162,11 +155,8 @@ class ParticleViewer():
         rtheta = math.degrees(est[2])
         self.drawTriangle((rx,ry),scale=2,angle=rtheta, color=(0,0,1,0.5))
 
-        #blocks
-        #self.drawRectangle((150,0),50,color=(1,0,0,.2))
-        #self.drawRectangle((0,75),50,color=(0,1,0,0.2))
-        #self.drawRectangle((0,-75),50,color=(0,0,1,0.2))
-        #self.drawRectangle((0.75,0.75),0.08,color=(0,1,0))
+        # Draw the landmarks last, so they go on top of the particles
+        self.draw_landmarks()
 
         glutSwapBuffers()
 
@@ -179,23 +169,28 @@ class ParticleViewer():
         glutPostRedisplay()
 
     def keyPressed(self,key,mouseX,mouseY):
+        pf = self.robot.world.particle_filter
         global particles
-        if(key == b'e'): #evaluate
-            self.robot.world.particle_filter.sensor_model.force_eval = True
-        if(key == b'r'): #resample
-            self.robot.world.particle_filter.resample()
-        if(key == b'w'): #forward
+        if key == b'e':       # evaluate
+            pf.sensor_model.evaluate(pf.particles,force=True)
+        elif key == b'r':     # resample
+            pf.sensor_model.evaluate(pf.particles,force=True)
+            pf.weight_variance()
+            pf.resample()
+        elif key == b'w':     # forward
             self.Forward(10).now()
-        if(key == b's'): #back
+        elif key == b's':     # back
             self.Forward(-10).now()
-        if(key == b'a'): #left
-            self.Turn(45).now()
-        if(key == b'd'): #left
-            self.Turn(-45).now()
-        if(key == b'v'): #left
-            print('weight_variance =', self.robot.world.particle_filter.weight_variance())
+        elif key == b'a':     # left
+            self.Turn(22.5).now()
+        elif key == b'd':     # right
+            self.Turn(-22.5).now()
+        elif key == b'z':     # randomize
+            pf.initializer.initialize(pf.particles)
+        elif key == b'v':     # display weight variance
+            print('weight_variance =', pf.weight_variance())
 
-        if(key == b'q'): #kill window
+        if key == b'q': #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
         est = self.robot.world.particle_filter.pose_estimate()

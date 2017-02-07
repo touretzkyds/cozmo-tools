@@ -5,9 +5,14 @@ class ArucoMarker(object):
     self.id = markerID
     self.bbox = bbox
 
-    #pose information
-    self.translation = translation
-    self.rotation = (180/math.pi)*rotation
+    # OpenCV Pose information
+    self.opencv_translation = translation
+    self.opencv_rotation = (180/math.pi)*rotation
+
+    # Cozmo coordinates in camera reference frame
+    self.camera_coords = (-translation[0], -translation[1], translation[2])
+    self.camera_distance = math.sqrt(translation[0]*translation[0] +
+                                     translation[2]*translation[2])
 
   def __str__(self):
     return "<ArucoMarker id=%d trans=(%d,%d,%d) rot=(%d,%d,%d)>" % (self.id,
