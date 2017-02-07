@@ -242,6 +242,11 @@ class ActionNode(StateNode):
 
 class Say(ActionNode):
     """Speaks some text, then posts a completion event."""
+
+    class SayText():
+        def __init__(self,text=None):
+            self.text = text
+            
     def __init__(self, text="I'm speechless",
                  abort_on_stop=False, **action_kwargs):
         self.text = text
@@ -251,8 +256,10 @@ class Say(ActionNode):
     def start(self,event=None):
         if self.running: return
         utterance = self.text
-        if isinstance(event,DataEvent):
-                utterance = event.data
+        if isinstance(event,DataEvent) and isinstance(event.data,Say.SayText):
+            utterance = event.data.text
+        else:
+            utterance = self.text
         if isinstance(utterance, (list,tuple)):
             utterance = random.choice(utterance)
         if not isinstance(utterance, str):
