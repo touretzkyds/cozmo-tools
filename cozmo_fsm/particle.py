@@ -145,12 +145,12 @@ class ArucoDistanceSensorModel(SensorModel):
         # cache seenMarkerObjects because vision is in another thread
         seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
         for (id,specs) in self.landmarks.items():
-            coords = specs[0]
             if id in seenMarkerObjects:
                 sensor_dist = seenMarkerObjects[id].camera_distance
+                map_coords = specs[0]
                 for p in particles:
-                    dx = coords[0] - p.x
-                    dy = coords[1] - p.y
+                    dx = map_coords[0] - p.x
+                    dy = map_coords[1] - p.y
                     predicted_dist = sqrt(dx*dx + dy*dy)
                     error = sensor_dist - predicted_dist
                     p.log_weight -= eta * (error * error) / self.dist_variance
