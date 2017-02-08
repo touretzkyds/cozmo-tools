@@ -141,7 +141,6 @@ class ArucoDistanceSensorModel(SensorModel):
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
-        eta = 0.01   # scale the weights
         # cache seenMarkerObjects because vision is in another thread
         seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
         for (id,specs) in self.landmarks.items():
@@ -153,7 +152,7 @@ class ArucoDistanceSensorModel(SensorModel):
                     dy = map_coords[1] - p.y
                     predicted_dist = sqrt(dx*dx + dy*dy)
                     error = sensor_dist - predicted_dist
-                    p.log_weight -= eta * (error * error) / self.dist_variance
+                    p.log_weight -= (error * error) / self.dist_variance
                     p.weight = exp(p.log_weight)
         return True
 
