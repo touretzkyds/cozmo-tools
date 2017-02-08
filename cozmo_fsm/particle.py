@@ -213,7 +213,11 @@ class ParticleFilter():
         for i in range(1,self.num_particles):
             cdf[i] = cdf[i-1] + exp_weights[i]
         cumsum = cdf[-1]
-        cdf = np.divide(cdf, cumsum)
+        if cumsum > 0:
+            np.divide(cdf, cumsum, cdf)
+        else:
+            cumsum = 1
+            cdf[:] = 1/self.num_particles
 
         # Prepare for resampling
         new_x = np.empty(self.num_particles)
@@ -233,16 +237,20 @@ class ParticleFilter():
             u += 1/self.num_particles
 
         # Copy the new particle values into the old particles while jittering
+        dist_var = 2 # mm squared
+        hdg_var = 0.01 # radians squared
+        randxy = np.random.normal(0, dist_var, size=(2,self.num_particles))
+        randtheta = np.random.normal(0, hdg_var, size=self.num_particles)
         for i in range(self.num_particles):
             p = self.particles[i]
-            p.x = random.gauss(new_x[i], 2)
-            p.y = random.gauss(new_y[i], 2)
-            p.theta = wrap_angle(random.gauss(new_theta[i], 0.01))
+            p.x = new_x[i] + randxy[0,i]
+            p.y = new_y[i] + randxy[1,i]
+            p.theta = wrap_angle(new_theta[i] + randtheta[i])
             p.log_weight = 0
             p.weight = 1
 
 def wrap_angle(angle_rads):
-    if angle_rads < -pi:
+    if angle_rads <= -pi:
         return 2*pi + angle_rads
     elif angle_rads > pi:
         return angle_rads - 2*pi
