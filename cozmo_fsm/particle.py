@@ -143,6 +143,7 @@ class ArucoDistanceSensorModel(SensorModel):
         self.last_evaluate_pose = self.robot.pose
         # cache seenMarkerObjects because vision is in another thread
         seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
+        min_log_weight = -300  # prevent floating point underflows
         for (id,specs) in self.landmarks.items():
             if id in seenMarkerObjects:
                 sensor_dist = seenMarkerObjects[id].camera_distance
@@ -152,7 +153,8 @@ class ArucoDistanceSensorModel(SensorModel):
                     dy = map_coords[1] - p.y
                     predicted_dist = sqrt(dx*dx + dy*dy)
                     error = sensor_dist - predicted_dist
-                    p.log_weight -= (error * error) / self.dist_variance
+                    p.log_weight = max(min_log_weight,
+                                       p.log_weight - (error*error)/self.dist_variance)
                     p.weight = exp(p.log_weight)
         return True
 
@@ -177,6 +179,10 @@ class ParticleFilter():
         self.sensor_model = sensor_model
         self.particles = [Particle() for i in range(num_particles)]
         self.initializer.initialize(self.particles)
+        self.new_x = np.empty(self.num_particles)
+        self.new_y = np.empty(self.num_particles)
+        self.new_theta = np.empty(self.num_particles)
+        self.cdf = np.empty(self.num_particles)
 
     def move(self):
         self.motion_model.move(self.particles)
@@ -186,9 +192,9 @@ class ParticleFilter():
                 self.resample()
 
     def pose_estimate(self):
-        cx = 0; cy = 0
-        hsin = 0; hcos = 0
-        weight_sum = 0
+        cx = 0.0; cy = 0.0
+        hsin = 0.0; hcos = 0.0
+        weight_sum = 0.0
         for p in self.particles:
             cx += p.weight * p.x
             cy += p.weight * p.y
@@ -200,54 +206,52 @@ class ParticleFilter():
         return (cx, cy, atan2(hsin,hcos))
 
     def weight_variance(self):
-        self.log_weights = array.array('f',[p.log_weight for p in self.particles])
+        self.log_weights = np.array([p.log_weight for p in self.particles])
         self.exp_weights = np.exp(self.log_weights)
         variance = np.var(self.exp_weights)
         return variance
 
     def resample(self):
-        # Compute and normalize the cdf
+        # Compute and normalize the cdf; make local pointers for faster access
+        num_particles = self.num_particles;
         exp_weights = self.exp_weights
-        cdf = np.empty(self.num_particles)
+        cdf = self.cdf
         cdf[0] = exp_weights[0]
-        for i in range(1,self.num_particles):
+        for i in range(1,num_particles):
             cdf[i] = cdf[i-1] + exp_weights[i]
         cumsum = cdf[-1]
-        if cumsum > 0:
-            np.divide(cdf, cumsum, cdf)
-        else:
-            cumsum = 1
-            cdf[:] = 1/self.num_particles
+        np.divide(cdf,cumsum,cdf)
 
         # Prepare for resampling
-        new_x = np.empty(self.num_particles)
-        new_y = np.empty(self.num_particles)
-        new_theta = np.empty(self.num_particles)
-        u = random.random() * (1/self.num_particles)
-        index = 1
-
-        # Resampling loop
-        for j in range(self.num_particles):
-            while u > cdf[index]:
-                index += 1
-            p = self.particles[index]
-            new_x[j] = p.x
-            new_y[j] = p.y
-            new_theta[j] = p.theta
-            u += 1/self.num_particles
-
-        # Copy the new particle values into the old particles while jittering
         dist_var = 2 # mm squared
         hdg_var = 0.01 # radians squared
-        randxy = np.random.normal(0, dist_var, size=(2,self.num_particles))
-        randtheta = np.random.normal(0, hdg_var, size=self.num_particles)
-        for i in range(self.num_particles):
-            p = self.particles[i]
-            p.x = new_x[i] + randxy[0,i]
-            p.y = new_y[i] + randxy[1,i]
-            p.theta = wrap_angle(new_theta[i] + randtheta[i])
-            p.log_weight = 0
-            p.weight = 1
+        x_jitter = np.random.normal(0, dist_var, size=self.num_particles)
+        y_jitter = np.random.normal(0, dist_var, size=self.num_particles)
+        theta_jitter = np.random.normal(0, hdg_var, size=self.num_particles)
+
+        u = random.random() * (1/num_particles)
+        index = 0
+
+        # Resampling loop
+        new_x = self.new_x; new_y = self.new_y; new_theta = self.new_theta
+        particles = self.particles
+        for j in range(num_particles):
+            while u > cdf[index]:
+                index += 1
+            p = particles[index]
+            new_x[j] = p.x + x_jitter[j]
+            new_y[j] = p.y + y_jitter[j]
+            new_theta[j] = wrap_angle(p.theta + theta_jitter[j])
+            u += 1/num_particles
+
+        # Copy the new particle values into the old particles
+        for i in range(num_particles):
+            p = particles[i]
+            p.x = new_x[i]
+            p.y = new_y[i]
+            p.theta = new_theta[i]
+            p.log_weight = 0.0
+            p.weight = 1.0
 
 def wrap_angle(angle_rads):
     if angle_rads <= -pi:
