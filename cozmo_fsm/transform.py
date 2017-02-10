@@ -76,7 +76,7 @@ def tprint(t):
                 print(' ]')
             else:
                 print()
-    if isinstance(t, np.array):
+    if isinstance(t, np.ndarray):
         tprint_matrix(t)
     else:
         print(t)
