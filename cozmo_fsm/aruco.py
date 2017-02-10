@@ -15,9 +15,8 @@ class ArucoMarker(object):
                                      translation[2]*translation[2])
 
   def __str__(self):
-    return "<ArucoMarker id=%d trans=(%d,%d,%d) rot=(%d,%d,%d)>" % (self.id,
-                  self.translation[0],self.translation[1],self.translation[2],
-                           self.rotation[0],self.rotation[1],self.rotation[2])
+    return "<ArucoMarker id=%d trans=(%d,%d,%d) rot=(%d,%d,%d)>" % \
+              (self.id, *self.opencv_translation, *self.opencv_rotation)
 
   def __repr__(self):
     return self.__str__()
