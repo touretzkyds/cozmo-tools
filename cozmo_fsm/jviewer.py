@@ -173,9 +173,10 @@ class ParticleViewer():
         global particles
         if key == b'e':       # evaluate
             pf.sensor_model.evaluate(pf.particles,force=True)
+            pf.update_weights()
         elif key == b'r':     # resample
             pf.sensor_model.evaluate(pf.particles,force=True)
-            pf.weight_variance()
+            pf.update_weights()
             pf.resample()
         elif key == b'w':     # forward
             self.Forward(10).now()
@@ -188,7 +189,10 @@ class ParticleViewer():
         elif key == b'z':     # randomize
             pf.initializer.initialize(pf.particles)
         elif key == b'v':     # display weight variance
-            print('weight_variance =', pf.weight_variance())
+            var = pf.update_weights()
+            minw = min(p.weight for p in pf.particles)
+            maxw = max(p.weight for p in pf.particles)
+            print('weights:','  min =', minw, '  max =', maxw,'  variance =', var)
 
         if key == b'q': #kill window
             glutDestroyWindow(self.window)

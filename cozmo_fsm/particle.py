@@ -34,6 +34,8 @@ class RandomWithinRadius(ParticleInitializer):
             p.x = r * cos(qangle)
             p.y = r * sin(qangle)
             p.theta = random.random()*2*pi
+            p.log_weight = 0.0
+            p.weight = 1.0
 
 class RobotPosition(ParticleInitializer):
     """ Initialize all particles to the robot's current position; the motion model will jitter tjem. """
@@ -41,6 +43,8 @@ class RobotPosition(ParticleInitializer):
         self.x = x
         self.y = y
         self.theta = theta
+        p.log_weight = 0.0
+        p.weight = 1.0
         
     def initialize(self,particles):
         if self.x == None:
@@ -141,21 +145,20 @@ class ArucoDistanceSensorModel(SensorModel):
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
-        # cache seenMarkerObjects because vision is in another thread
+        # Cache seenMarkerObjects because vision is in another thread
         seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
-        min_log_weight = -300  # prevent floating point underflows
-        for (id,specs) in self.landmarks.items():
-            if id in seenMarkerObjects:
+        # Process each seen marker:
+        for id in seenMarkerObjects:
+            if id in self.landmarks:
                 sensor_dist = seenMarkerObjects[id].camera_distance
-                map_coords = specs[0]
+                landmark_spec = self.landmarks[id]
+                map_coords = landmark_spec[0]
                 for p in particles:
                     dx = map_coords[0] - p.x
                     dy = map_coords[1] - p.y
                     predicted_dist = sqrt(dx*dx + dy*dy)
                     error = sensor_dist - predicted_dist
-                    p.log_weight = max(min_log_weight,
-                                       p.log_weight - (error*error)/self.dist_variance)
-                    p.weight = exp(p.log_weight)
+                    p.log_weight -= (error*error)/self.dist_variance
         return True
 
 #================ Particle Filter ================
@@ -178,7 +181,9 @@ class ParticleFilter():
         self.motion_model = motion_model
         self.sensor_model = sensor_model
         self.particles = [Particle() for i in range(num_particles)]
+        self.min_log_weight = -300  # prevent floating point underflow in exp()
         self.initializer.initialize(self.particles)
+        self.exp_weights = np.empty(self.num_particles)
         self.new_x = np.empty(self.num_particles)
         self.new_y = np.empty(self.num_particles)
         self.new_theta = np.empty(self.num_particles)
@@ -186,8 +191,8 @@ class ParticleFilter():
 
     def move(self):
         self.motion_model.move(self.particles)
-        if self.sensor_model.evaluate(self.particles):
-            var = self.weight_variance()
+        if self.sensor_model.evaluate(self.particles):  # true if log_weights changed
+            var = self.update_weights()
             if var > 0:
                 self.resample()
 
@@ -205,10 +210,19 @@ class ParticleFilter():
         cy /= weight_sum
         return (cx, cy, atan2(hsin,hcos))
 
-    def weight_variance(self):
-        self.log_weights = np.array([p.log_weight for p in self.particles])
-        self.exp_weights = np.exp(self.log_weights)
-        variance = np.var(self.exp_weights)
+    def update_weights(self):
+        # Clip the log_weight values and calculate the new weights
+        if max(p.log_weight for p in self.particles) >= self.min_log_weight:
+            wt_inc = 0.0
+        else:
+            wt_inc = - self.min_log_weight / 2.0
+        exp_weights = self.exp_weights
+        particles = self.particles
+        for i in range(self.num_particles):
+            p = particles[i]
+            p.log_weight += wt_inc            
+            exp_weights[i] = p.weight = exp(p.log_weight)
+        variance = np.var(exp_weights)
         return variance
 
     def resample(self):
