@@ -1,7 +1,7 @@
 import time
 import inspect
 import random
-from math import sqrt
+from math import sqrt, sin, asin
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
@@ -46,12 +46,23 @@ class MoveLift(StateNode):
     def start(self,event=None):
         if self.running: return
         super().start(event)
+        # Temporary hack supplied by Mark Wesley at Anki
+        msg = cozmo._clad._clad_to_engine_iface.EnableLiftPower(True)
+        self.robot.conn.send_msg(msg)
         self.robot.move_lift(self.speed)
 
     def stop(self):
         if not self.running: return
         self.robot.move_lift(0)
         super().stop()
+
+class RelaxLift(StateNode):
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        # Temporary hack supplied by Mark Wesley at Anki
+        msg = cozmo._clad._clad_to_engine_iface.EnableLiftPower(False)
+        self.robot.conn.send_msg(msg)
 
 #________________ Coroutine Nodes ________________
 
@@ -322,6 +333,29 @@ class SetHeadAngle(ActionNode):
     def action_launcher(self):
         return self.robot.set_head_angle(self.angle, **self.action_kwargs)
 
+class SetLiftHeight(ActionNode):
+    def __init__(self, height, abort_on_stop=True, **action_kwargs):
+        self.height = height
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop)
+
+    def action_launcher(self):
+        # Temporary hack supplied by Mark Wesley at Anki
+        msg = cozmo._clad._clad_to_engine_iface.EnableLiftPower(True)
+        self.robot.conn.send_msg(msg)
+        return self.robot.set_lift_height(self.height, **self.action_kwargs)
+
+class SetLiftAngle(SetLiftHeight):
+    def __init__(self, angle, abort_on_stop=True, **action_kwargs):
+        def get_theta(height):
+            return asin((height-45)/66)
+        if isinstance(angle, cozmo.util.Angle):
+            angle = angle.radians
+        min_theta = get_theta(cozmo.robot.MIN_LIFT_HEIGHT_MM)
+        max_theta = get_theta(cozmo.robot.MAX_LIFT_HEIGHT_MM)
+        angle_range = max_theta - min_theta
+        height_pct = (angle - min_theta) / angle_range
+        super().__init__(height_pct, abort_on_stop=abort_on_stop, **action_kwargs)
 
 #________________ Animations ________________
 
