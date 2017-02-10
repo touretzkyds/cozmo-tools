@@ -7,9 +7,11 @@ import cozmo
 from .base import StateNode
 from .aruco import *
 from .particle import *
+from .cozmo_kin import *
 
 class StateMachineProgram(StateNode):
     def __init__(self,
+                 kine_class=CozmoKinematics,
                  viewer=True,
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
@@ -17,6 +19,7 @@ class StateMachineProgram(StateNode):
                  ):
         super().__init__()
 
+        self.kine_class = kine_class
         self.windowName = None
         self.viewer = viewer
         self.aruco = aruco
@@ -25,12 +28,14 @@ class StateMachineProgram(StateNode):
         self.particle_filter = particle_filter
 
     def start(self):
+        # Set up kinematics
+        self.robot.kine = self.kine_class(self.robot)
+        self.set_polling_interval(0.050)
         # Create a particle filter
         if self.particle_filter:
             if self.particle_filter is True:
                 self.particle_filter = ParticleFilter(self.robot)
             self.robot.world.particle_filter = self.particle_filter
-            self.set_polling_interval(0.050)
         else:
             self.robot.world.particle_filter = None
 
@@ -65,6 +70,7 @@ class StateMachineProgram(StateNode):
             cv2.destroyWindow(self.windowName)
 
     def poll(self):
+        self.robot.kine.get_pose()
         if self.robot.world.particle_filter:
             self.robot.world.particle_filter.move()
 

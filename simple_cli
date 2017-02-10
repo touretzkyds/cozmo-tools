@@ -189,10 +189,8 @@ from cozmo._clad import _clad_to_engine_iface  # fix charger pose bug
 
 from event_monitor import monitor, unmonitor
 
-try:
-    import cozmo_fsm
-    from cozmo_fsm import StateMachineProgram, tracefsm, TextMsgEvent
-except: pass
+import cozmo_fsm
+from cozmo_fsm import StateMachineProgram, tracefsm, TextMsgEvent, CozmoKinematics
 
 try:
     import world_viewer
@@ -356,6 +354,7 @@ def cli_loop(robot,intro_msg):
     global ans, RUNNING, running_fsm
     cli_loop.charger_warned = False
 
+    robot.kine = CozmoKinematics(robot)
     world = robot.world
     light_cubes = world.light_cubes
     cube1 = light_cubes[cozmo.objects.LightCube1Id]
@@ -394,6 +393,7 @@ def cli_loop(robot,intro_msg):
             except EOFError:
                 print("EOF.\nType 'exit' to exit.\n")
                 continue
+        robot.kine.get_pose()
         if cli_loop._line[0] == '!':
             do_shell_command(cli_loop._line[1:])
             continue
