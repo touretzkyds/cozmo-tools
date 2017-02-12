@@ -83,6 +83,10 @@ class Kinematics():
         return np.linalg.inv(self.joint_to_base(joint))
 
     def joint_to_joint(self,joint1,joint2):
+        if isinstance(joint1, str):
+            joint1 = self.joints[joint1]
+        if isinstance(joint2, str):
+            joint2 = self.joints[joint2]
         return self.base_to_joint(joint2).dot(self.joint_to_base(joint1))
 
     def get_pose(self):

@@ -54,7 +54,7 @@ def identity():
         [0, 0, 0, 1.]])
 
 def dh_matrix(d,theta,r,alpha):
-    return aboutX(alpha).dot(translate(r,0,d).dot(aboutZ(theta)))
+    return aboutX(alpha).dot(translate(-r,0,-d).dot(aboutZ(theta)))
 
 def translation(t):
     return np.array([ [t[0,3]], [t[1,3]], [t[2,3]], [t[3,3]] ])
@@ -76,8 +76,22 @@ def tprint(t):
                 print(' ]')
             else:
                 print()
-    if isinstance(t, np.array):
+    if isinstance(t, np.ndarray):
         tprint_matrix(t)
     else:
         print(t)
 
+def quat2rot(q0,q1,q2,q3):
+    # formula from http://stackoverflow.com/questions/7938373/from-quaternions-to-opengl-rotations
+    q0_sq = q0*q0; q1_sq = q1*q1; q2_sq = q2*q2; q3_sq = q3*q3
+    t_q0q1 = 2. * q0 * q1
+    t_q0q2 = 2. * q0 * q2
+    t_q0q3 = 2. * q0 * q3
+    t_q1q2 = 2. * q1 * q2
+    t_q1q3 = 2. * q1 * q3
+    t_q2q3 = 2. * q2 * q3
+    return np.array([
+        [ q0_sq+q1_sq-q2_sq-q3_sq, t_q1q2-t_q0q3,           t_q1q3+t_q0q2,           0. ],
+        [ t_q1q2+t_q0q3,           q0_sq-q1_sq+q2_sq-q3_sq, t_q2q3-t_q0q1,           0. ],
+        [ t_q1q3-t_q0q2,           t_q2q3+t_q0q1,           q0_sq-q1_sq-q2_sq+q3_sq, 0. ],
+        [             0.,                     0.,                      0.,           1.  ]])
