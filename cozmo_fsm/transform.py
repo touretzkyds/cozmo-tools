@@ -3,32 +3,32 @@ Transformation matrices for kinematics calculations.
 """
 
 import numpy as np
-from math import sin, cos
+from math import sin, cos, pi
 
 def aboutX(theta):
     c = cos(theta)
     s = sin(theta)
     return np.array([
         [ 1,  0,  0, 0],
-        [ 0,  c,  s, 0],
-        [ 0, -s,  c, 0],
+        [ 0,  c, -s, 0],
+        [ 0,  s,  c, 0],
         [ 0,  0,  0, 1]])
 
 def aboutY(theta):
     c = cos(theta)
     s = sin(theta)
     return np.array([
-        [ c,  0, -s, 0],
+        [ c,  0,  s, 0],
         [ 0,  1,  0, 0],
-        [ s,  0,  c, 1],
+        [-s,  0,  c, 0],
         [ 0,  0,  0, 1]])
 
 def aboutZ(theta):
     c = cos(theta)
     s = sin(theta)
     return np.array([
-        [ c,  s,  0, 0],
-        [-s,  c,  0, 0],
+        [ c, -s,  0, 0],
+        [ s,  c,  0, 0],
         [ 0,  0,  1, 0],
         [ 0,  0,  0, 1.]])
 
@@ -54,7 +54,7 @@ def identity():
         [0, 0, 0, 1.]])
 
 def dh_matrix(d,theta,r,alpha):
-    return aboutX(alpha).dot(translate(-r,0,-d).dot(aboutZ(theta)))
+    return aboutX(alpha).dot(translate(r,0,d).dot(aboutZ(theta)))
 
 def translation(t):
     return np.array([ [t[0,3]], [t[1,3]], [t[2,3]], [t[3,3]] ])

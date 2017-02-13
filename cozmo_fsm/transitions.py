@@ -41,19 +41,50 @@ class CSFEventBase(Transition):
             raise ValueError("%s can't handle %s" % (self.event_type, event))
 
 class CompletionTrans(CSFEventBase):
-    """Transition fires when a source node completes."""
+    """Transition fires when source nodes complete."""
     def __init__(self,count=None):
         super().__init__(CompletionEvent,count)
 
 class SuccessTrans(CSFEventBase):
-    """Transition fires when a source node succeeds."""
+    """Transition fires when source nodes succeed."""
     def __init__(self,count=None):
         super().__init__(SuccessEvent,count)
 
 class FailureTrans(CSFEventBase):
-    """Transition fires when a source node fails."""
+    """Transition fires when source nodes fail."""
     def __init__(self,count=None):
         super().__init__(FailureEvent,count)
+
+class CNextTrans(CSFEventBase):
+    """Transition fires when source nodes complete."""
+    def __init__(self,count=None):
+        super().__init__(CompletionEvent,count)
+    def fire(self, event):
+        self.fire(IterNode.NextEvent())
+
+class NextTrans(Transition):
+    """Transition sends a NextEvent to its target nodes to advance an iterator."""
+    def start(self):
+        self.fire(IterNode.NextEvent())
+
+class SayDataTrans(Transition):
+    """Converts a DataEvent to Say.SayDataEvent so we can speak the data."""
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        for source in self.sources:
+            self.robot.erouter.add_listener(self, DataEvent, source)
+            self.robot.erouter.add_listener(self, Say.SayDataEvent, source)
+
+    def handle_event(self,event):
+        super().handle_event(event)
+        if isinstance(event, Say.SayDataEvent):
+            say_data_event = event
+        elif isinstance(event, DataEvent):
+            say_data_event = Say.SayDataEvent(event.data)
+        else:
+            return
+        self.fire(say_data_event)            
 
 
 class TimerTrans(Transition):

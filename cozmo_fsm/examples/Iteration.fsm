@@ -1,0 +1,18 @@
+"""
+    Iteration.fsm demonstrates nested iteration using the Iterate node
+    and the =CNext=> transition, which waits for completion before advancing
+    the iterator.  Use =Next=> if the source nodes don't need to
+    complete.
+"""
+
+from cozmo_fsm import *
+
+class Iterate(StateMachineProgram):
+    $setup{
+	outer_loop: Iterate(['alpha', 'bravo', 'charlie'])
+	outer_loop =SayData=> Say() =C=> inner_loop
+	outer_loop =C=> Say('Done')
+
+        inner_loop: Iterate(4) =SayData=> Say() =CNext=> inner_loop
+        inner_loop =Cnext=> outer_loop
+    }

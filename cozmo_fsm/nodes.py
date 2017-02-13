@@ -38,6 +38,28 @@ class ParentFails(StateNode):
         if self.parent:
             self.parent.post_failure()
 
+class Iterate(StateNode):
+    """Iterates over an iterable, posting DataEvents.  Completes when done."""
+    def __init__(self,iterable):
+        super().__init__()
+        if instanceof(iterable, int):
+            iterable = range(int)
+        self.iterable = iterable
+
+    class NextEvent(Event): pass
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        if not isinstance(event, NextEvent):
+            self.iterator = self.iterable.__iter__()
+        try:
+            value = next(self.iterator)
+        except StopIteration:
+            self.post_completion()
+            return
+        self.post_data(value)
+
 class MoveLift(StateNode):
     def __init__(self,speed):
         super().__init__()
@@ -254,7 +276,7 @@ class ActionNode(StateNode):
 class Say(ActionNode):
     """Speaks some text, then posts a completion event."""
 
-    class SayText():
+    class SayDataEvent(Event):
         def __init__(self,text=None):
             self.text = text
             
@@ -266,9 +288,8 @@ class Say(ActionNode):
 
     def start(self,event=None):
         if self.running: return
-        utterance = self.text
-        if isinstance(event,DataEvent) and isinstance(event.data,Say.SayText):
-            utterance = event.data.text
+        if isinstance(event, SayDataEvent)
+            utterance = event.text
         else:
             utterance = self.text
         if isinstance(utterance, (list,tuple)):
