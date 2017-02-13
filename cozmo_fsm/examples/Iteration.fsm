@@ -7,12 +7,13 @@
 
 from cozmo_fsm import *
 
-class Iterate(StateMachineProgram):
+class Iteration(StateMachineProgram):
     $setup{
 	outer_loop: Iterate(['alpha', 'bravo', 'charlie'])
 	outer_loop =SayData=> Say() =C=> inner_loop
-	outer_loop =C=> Say('Done')
 
-        inner_loop: Iterate(4) =SayData=> Say() =CNext=> inner_loop
-        inner_loop =Cnext=> outer_loop
+          inner_loop: Iterate(4) =SayData=> Say() =CNext=> inner_loop
+          inner_loop =CNext=> outer_loop
+
+	outer_loop =C=> Say('Done')
     }

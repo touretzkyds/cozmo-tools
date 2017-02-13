@@ -42,8 +42,8 @@ class Iterate(StateNode):
     """Iterates over an iterable, posting DataEvents.  Completes when done."""
     def __init__(self,iterable):
         super().__init__()
-        if instanceof(iterable, int):
-            iterable = range(int)
+        if isinstance(iterable, int):
+            iterable = range(iterable)
         self.iterable = iterable
 
     class NextEvent(Event): pass
@@ -51,7 +51,7 @@ class Iterate(StateNode):
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        if not isinstance(event, NextEvent):
+        if not isinstance(event, self.NextEvent):
             self.iterator = self.iterable.__iter__()
         try:
             value = next(self.iterator)
@@ -288,7 +288,7 @@ class Say(ActionNode):
 
     def start(self,event=None):
         if self.running: return
-        if isinstance(event, SayDataEvent)
+        if isinstance(event, self.SayDataEvent):
             utterance = event.text
         else:
             utterance = self.text
