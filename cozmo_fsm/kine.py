@@ -27,8 +27,8 @@ class Joint():
         self.q = 0
         self.qmin = -math.inf
         self.qmax = math.inf
-        self.parent_link_to_this_joint = transform.dh_matrix(d,theta,r,alpha)
-        self.this_joint_to_parent_link = np.linalg.inv(self.parent_link_to_this_joint)
+        self.this_joint_to_parent_link = transform.dh_matrix(d,theta,r,alpha)
+        self.parent_link_to_this_joint = np.linalg.inv(self.this_joint_to_parent_link)
         self.solver = None
 
     def __repr__(self):
