@@ -156,7 +156,7 @@ class Transition(EventListener):
             self.destinations.append(node)
         return self
 
-    def start(self,event):
+    def start(self,event=None):
         if self.running: return
         if TRACE.trace_level >= TRACE.transition_startstop:
             print('TRACE%d:' % TRACE.transition_startstop, self, 'starting')
@@ -193,7 +193,7 @@ class Transition(EventListener):
             src.stop()
         self.stop()
         action_cancel_delay = 0.01  # wait for source node action cancellations to take effect
-        self.robot.loop.call_later(action_cancel_delay, self.fire2,event)
+        self.robot.loop.call_later(action_cancel_delay, self.fire2, event)
 
     def fire2(self,event):
         for dest in self.destinations:

@@ -60,13 +60,17 @@ class CNextTrans(CSFEventBase):
     """Transition fires when source nodes complete."""
     def __init__(self,count=None):
         super().__init__(CompletionEvent,count)
-    def fire(self, event):
+
+    def fire(self, event=None):
         super().fire(Iterate.NextEvent())
+
 
 class NextTrans(Transition):
     """Transition sends a NextEvent to its target nodes to advance an iterator."""
-    def start(self):
+    def start(self, event=None):
+        super().start(event)
         self.fire(Iterate.NextEvent())
+
 
 class SayDataTrans(Transition):
     """Converts a DataEvent to Say.SayDataEvent so we can speak the data."""
