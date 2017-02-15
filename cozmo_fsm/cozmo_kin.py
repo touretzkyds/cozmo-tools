@@ -18,7 +18,7 @@ class CozmoKinematics(Kinematics):
         # x is forward, y points up.
         shoulder_frame = Joint('shoulder', parent=base_frame,
                                type='revolute', getter=self.get_shoulder,
-                               d=-21., r=39., alpha=pi/2)
+                               d=21., r=-39., alpha=pi/2)
         lift_attach_frame = Joint('lift_attach', parent=shoulder_frame, type='revolute',
                                   getter=self.get_lift_attach, r=-66.)
 
