@@ -46,10 +46,10 @@ class Joint():
         return np.linalg.inv(self.this_joint_to_this_link())
 
     def revolute(self):
-        return transform.aboutZ(self.q)
+        return transform.aboutZ(-self.q)
 
     def prismatic(self):
-        return transform.translate(0.,0.,self.q)
+        return transform.translate(0.,0.,-self.q)
 
     def fixed(self):
         return transform.identity()
