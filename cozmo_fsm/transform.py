@@ -54,6 +54,7 @@ def identity():
         [0, 0, 0, 1.]])
 
 def dh_matrix(d,theta,r,alpha):
+    """Denavit-Hartenberg transformation from joint i to joint i+1."""
     return aboutX(alpha).dot(translate(r,0,d).dot(aboutZ(theta)))
 
 def translation(t):
