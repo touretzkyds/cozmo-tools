@@ -63,6 +63,7 @@ def point(x=0,y=0,z=0):
     return np.array([ [x], [y], [z], [1.] ])
 
 def tprint(t):
+    number_format = "%7.3f"
     def tprint_matrix(t):
         for i in range(t.shape[0]):
             if i == 0:
@@ -71,13 +72,15 @@ def tprint(t):
                 print('  ',end='')
             for j in range(t.shape[1]):
                 if j>0: print('  ',end='')
-                print('%7.3f' % t[i][j], end='')
+                print(number_format % t[i][j], end='')
             if i+1 == t.shape[0]:
                 print(' ]')
             else:
                 print()
     if isinstance(t, np.ndarray):
         tprint_matrix(t)
+    elif isinstance(t, (int,float)):
+        print(number_format % t)
     else:
         print(t)
 
