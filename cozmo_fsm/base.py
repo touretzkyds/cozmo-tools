@@ -127,12 +127,6 @@ class Transition(EventListener):
     @property
     def robot(self):
         return self._robot
-        """if not self._robot:
-            if len(self.sources) > 0:
-                self._robot = self.sources.robot
-                return self._robot
-            else:
-                raise Exception('Transition %s has no sources.' % self)"""
 
     def _sibling_check(self,node):
         for sibling in self.sources + self.destinations:
