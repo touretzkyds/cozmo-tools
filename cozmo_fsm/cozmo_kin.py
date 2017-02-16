@@ -28,7 +28,8 @@ class CozmoKinematics(Kinematics):
                            getter=self.get_head,
                            d=35., r=-10., alpha=pi/2)
 
-        # x axis points down, z points forward, y pooints left
+        # Dummy joint located below head joint at level of the camera frame,
+        # and x axis points down, z points forward, y points left
         camera_dummy = Joint('camera_dummy', parent=head_frame,
                              theta=-pi/2, r=-7.5, alpha=-pi/2)
         # x axis points right, y points down, z points forward
