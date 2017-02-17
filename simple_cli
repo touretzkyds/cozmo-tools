@@ -84,7 +84,7 @@ Available CLI commands:
     show active
         Shows active state nodes and transitions.
 
-    show viewer
+    show camviewer
         Displays an OpenCV camera image viewer.
 
     !cmd
@@ -194,7 +194,6 @@ from cozmo_fsm import StateMachineProgram, tracefsm, TextMsgEvent, CozmoKinemati
 
 try:
     import world_viewer
-    from world_viewer import viewer
 except: pass
 
 # tab completion 
@@ -318,12 +317,14 @@ def show_stuff(spec):
             print('State machine is not running.')
         else:
             show_active(running_fsm,0)
-    elif spec == 'camview' or spec=='viewer':
+    elif spec == 'camviewer' or spec=='viewer':
         if running_fsm:
             running_fsm.stop()
-        running_fsm = StateMachineProgram().set_name("Viewer").now()
+        running_fsm = StateMachineProgram().set_name("CamViewer").now()
+    elif spec == "worldviewer":
+        world_viewer.viewer(robot)
     else:
-        print('Invalid option.  Type "show active".')
+        print('Invalid option.  Type "show active|camviewer|worldviewer".')
 
 def show_active(node,depth):
     if node.running: print('  '*depth, node)
