@@ -4,6 +4,8 @@ import cv2
 
 import cozmo
 
+import world_viewer
+
 from .base import StateNode
 from .aruco import *
 from .particle import *
@@ -12,22 +14,26 @@ from .cozmo_kin import *
 class StateMachineProgram(StateNode):
     def __init__(self,
                  kine_class=CozmoKinematics,
-                 viewer=True,
+                 worldviewer=False,
+                 camviewer=True,
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
                  particle_filter = True
                  ):
         super().__init__()
+        self.name = self.__class__.__name__.lower()
 
         self.kine_class = kine_class
         self.windowName = None
-        self.viewer = viewer
+        self.worldviewer = worldviewer
+        self.camviewer = camviewer
         self.aruco = aruco
         if self.aruco:
             self.robot.world.aruco = Aruco(arucolibname)
         self.particle_filter = particle_filter
 
     def start(self):
+        self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
         self.set_polling_interval(0.050)
@@ -39,8 +45,10 @@ class StateMachineProgram(StateNode):
         else:
             self.robot.world.particle_filter = None
 
-        # Launch viewer
-        if self.viewer:
+        # Launch viewers
+        if self.worldviewer:
+            world_viewer.viewer(self.robot)
+        if self.camviewer:
             self.windowName = self.name
             cv2.namedWindow(self.windowName)
             cv2.startWindowThread()
@@ -52,7 +60,7 @@ class StateMachineProgram(StateNode):
             self.windowName = None
 
         # Request camera image stream
-        if self.viewer or self.aruco:
+        if self.camviewer or self.aruco:
             self.robot.camera.image_stream_enabled = True
             self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                                self.process_image)
