@@ -10,14 +10,16 @@ from threading import Thread  # for backgrounding window
 import math
 import array
 
+import cozmo
+
+RUNNING = False
+
 class ParticleViewer():
     def __init__(self, robot,
-                 width=512,height=512,
+                 width=512, height=512,
                  windowName = "particle viewer",
                  bgcolor = (0,0,0)):
         self.robot = robot
-        self.particles = robot.world.particle_filter.particles
-        self.landmarks = robot.world.particle_filter.sensor_model.landmarks
         self.width = width
         self.height = height
         self.bgcolor = bgcolor
@@ -25,6 +27,7 @@ class ParticleViewer():
         self.windowName = windowName
         self.thread = None
 
+    def initialize_window(self):
         # OpenGL params
         glutInit()
         glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
@@ -36,7 +39,6 @@ class ParticleViewer():
         # Killing window should not directly kill main program
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
 
-    def start(self):
         from cozmo_fsm.nodes import Forward, Turn
         self.Forward = Forward
         self.Turn = Turn
@@ -56,7 +58,12 @@ class ParticleViewer():
         glutMainLoop()
 
     def startThread(self): # Displays in background
-        self.thread = Thread(target=self.start)
+        global RUNNING
+        if RUNNING:
+            return
+        else:
+            RUNNING = True
+        self.thread = Thread(target=self.initialize_window)
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
 
@@ -110,22 +117,31 @@ class ParticleViewer():
         return
 
     def draw_landmarks(self):
-        if self.landmarks:
-            for (id,specs) in self.landmarks.items():
-                coords = specs[0]
-                angle = specs[1]
+        landmarks = self.robot.world.particle_filter.sensor_model.landmarks
+        if landmarks:
+            for (id,specs) in landmarks.items():
+                coords = specs.position.x_y_z
+                angle = specs.rotation.angle_z.degrees
                 glPushMatrix()
-                if id in self.robot.world.aruco.seenMarkers:
+                if isinstance(id, cozmo.objects.LightCube):
+                    seen = id.is_visible
+                    label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)
+                else:
+                    seen = id in self.robot.world.aruco.seenMarkers
+                    label = id
+                if seen:
                     color = (0.5, 1, 0.3, 0.75)
                 else:
                     color = (0, 0.5, 0, 0.75)
                 self.drawRectangle(coords,20,50,angle=angle,color=color)
                 glColor4f(0., 0., 0., 1.)
-                glTranslatef(coords[0], coords[1], 0.)
+                glTranslatef(*coords)
                 glRotatef(angle-90, 0., 0., 1.)
-                glTranslatef(0., -5., 0.) 
+                label_str = ascii(label)
+                glTranslatef(3.-7*len(label_str), -5., 0.) 
                 glScalef(0.1,0.1,0.1)
-                glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(id)))
+                for char in label_str:
+                    glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
                 glPopMatrix()
 
     def display(self):
@@ -142,7 +158,7 @@ class ParticleViewer():
 
 
         # Draw the particles
-        for p in self.particles:
+        for p in self.robot.world.particle_filter.particles:
             pscale = 1 - p.weight
             color=(1,pscale,pscale)
             self.drawTriangle((p.x,p.y), angle=math.degrees(p.theta),
@@ -192,9 +208,8 @@ class ParticleViewer():
             var = pf.update_weights()
             minw = min(p.weight for p in pf.particles)
             maxw = max(p.weight for p in pf.particles)
-            print('weights:','  min =', minw, '  max =', maxw,'  variance =', var)
-
-        if key == b'q': #kill window
+            print('weights:  min = %3.3e  max = %3.3e  variance = %3.3e' % (minw, maxw, var))
+        elif key == b'q': #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
         est = self.robot.world.particle_filter.pose_estimate()
