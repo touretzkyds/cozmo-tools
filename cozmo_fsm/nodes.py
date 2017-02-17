@@ -341,6 +341,15 @@ class Turn(ActionNode):
     def action_launcher(self):
         return self.robot.turn_in_place(self.angle, **self.action_kwargs)
 
+class GoToPose(ActionNode):
+    def __init__(self, pose, abort_on_stop=True, **action_kwargs):
+        self.pose = pose
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop)
+
+    def action_launcher(self):
+        return self.robot.go_to_pose(self.pose, **self.action_kwargs)
+
 class SetHeadAngle(ActionNode):
     def __init__(self, angle=degrees(0), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
@@ -377,6 +386,7 @@ class SetLiftAngle(SetLiftHeight):
         angle_range = max_theta - min_theta
         height_pct = (angle - min_theta) / angle_range
         super().__init__(height_pct, abort_on_stop=abort_on_stop, **action_kwargs)
+
 
 #________________ Animations ________________
 
