@@ -591,18 +591,16 @@ def init_display():
     glutVisibilityFunc(visible)
     glutMainLoop()
 
-global RUNNING
 RUNNING = False
 
 def viewer(_robot):
     global RUNNING, robot
-    if not isinstance(_robot,cozmo.robot.Robot):
-        raise TypeError('Argument must be a cozmo.robot.Robot instance.')
     if RUNNING:
-        print('Viewer is already running!\n')
         return
     else:
         RUNNING = True
+    if not isinstance(_robot,cozmo.robot.Robot):
+        raise TypeError('Argument must be a cozmo.robot.Robot instance.')
     robot = _robot
     th = threading.Thread(target=init_display)
     th.start()
