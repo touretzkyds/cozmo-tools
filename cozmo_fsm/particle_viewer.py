@@ -9,8 +9,10 @@ from OpenGL.GLU import *
 from threading import Thread  # for backgrounding window
 import math
 import array
+import numpy as np
 
 import cozmo
+from cozmo.util import distance_mm, speed_mmps, degrees
 
 RUNNING = False
 
@@ -184,6 +186,15 @@ class ParticleViewer():
         self.display()
         glutPostRedisplay()
 
+    def report_variance(self,pf):
+        weights = np.empty(pf.num_particles)
+        for i in range(pf.num_particles):
+            weights[i] = pf.particles[i].weight
+        weights.sort()
+        var = np.var(weights)
+        print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
+              (weights[0], weights[-1], weights[pf.num_particles//2], var))
+
     def keyPressed(self,key,mouseX,mouseY):
         pf = self.robot.world.particle_filter
         global particles
@@ -195,20 +206,17 @@ class ParticleViewer():
             pf.update_weights()
             pf.resample()
         elif key == b'w':     # forward
-            self.Forward(10).now()
+            self.robot.drive_straight(distance_mm(10), speed_mmps(50)).wait_for_completed()
         elif key == b's':     # back
-            self.Forward(-10).now()
+            self.robot.drive_straight(distance_mm(-10), speed_mmps(50)).wait_for_completed()
         elif key == b'a':     # left
-            self.Turn(22.5).now()
+            self.robot.turn_in_place(degrees(22.5)).wait_for_completed()
         elif key == b'd':     # right
-            self.Turn(-22.5).now()
+            self.robot.turn_in_place(degrees(-22.5)).wait_for_completed()
         elif key == b'z':     # randomize
             pf.initializer.initialize(pf.particles)
         elif key == b'v':     # display weight variance
-            var = pf.update_weights()
-            minw = min(p.weight for p in pf.particles)
-            maxw = max(p.weight for p in pf.particles)
-            print('weights:  min = %3.3e  max = %3.3e  variance = %3.3e' % (minw, maxw, var))
+            self.report_variance(pf)
         elif key == b'q': #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
