@@ -195,6 +195,23 @@ class ParticleViewer():
         print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
 
+    def report_pose(self):
+        est = self.robot.world.particle_filter.pose_estimate()
+        hdg = math.degrees(est[2])
+        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (est[0], est[1], hdg))
+
+    async def forward(self,distance):
+        handle = self.robot.drive_straight(distance_mm(distance), speed_mmps(50),
+                                           in_parallel=True,
+                                           should_play_anim=False)
+        await handle.wait_for_completed()
+        self.report_pose()
+
+    async def turn(self,angle):
+        handle = self.robot.turn_in_place(degrees(angle), in_parallel=True)
+        await handle.wait_for_completed()
+        self.report_pose()
+
     def keyPressed(self,key,mouseX,mouseY):
         pf = self.robot.world.particle_filter
         global particles
@@ -206,13 +223,13 @@ class ParticleViewer():
             pf.update_weights()
             pf.resample()
         elif key == b'w':     # forward
-            self.robot.drive_straight(distance_mm(10), speed_mmps(50)).wait_for_completed()
+            self.robot.loop.create_task(self.forward(10))
         elif key == b's':     # back
-            self.robot.drive_straight(distance_mm(-10), speed_mmps(50)).wait_for_completed()
+            self.robot.loop.create_task(self.forward(-10))
         elif key == b'a':     # left
-            self.robot.turn_in_place(degrees(22.5)).wait_for_completed()
+            self.robot.loop.create_task(self.turn(22.5))
         elif key == b'd':     # right
-            self.robot.turn_in_place(degrees(-22.5)).wait_for_completed()
+            self.robot.loop.create_task(self.turn(-22.5))
         elif key == b'z':     # randomize
             pf.initializer.initialize(pf.particles)
         elif key == b'v':     # display weight variance
@@ -220,6 +237,5 @@ class ParticleViewer():
         elif key == b'q': #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
-        est = self.robot.world.particle_filter.pose_estimate()
-        hdg = math.degrees(est[2])
-        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (est[0], est[1], hdg))
+        self.report_pose()
+
