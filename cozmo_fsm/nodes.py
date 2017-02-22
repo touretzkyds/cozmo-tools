@@ -394,7 +394,7 @@ class SetLiftAngle(SetLiftHeight):
 class AnimationNode(ActionNode):
     def __init__(self, anim_name='anim_bored_01', **kwargs):
         self.anim_name = anim_name
-        self.kwargs = kwargs
+        self.action_kwargs = kwargs
         super().__init__()
 
     def action_launcher(self):
@@ -406,7 +406,7 @@ class AnimationTriggerNode(ActionNode):
             raise TypeError('%s is not an instance of cozmo.anim._AnimTrigger' %
                             repr(trigger))
         self.trigger = trigger
-        self.kwargs = kwargs
+        self.action_kwargs = kwargs
         super().__init__()
 
     def action_launcher(self):
