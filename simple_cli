@@ -196,10 +196,16 @@ try:
     import world_viewer
 except: pass
 
-# tab completion 
+# tab completion
 readline.parse_and_bind('tab: complete') 
-# history file 
-histfile = os.path.join(os.environ['HOME'], '.pythonhistory') 
+# history file
+if 'HOME' in os.environ:  # Linux
+    histfile = os.path.join(os.environ['HOME'], '.pythonhistory')
+elif 'USERPROFILE' in os.path.environ:  # Windows
+    histfile = os.path.join(os.environ['USERPROFILE'], '.pythonhistory')
+else:
+    histfile = '.pythonhistory'
+
 try: 
     readline.read_history_file(histfile) 
 except IOError: 
