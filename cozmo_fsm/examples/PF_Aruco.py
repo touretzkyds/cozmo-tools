@@ -17,7 +17,7 @@ from cozmo_fsm import *
 from cozmo.util import degrees, Pose
 
 class PF_Aruco(StateMachineProgram):
-    def start(self):
+    def __init__(self):
         landmarks = {
             0 : Pose(-55, 160, 0, angle_z=degrees(90)),
             1 : Pose( 55, 160, 0, angle_z=degrees(90)),
@@ -27,8 +27,5 @@ class PF_Aruco(StateMachineProgram):
         pf = ParticleFilter(robot,
                             landmarks = landmarks,
                             sensor_model = ArucoCombinedSensorModel(robot))
-        self.particle_filter = pf
-        super().start()
-        v = ParticleViewer(robot)
-        v.startThread()
-        
+        super().__init__(particle_filter=pf, particle_viewer=True)
+
