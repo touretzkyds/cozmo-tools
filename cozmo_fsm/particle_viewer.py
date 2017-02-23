@@ -59,7 +59,7 @@ class ParticleViewer():
         glutDisplayFunc(self.display)
         glutMainLoop()
 
-    def startThread(self): # Displays in background
+    def start_thread(self): # Displays in background
         global RUNNING
         if RUNNING:
             return
@@ -69,7 +69,8 @@ class ParticleViewer():
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
 
-    def drawRectangle(self,center,width=10,height=None,angle=0,color=(1,1,1),fill=True):
+    def draw_rectangle(self, center, width=10, height=None,
+                       angle=0, color=(1,1,1), fill=True):
         # Default to solid color and square window
         if len(color)==3:
           color = (color[0],color[1],color[2],1)
@@ -97,7 +98,7 @@ class ParticleViewer():
         glEnd()
         glPopMatrix()
 
-    def drawTriangle(self,center,scale=1,angle=0,color=(1,1,1),fill=True):
+    def draw_triangle(self,center,scale=1,angle=0,color=(1,1,1),fill=True):
         # Default to solid color
         if len(color) == 3:
           color = (color[0],color[1],color[2],1)
@@ -135,7 +136,7 @@ class ParticleViewer():
                     color = (0.5, 1, 0.3, 0.75)
                 else:
                     color = (0, 0.5, 0, 0.75)
-                self.drawRectangle(coords,20,50,angle=angle,color=color)
+                self.draw_rectangle(coords,20,50,angle=angle,color=color)
                 glColor4f(0., 0., 0., 1.)
                 glTranslatef(*coords)
                 glRotatef(angle-90, 0., 0., 1.)
@@ -163,15 +164,15 @@ class ParticleViewer():
         for p in self.robot.world.particle_filter.particles:
             pscale = 1 - p.weight
             color=(1,pscale,pscale)
-            self.drawTriangle((p.x,p.y), angle=math.degrees(p.theta),
-                              color=color, fill=True)
+            self.draw_triangle((p.x,p.y), angle=math.degrees(p.theta),
+                               color=color, fill=True)
 
         # Draw the robot at the best particle location
         est = self.robot.world.particle_filter.pose_estimate()
         rx = est[0]
         ry = est[1]
         rtheta = math.degrees(est[2])
-        self.drawTriangle((rx,ry),scale=2,angle=rtheta, color=(0,0,1,0.5))
+        self.draw_triangle((rx,ry),scale=2,angle=rtheta, color=(0,0,1,0.5))
 
         # Draw the landmarks last, so they go on top of the particles
         self.draw_landmarks()
