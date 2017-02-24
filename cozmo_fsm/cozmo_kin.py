@@ -1,13 +1,13 @@
 from math import pi
 
 from .kine import *
-import transform
+from cozmo_fsm import transform
 from .transform import tprint
 from .shapes import *
 
 class CozmoKinematics(Kinematics):
     def __init__(self,robot):
-        base_frame = Joint('base', collision_model=Circle(transform.point(), radius=50)
+        base_frame = Joint('base', collision_model=Circle(transform.point(), radius=50))
 
         # cor is center of rotation
         cor_frame = Joint('cor', parent=base_frame, r=-20.)
