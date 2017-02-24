@@ -126,11 +126,13 @@ class RRT():
         # need to be reversed
         nodeB = treeB[-1]
         pathB = []
+        prev_heading = wrap_angle(nodeB.q + pi)
         while nodeB.parent is not None:
             nodeB = nodeB.parent
-            nodeB.q = wrap_angle(nodeB.q + pi)
+            (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
             pathB.append(nodeB)
-        return (treeA, treeB, pathA + pathB)
+        self.path = pathA + pathB
+        return (treeA, treeB, self.path)
 
     def make_robot_parts(self,robot):
         result = []
