@@ -113,7 +113,6 @@ class RRT():
             return None
         if swapped:
             (treeB, treeA) = (treeA, treeB)
-        print('iterations=',i)
         return self.get_path(treeA, treeB)
 
     def get_path(self, treeA, treeB):
