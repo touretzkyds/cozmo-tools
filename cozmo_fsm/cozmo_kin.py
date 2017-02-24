@@ -24,7 +24,8 @@ class CozmoKinematics(Kinematics):
                                type='revolute', getter=self.get_shoulder,
                                d=21., r=-39., alpha=pi/2)
         lift_attach_frame = Joint('lift_attach', parent=shoulder_frame, type='revolute',
-                                  getter=self.get_lift_attach, r=66.)
+                                  getter=self.get_lift_attach, r=66.,
+                                  collision_model=Circle(transform.point(), radius=10))
 
         # Positive head angle is up, so z must point to the right.
         # With x pointing forward, y must point up.

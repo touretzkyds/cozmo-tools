@@ -41,9 +41,6 @@ class ParticleViewer():
         # Killing window should not directly kill main program
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
 
-        from cozmo_fsm.nodes import Forward, Turn
-        self.Forward = Forward
-        self.Turn = Turn
         self.window = glutCreateWindow(self.windowName)
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)

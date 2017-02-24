@@ -1,15 +1,16 @@
-import transform
+from cozmo_fsm import transform
+from math import sqrt
 
 class Shape():
     def __init__(self):
         self.center = transform.point()
         self.rotmat = transform.identity()
     
-    def _repr_(self):
+    def __repr__(self):
         return "<%s >" % (self.__class.__name)
 
     def collides(self, shape):
-        if isinstance(shape, Polyon):
+        if isinstance(shape, Polygon):
             return self.collides_poly(shape)
         elif isinstance(shape, Circle):
             return self.collides_circle(shape)
@@ -26,17 +27,25 @@ class Circle(Shape):
         self.center = center
         self.radius = radius
 
-    def instantiate(self, tmat, x, y, q):
-        return Circle(center=transform.translate(x,y).dot(tmat.dot(self.center)), radius=self.radius)        
+    def __repr__(self):
+        return '<Circle (%s,%s) r=%s>' % \
+               ( ('%5.1f' % self.center[0,0]).strip(),
+                 ('%5.1f' % self.center[1,0]).strip(),
+                 ('%5.1f' % self.radius).strip() )
 
-    def collides_poly(poly):
+    def instantiate(self, tmat):
+        return Circle(center=tmat.dot(self.center), radius=self.radius)        
+
+    def collides_poly(self,poly):
         return poly.collides(self)
 
-    def collides_circle(circle):
-        dist = transform.norm(self.center - circle.center)
+    def collides_circle(self,circle):
+        dx = self.center[0,0] - circle.center[0,0]
+        dy = self.center[1,0] - circle.center[1,0]
+        dist = sqrt(dx*dx + dy*dy)
         return dist < (self.radius + circle.radius)
         
-class Rectangle(Polygon):
+class Rectangle(Shape):
     def __init__(self, corners=None, dimensions=None, orient=0):
         if corners:
             pt0 = pt1 = corners[0]

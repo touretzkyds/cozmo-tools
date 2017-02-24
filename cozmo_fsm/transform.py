@@ -66,6 +66,15 @@ def dh_matrix(d,theta,r,alpha):
 def translation(t):
     return np.array([ [t[0,3]], [t[1,3]], [t[2,3]], [t[3,3]] ])
 
+def wrap_angle(angle_rads):
+    """Keep angle between -pi and pi."""
+    if angle_rads <= -pi:
+        return 2*pi + angle_rads
+    elif angle_rads > pi:
+        return angle_rads - 2*pi
+    else:
+        return angle_rads
+
 def tprint(t):
     number_format = "%7.3f"
     def tprint_matrix(t):

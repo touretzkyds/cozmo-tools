@@ -7,7 +7,7 @@ from . import shapes
 class Joint():
     def __init__(self, name, parent=None, type='fixed', getter=(lambda:0),
                  d=0, theta=0, r=0, alpha=0,
-                 cmodel = None, ctransform = transform.identity()):
+                 collision_model=None, ctransform=transform.identity()):
         self.name = name
         self.parent = parent
         self.type = type
@@ -27,8 +27,8 @@ class Joint():
         self.theta = theta
         self.r = r
         self.alpha = alpha
-        self.aabb = aabb
         self.children = []
+        self.collision_model = collision_model
         self.q = 0
         self.qmin = -math.inf
         self.qmax = math.inf

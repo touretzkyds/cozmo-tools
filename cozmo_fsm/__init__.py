@@ -6,3 +6,4 @@ from .particle import *
 from .particle_viewer import ParticleViewer
 from .cozmo_kin import *
 from .rrt import *
+from .path_viewer import PathViewer

@@ -6,6 +6,8 @@ import math, array, random
 import numpy as np
 from math import pi, sqrt, sin, cos, atan2, exp
 
+from .transform import wrap_angle
+
 class Particle():
     def __init__(self):
         self.x = 0
@@ -341,12 +343,4 @@ class ParticleFilter():
             p.log_weight = 0.0
             p.weight = 1.0
 
-def wrap_angle(angle_rads):
-    """Keep angle between -pi and pi."""
-    if angle_rads <= -pi:
-        return 2*pi + angle_rads
-    elif angle_rads > pi:
-        return angle_rads - 2*pi
-    else:
-        return angle_rads
 
