@@ -24,7 +24,7 @@ class CozmoKinematics(Kinematics):
                                type='revolute', getter=self.get_shoulder,
                                d=21., r=-39., alpha=pi/2)
         lift_attach_frame = Joint('lift_attach', parent=shoulder_frame, type='revolute',
-                                  getter=self.get_lift_attach, r=-66.)
+                                  getter=self.get_lift_attach, r=66.)
 
         # Positive head angle is up, so z must point to the right.
         # With x pointing forward, y must point up.
@@ -32,7 +32,8 @@ class CozmoKinematics(Kinematics):
                            getter=self.get_head,
                            d=35., r=-10., alpha=pi/2)
 
-        # x axis points down, z points forward, y pooints left
+        # Dummy joint located below head joint at level of the camera frame,
+        # and x axis points down, z points forward, y points left
         camera_dummy = Joint('camera_dummy', parent=head_frame,
                              theta=-pi/2, r=-7.5, alpha=-pi/2)
         # x axis points right, y points down, z points forward

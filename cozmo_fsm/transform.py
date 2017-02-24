@@ -60,12 +60,14 @@ def identity():
         [0, 0, 0, 1.]])
 
 def dh_matrix(d,theta,r,alpha):
+    """Denavit-Hartenberg transformation from joint i to joint i+1."""
     return aboutX(alpha).dot(translate(r,0,d).dot(aboutZ(theta)))
 
 def translation(t):
     return np.array([ [t[0,3]], [t[1,3]], [t[2,3]], [t[3,3]] ])
 
 def tprint(t):
+    number_format = "%7.3f"
     def tprint_matrix(t):
         for i in range(t.shape[0]):
             if i == 0:
@@ -74,13 +76,15 @@ def tprint(t):
                 print('  ',end='')
             for j in range(t.shape[1]):
                 if j>0: print('  ',end='')
-                print('%7.3f' % t[i][j], end='')
+                print(number_format % t[i][j], end='')
             if i+1 == t.shape[0]:
                 print(' ]')
             else:
                 print()
     if isinstance(t, np.ndarray):
         tprint_matrix(t)
+    elif isinstance(t, (int,float)):
+        print(number_format % t)
     else:
         print(t)
 

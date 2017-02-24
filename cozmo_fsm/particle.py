@@ -132,33 +132,105 @@ class SensorModel():
         return (dx,dy,dist,turn_angle)
 
 class ArucoDistanceSensorModel(SensorModel):
-    def __init__(self, robot, landmarks=dict(), dist_variance=100):
+    """Sensor model using only landmark distances."""
+    def __init__(self, robot, landmarks=dict(), distance_variance=100):
         super().__init__(robot,landmarks)
-        self.dist_variance = dist_variance
+        self.distance_variance = distance_variance
 
     def evaluate(self,particles,force=False):
         # Returns true if particles were evaluated.
-        # Called with force=True from jviewer to force evaluation when no motion.
+        # Called with force=True from particle_viewer to force evaluation.
 
         # Only evaluate if the robot moved enough for evaluation to be worthwhile.
         (dx,dy,dist,turn_angle) = self.compute_robot_motion()
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
-        # Cache seenMarkerObjects because vision is in another thread
+        # Cache seenMarkerObjects because vision is in another thread.
         seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
         # Process each seen marker:
         for id in seenMarkerObjects:
             if id in self.landmarks:
                 sensor_dist = seenMarkerObjects[id].camera_distance
                 landmark_spec = self.landmarks[id]
-                map_coords = landmark_spec[0]
+                lm_x = landmark_spec.position.x
+                lm_y = landmark_spec.position.y
                 for p in particles:
-                    dx = map_coords[0] - p.x
-                    dy = map_coords[1] - p.y
+                    dx = lm_x - p.x
+                    dy = lm_y - p.y
                     predicted_dist = sqrt(dx*dx + dy*dy)
                     error = sensor_dist - predicted_dist
-                    p.log_weight -= (error*error)/self.dist_variance
+                    p.log_weight -= (error*error)/self.distance_variance
+        return True
+
+class ArucoBearingSensorModel(SensorModel):
+    """Sensor model using only landmark bearings."""
+    def __init__(self, robot, landmarks=dict(), bearing_variance=0.1):
+        super().__init__(robot,landmarks)
+        self.bearing_variance = bearing_variance
+
+    def evaluate(self,particles,force=False):
+        # Returns true if particles were evaluated.
+        # Called with force=True from particle_viewer to force evaluation.
+
+        # Only evaluate if the robot moved enough for evaluation to be worthwhile.
+        (dx,dy,dist,turn_angle) = self.compute_robot_motion()
+        if not force and dist < 5 and abs(turn_angle) < math.radians(5):
+            return False
+        self.last_evaluate_pose = self.robot.pose
+        # Cache seenMarkerObjects because vision is in another thread.
+        seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
+        # Process each seen marker:
+        for id in seenMarkerObjects:
+            if id in self.landmarks:
+                sensor_coords = seenMarkerObjects[id].camera_coords
+                sensor_bearing = atan2(sensor_coords[0], sensor_coords[2])
+                landmark_spec = self.landmarks[id]
+                lm_x = landmark_spec.position.x
+                lm_y = landmark_spec.position.y
+                for p in particles:
+                    dx = lm_x - p.x
+                    dy = lm_y - p.y
+                    predicted_bearing = wrap_angle(atan2(dy,dx) - p.theta)
+                    error = wrap_angle(sensor_bearing - predicted_bearing)
+                    p.log_weight -= (error * error) / self.bearing_variance
+        return True
+
+class ArucoCombinedSensorModel(SensorModel):
+    """Sensor model using combined distance and bearing information."""
+    def __init__(self, robot, landmarks=dict(), distance_variance=200):
+        super().__init__(robot,landmarks)
+        self.distance_variance = distance_variance
+
+    def evaluate(self,particles,force=False):
+        # Returns true if particles were evaluated.
+        # Called with force=True from particle_viewer to force evaluation.
+
+        # Only evaluate if the robot moved enough for evaluation to be worthwhile.
+        (dx,dy,dist,turn_angle) = self.compute_robot_motion()
+        if not force and dist < 5 and abs(turn_angle) < math.radians(5):
+            return False
+        self.last_evaluate_pose = self.robot.pose
+        # Cache seenMarkerObjects because vision is in another thread.
+        seenMarkerObjects = self.robot.world.aruco.seenMarkerObjects
+        # Process each seen marker:
+        for id in seenMarkerObjects:
+            if id in self.landmarks:
+                sensor_dist = seenMarkerObjects[id].camera_distance
+                sensor_coords = seenMarkerObjects[id].camera_coords
+                sensor_bearing = atan2(sensor_coords[0], sensor_coords[2])
+                landmark_spec = self.landmarks[id]
+                lm_x = landmark_spec.position.x
+                lm_y = landmark_spec.position.y
+                for p in particles:
+                    # Use sensed bearing and distance to get particle's
+                    # estimate of landmark position on the world map.
+                    predicted_pos_x = p.x + sensor_dist * cos(p.theta + sensor_bearing)
+                    predicted_pos_y = p.y + sensor_dist * sin(p.theta + sensor_bearing)
+                    dx = lm_x - predicted_pos_x
+                    dy = lm_y - predicted_pos_y
+                    error_sq = dx*dx + dy*dy
+                    p.log_weight -= error_sq / self.distance_variance
         return True
 
 #================ Particle Filter ================
@@ -194,6 +266,7 @@ class ParticleFilter():
         if self.sensor_model.evaluate(self.particles):  # true if log_weights changed
             var = self.update_weights()
             if var > 0:
+                print('resample')
                 self.resample()
 
     def pose_estimate(self):
@@ -211,7 +284,7 @@ class ParticleFilter():
         return (cx, cy, atan2(hsin,hcos))
 
     def update_weights(self):
-        # Clip the log_weight values and calculate the new weights
+        # Clip the log_weight values and calculate the new weights.
         if max(p.log_weight for p in self.particles) >= self.min_log_weight:
             wt_inc = 0.0
         else:
@@ -226,7 +299,7 @@ class ParticleFilter():
         return variance
 
     def resample(self):
-        # Compute and normalize the cdf; make local pointers for faster access
+        # Compute and normalize the cdf; make local pointers for faster access.
         num_particles = self.num_particles;
         exp_weights = self.exp_weights
         cdf = self.cdf
@@ -258,7 +331,8 @@ class ParticleFilter():
             new_theta[j] = wrap_angle(p.theta + theta_jitter[j])
             u += 1/num_particles
 
-        # Copy the new particle values into the old particles
+        # Copy the new particle values into the old particles and
+        # clear the weights.
         for i in range(num_particles):
             p = particles[i]
             p.x = new_x[i]
@@ -268,6 +342,7 @@ class ParticleFilter():
             p.weight = 1.0
 
 def wrap_angle(angle_rads):
+    """Keep angle between -pi and pi."""
     if angle_rads <= -pi:
         return 2*pi + angle_rads
     elif angle_rads > pi:

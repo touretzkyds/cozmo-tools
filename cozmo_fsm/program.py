@@ -4,30 +4,42 @@ import cv2
 
 import cozmo
 
+import world_viewer
+
 from .base import StateNode
 from .aruco import *
 from .particle import *
 from .cozmo_kin import *
+from .particle_viewer import ParticleViewer
+
 
 class StateMachineProgram(StateNode):
     def __init__(self,
                  kine_class=CozmoKinematics,
-                 viewer=True,
+                 world_viewer=False,
+                 cam_viewer=True,
+                 particle_viewer = False,
+                 annotate_cube = True,
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
-                 particle_filter = True
+                 particle_filter = True,
                  ):
         super().__init__()
+        self.name = self.__class__.__name__.lower()
 
         self.kine_class = kine_class
         self.windowName = None
-        self.viewer = viewer
+        self.world_viewer = world_viewer
+        self.cam_viewer = cam_viewer
+        self.particle_viewer = particle_viewer
+        self.annotate_cube = annotate_cube
         self.aruco = aruco
         if self.aruco:
             self.robot.world.aruco = Aruco(arucolibname)
         self.particle_filter = particle_filter
 
     def start(self):
+        self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
         self.set_polling_interval(0.050)
@@ -39,8 +51,11 @@ class StateMachineProgram(StateNode):
         else:
             self.robot.world.particle_filter = None
 
-        # Launch viewer
-        if self.viewer:
+        # Launch viewers
+        if self.world_viewer:
+            world_viewer.viewer(self.robot)
+
+        if self.cam_viewer:
             self.windowName = self.name
             cv2.namedWindow(self.windowName)
             cv2.startWindowThread()
@@ -51,11 +66,15 @@ class StateMachineProgram(StateNode):
         else:
             self.windowName = None
 
+        if self.particle_viewer:
+            if self.particle_viewer is True:
+                self.particle_viewer = ParticleViewer(self.robot)
+            self.particle_viewer.start_thread()
+
         # Request camera image stream
-        if self.viewer or self.aruco:
-            self.robot.camera.image_stream_enabled = True
-            self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
-                                               self.process_image)
+        self.robot.camera.image_stream_enabled = True
+        self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
+                                           self.process_image)
 
         # Call parent's start() to launch the state machine
         super().start()
@@ -74,6 +93,11 @@ class StateMachineProgram(StateNode):
         if self.robot.world.particle_filter:
             self.robot.world.particle_filter.move()
 
+    def user_image(self,image,gray): pass
+
+    def user_annotate(self,image):
+        return image
+
     def process_image(self,event,**kwargs):
         curim = numpy.array(event.image.raw_image).astype(numpy.uint8) #cozmo-raw image
         gray = cv2.cvtColor(curim,cv2.COLOR_BGR2GRAY)
@@ -82,20 +106,26 @@ class StateMachineProgram(StateNode):
         if self.aruco:
             self.robot.world.aruco.process_image(gray)
         # Other image processors can run here if the user supplies them.
-        #  ...
+        self.user_image(curim,gray)
         # Done with image processing
 
         # Annotate and display image if stream enabled.
         if self.windowName is not None:
             scale_factor = 2
-            # Cozmo's anootations
+            # Cozmo's annotations
             self.robot.img = event.image
-            coz_ann = event.image.annotate_image(scale=scale_factor)
-            annotated_im = numpy.array(coz_ann).astype(numpy.uint8)
+            if self.annotate_cube:
+                coz_ann = event.image.annotate_image(scale=scale_factor)
+                annotated_im = numpy.array(coz_ann).astype(numpy.uint8)
+            else:
+                im = numpy.array(event.image.raw_image).astype(numpy.uint8)
+                shape = im.shape
+                dsize = (2*shape[1], 2*shape[0])
+                annotated_im = cv2.resize(im, dsize)
             # Aruco annotation
-            if self.robot.world.aruco.seenMarkers is not None:
+            if self.aruco and self.robot.world.aruco.seenMarkers is not None:
                 annotated_im = self.robot.world.aruco.annotate(annotated_im,scale_factor)
             # Other annotators can run here if the user supplies them.
-            #  ...
-            # Done with nnotation
+            annotated_im = self.user_annotate(annotated_im)
+            # Done with annotation
             cv2.imshow(self.windowName,annotated_im)

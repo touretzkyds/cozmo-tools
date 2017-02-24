@@ -29,6 +29,8 @@ class Aruco(object):
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         self.seenMarkers = dict()
         self.seenMarkerObjects = []
+        self.ids = []
+        self.corners = []
 
         #added for pose estimation
         self.markerSize = markerSize #these units will be pose est units!!
