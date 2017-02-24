@@ -1,14 +1,18 @@
 from math import pi
 
 from .kine import *
+import transform
 from .transform import tprint
+from .shapes import *
 
 class CozmoKinematics(Kinematics):
     def __init__(self,robot):
-        base_frame = Joint('base')
+        base_frame = Joint('base', collision_model=Circle(transform.point(), radius=50)
 
         # cor is center of rotation
-        cor_frame = Joint('cor', base_frame, r=-20.)
+        cor_frame = Joint('cor', parent=base_frame, r=-20.)
+
+        world_frame = Joint('world', parent=base_frame, type='world', getter=self.get_world)
 
         front_axle_frame = Joint('front_axle', parent=base_frame, alpha=pi/2)
         back_axle_frame = Joint('back_axle', parent=base_frame, r=-46., alpha=pi/2)
@@ -50,3 +54,6 @@ class CozmoKinematics(Kinematics):
 
     def get_lift_attach(self):
         return -self.get_shoulder()
+
+    def get_world(self):
+        return self.robot.world.particle_filter.pose_estimate()

@@ -2,10 +2,12 @@ import math
 import numpy as np
 
 from . import transform
+from . import shapes
 
 class Joint():
     def __init__(self, name, parent=None, type='fixed', getter=(lambda:0),
-                 d=0,theta=0,r=0,alpha=0):
+                 d=0, theta=0, r=0, alpha=0,
+                 cmodel = None, ctransform = transform.identity()):
         self.name = name
         self.parent = parent
         self.type = type
@@ -15,6 +17,8 @@ class Joint():
             self.apply_q = self.revolute
         elif type == 'prismatic':
             self.apply_q = self.prismatic
+        elif type == 'world':
+            self.apply_q = self.world_joint
         else:
             raise ValueError("Type must be 'fixed', 'revolute', or 'prismatic'.")
         self.getter = getter
@@ -23,6 +27,7 @@ class Joint():
         self.theta = theta
         self.r = r
         self.alpha = alpha
+        self.aabb = aabb
         self.children = []
         self.q = 0
         self.qmin = -math.inf
@@ -54,6 +59,8 @@ class Joint():
     def fixed(self):
         return transform.identity()
 
+    def world_joint(self):
+        return transform.translate(self.q[0],self.q[1]).transform.aboutZ(self.q[2])
 
 class Kinematics():
     def __init__(self,joint_list,robot):
@@ -79,6 +86,9 @@ class Kinematics():
             return Tinv
         else:
             raise Exception('Joint %s has no path to base frame' % joint)
+
+    def link_to_base(self,joint):
+        return self.joint_to_base(joint).dot(joint.this_link_to_this_joint())
 
     def base_to_joint(self,joint):
         return np.linalg.inv(self.joint_to_base(joint))
