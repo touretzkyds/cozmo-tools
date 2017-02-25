@@ -3,7 +3,7 @@ from math import pi
 from .kine import *
 from cozmo_fsm import transform
 from .transform import tprint
-from .shapes import *
+from .rrt_shapes import *
 
 class CozmoKinematics(Kinematics):
     def __init__(self,robot):

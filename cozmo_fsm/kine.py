@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 from . import transform
-from . import shapes
+from . import rrt_shapes
 
 class Joint():
     def __init__(self, name, parent=None, type='fixed', getter=(lambda:0),

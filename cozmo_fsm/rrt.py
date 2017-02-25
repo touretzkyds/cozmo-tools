@@ -4,7 +4,7 @@ import random
 import time
 
 from .transform import wrap_angle
-from .shapes import *
+from .rrt_shapes import *
 
 class RRTNode():
     def __init__(self, parent=None, x=0, y=0, q=0):

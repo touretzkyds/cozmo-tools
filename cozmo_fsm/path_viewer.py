@@ -13,7 +13,7 @@ import numpy as np
 
 RUNNING = False
 
-from .shapes import *
+from .rrt_shapes import *
 
 the_rrt = None
 the_items = []  # each item is a tuple (tree,color)

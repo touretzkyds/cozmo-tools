@@ -40,10 +40,8 @@ class ParentFails(StateNode):
 
 class Iterate(StateNode):
     """Iterates over an iterable, posting DataEvents.  Completes when done."""
-    def __init__(self,iterable):
+    def __init__(self,iterable=None):
         super().__init__()
-        if isinstance(iterable, int):
-            iterable = range(iterable)
         self.iterable = iterable
 
     class NextEvent(Event): pass
@@ -51,6 +49,12 @@ class Iterate(StateNode):
     def start(self,event=None):
         if self.running: return
         super().start(event)
+        if isinstance(event, DataEvent):
+            self.iterable = event.data
+        if isinstance(self.iterable, int):
+            self.iterable = range(self.iterable)
+        if self.iterable is None:
+            raise ValueError('~s has nothing to iterate on.' % repr(self))
         if not isinstance(event, self.NextEvent):
             self.iterator = self.iterable.__iter__()
         try:
@@ -305,6 +309,7 @@ class Say(ActionNode):
 
 
 class Forward(ActionNode):
+    """ Moves forward a specified distance. Can accept a Distance as a Dataevent."""
     def __init__(self, distance=distance_mm(50),
                  speed=speed_mmps(50), abort_on_stop=True, **action_kwargs):
         if isinstance(distance, (int,float)):
@@ -323,12 +328,19 @@ class Forward(ActionNode):
         # super's init must come last because it checks self.action_kwargs
         super().__init__(abort_on_stop)
 
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Distance):
+            self.distance = event.data
+        super().start(event)
+
     def action_launcher(self):
         return self.robot.drive_straight(self.distance, self.speed,
                                          **self.action_kwargs)
 
 
 class Turn(ActionNode):
+    """Turns by a specified angle. Can accapet an Angle as a DataEvent."""
     def __init__(self, angle=degrees(90), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
@@ -337,6 +349,12 @@ class Turn(ActionNode):
         self.angle = angle
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data
+        super().start(event)
 
     def action_launcher(self):
         return self.robot.turn_in_place(self.angle, **self.action_kwargs)
