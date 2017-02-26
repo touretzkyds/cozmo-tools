@@ -253,6 +253,7 @@ def runfsm(module_name, running_modules=dict()):
     global running_fsm
 
     if running_fsm:
+        robot.stop_all_motors()
         running_fsm.stop()
 
     r_py = re.compile('.*\.py$')
@@ -493,6 +494,7 @@ if __name__ == '__main__':
         try:
             time.sleep(1)
         except KeyboardInterrupt:
+            robot.stop_all_motors()
             if running_fsm and running_fsm.running:
                 print('\nKeyboardInterrupt: stopping', running_fsm.name)
                 running_fsm.stop()
