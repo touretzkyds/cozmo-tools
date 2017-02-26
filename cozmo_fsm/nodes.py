@@ -167,7 +167,9 @@ class DriveForward(DriveWheels):
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
             self.poll_handle.cancel()
-            self.stop_wheels()
+            #self.stop_wheels()
+            print('dist=',dist)
+            self.robot.stop_all_motors()
             self.post_completion()
 
 class DriveTurn(DriveWheels):
@@ -209,6 +211,88 @@ class DriveTurn(DriveWheels):
             self.poll_handle.cancel()
             self.stop_wheels()
             self.post_completion()
+
+
+class DriveArc(DriveWheels):
+    def ang2dist(self, angle, radius):
+        return (angle / 360) * 2 * pi * radius
+
+    def dist2ang(self, distance, radius):
+        return (distance / (2 * pi * radius)) * 360
+
+    def __init__(self, radius=0, angle=None, distance=None,
+                 speed=None, angspeed=None,
+                 **kwargs):
+        if isinstance(radius, cozmo.util.Distance):
+            radius = radius.distance_mm
+        if isinstance(angle, cozmo.util.Angle):
+            angle = angle.degrees
+        if isinstance(speed, cozmo.util.Speed):
+            speed = speed.speed_mmps
+        if isinstance(angspeed, cozmo.util.Angle):
+            angspeed = angspeed.degrees
+
+        wheelbase = 45    # robot's wheelbase in mm
+        if radius != 0:
+            if angle is not None:
+                self.angle = angle
+                if angle < 0:
+                    radius = - radius
+            elif distance is not None:
+                self.angle = self.dist2ang(distance, radius)
+            else:
+                raise ValueError('DriveArc requires an angle or distance.')
+
+            if  speed is not None:
+                pass
+            elif angspeed is not None:
+                speed = self.ang2dist(angspeed, radius)
+            else:
+                speed = 40 # degrees/second
+
+            lspeed = speed * (1 - wheelbase / radius)
+            rspeed = speed * (1 + wheelbase / radius)
+
+        else:  # radius is 0
+            self.angle = angle
+            if angspeed is None:
+                angspeed = 40 # degrees/second
+            s = angspeed
+            if angle < 0:
+                s = -s
+            lspeed = -s
+            rspeed = s
+
+        super().__init__(lspeed, rspeed, **kwargs)
+        self.polling_interval = 0.05
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        self.last_heading = self.robot.pose.rotation.angle_z.degrees
+        self.traveled = 0
+
+    def poll(self):
+        """See how far we've traveled"""
+        p0 = self.last_heading
+        p1 = self.robot.pose.rotation.angle_z.degrees
+        self.last_heading = p1
+        # Assume we're polling quickly enough that diff will be small;
+        # typically only about 1 degree.  So diff will be large only
+        # if the heading has passed through 360 degrees since the last
+        # call to poll().  Use 90 degrees as an arbitrary large threshold.
+        diff = p1 - p0
+        if diff  < -90.0:
+            diff += 360.0
+        elif diff > 90.0:
+            diff -= 360.0
+        self.traveled += diff
+
+        if self.angle is not None and abs(self.traveled) > abs(self.angle):
+            self.poll_handle.cancel()
+            self.stop_wheels()
+            self.post_completion()
+
 
 #________________ Action Nodes ________________
 
