@@ -167,9 +167,7 @@ class DriveForward(DriveWheels):
         dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
             self.poll_handle.cancel()
-            #self.stop_wheels()
-            print('dist=',dist)
-            self.robot.stop_all_motors()
+            self.stop_wheels()
             self.post_completion()
 
 class DriveTurn(DriveWheels):
