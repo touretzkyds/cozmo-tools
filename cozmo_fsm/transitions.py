@@ -124,10 +124,9 @@ class TapTrans(Transition):
 
 class DataTrans(Transition):
     """Transition fires when data matches."""
-    def __init__(self, data=None, data_type=None):
+    def __init__(self, data=None):
         super().__init__()
         self.data = data
-        self.data_type = data_type
 
     def start(self,event=None):
         if self.running: return
@@ -138,9 +137,14 @@ class DataTrans(Transition):
     def handle_event(self,event):
         super().handle_event(event)
         if isinstance(event,DataEvent):
-            if self.data_type is None or isinstance(event.data, self.data_type):
-                if self.data is None or self.data == event.data: 
+            if self.data is None or \
+               (isinstance(self.data, type) and isinstance(event.data, self.data)):
                     self.fire(event)
+            else:
+                try:
+                    if self.data == event.data:    # error if == barfs
+                        self.fire(event)
+                except TypeError: pass
         else:
             raise TypeError('%s is not a DataEvent' % event)
 
