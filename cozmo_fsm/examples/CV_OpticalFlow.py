@@ -24,7 +24,7 @@ class CV_OpticalFlow(StateMachineProgram):
                                            cv2.TERM_CRITERIA_COUNT,
                                            10, 0.03) )
 
-        self.colors = np.random.randint(0,255,(100,3))
+        self.colors = np.random.randint(0, 255, (100,3), dtype=np.int)
 
         self.prev_gray = None
         self.good_new = None
