@@ -60,8 +60,7 @@ class PathViewer():
         glutMainLoop()
 
     def start_thread(self): # Displays in background
-        global RUNNING, the_rrt
-        self.rrt = the_rrt
+        global RUNNING
         if RUNNING:
             return
         else:
