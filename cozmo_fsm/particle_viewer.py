@@ -21,7 +21,7 @@ class ParticleViewer():
                  width=512, height=512,
                  windowName = "particle viewer",
                  bgcolor = (0,0,0)):
-        self.robot = robot
+        self.robot=robot
         self.width = width
         self.height = height
         self.bgcolor = bgcolor
@@ -118,31 +118,32 @@ class ParticleViewer():
 
     def draw_landmarks(self):
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
-        if landmarks:
-            for (id,specs) in landmarks.items():
-                coords = specs.position.x_y_z
-                angle = specs.rotation.angle_z.degrees
-                glPushMatrix()
-                if isinstance(id, cozmo.objects.LightCube):
-                    seen = id.is_visible
-                    label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)
-                else:
-                    seen = id in self.robot.world.aruco.seenMarkers
-                    label = id
-                if seen:
-                    color = (0.5, 1, 0.3, 0.75)
-                else:
-                    color = (0, 0.5, 0, 0.75)
-                self.draw_rectangle(coords,20,50,angle=angle,color=color)
-                glColor4f(0., 0., 0., 1.)
-                glTranslatef(*coords)
-                glRotatef(angle-90, 0., 0., 1.)
-                label_str = ascii(label)
-                glTranslatef(3.-7*len(label_str), -5., 0.) 
-                glScalef(0.1,0.1,0.1)
-                for char in label_str:
-                    glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
-                glPopMatrix()
+        if not landmarks: return
+        for (id,specs) in landmarks.items():
+            coords = (specs.position.x, specs.position.y, 0.)
+            angle = specs.rotation.angle_z.degrees
+            if isinstance(id, cozmo.objects.LightCube):
+                seen = id.is_visible
+                label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)
+            else:
+                seen = id in self.robot.world.aruco.seenMarkers
+                label = id
+            if seen:
+                color = (0.5, 1, 0.3, 0.75)
+            else:
+                color = (0, 0.5, 0, 0.75)
+            glPushMatrix()
+            glColor4f(*color)
+            self.draw_rectangle(coords,20,50,angle=angle,color=color)
+            glColor4f(0., 0., 0., 1.)
+            glTranslatef(*coords)
+            glRotatef(angle-90, 0., 0., 1.)
+            label_str = ascii(label)
+            glTranslatef(3.-7*len(label_str), -5., 0.)
+            glScalef(0.1,0.1,0.1)
+            for char in label_str:
+                glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
+            glPopMatrix()
 
     def display(self):
         glMatrixMode(GL_PROJECTION)
