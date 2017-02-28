@@ -211,7 +211,7 @@ class ParticleViewer():
         (w,v) = np.linalg.eigh(xy_var)
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse((rx,ry), w**0.5, alpha/pi*180, color=(0,1,1))
-        self.draw_wedge((rx,ry), 25wwwww, hdg, max(5, sqrt(theta_var)*360),
+        self.draw_wedge((rx,ry), 25, hdg, max(5, sqrt(theta_var)*360),
                         color=(0,1,1,0.4))
         
 
