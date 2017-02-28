@@ -285,6 +285,25 @@ class ParticleFilter():
         cy /= weight_sum
         return (cx, cy, atan2(hsin,hcos))
 
+    def variance_estimate(self):
+        weight = var_xx = var_xy = var_yy = r_sin = r_cos = 0
+        (mu_x, mu_y, mu_theta) = self.pose_estimate()
+        for p in self.particles:
+            dx = (p.x - mu_x)
+            dy = (p.y - mu_y)
+            var_xx += dx * dx * p.weight
+            var_xy += dx * dy * p.weight
+            var_yy += dy * dy * p.weight
+            r_sin += sin(p.theta) * p.weight
+            r_cos += cos(p.theta) * p.weight
+            weight += p.weight
+        xy_var = np.array([[var_xx, var_xy],
+                           [var_xy, var_yy]]) / weight
+        Rsq = r_sin**2 + r_cos**2
+        Rav = sqrt(Rsq) / weight
+        theta_var = 1 - Rav
+        return (xy_var, theta_var)
+
     def update_weights(self):
         # Clip the log_weight values and calculate the new weights.
         if max(p.log_weight for p in self.particles) >= self.min_log_weight:

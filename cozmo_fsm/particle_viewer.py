@@ -8,6 +8,7 @@ from OpenGL.GLU import *
 
 from threading import Thread  # for backgrounding window
 import math
+from math import sin, cos, pi, atan2, sqrt
 import array
 import numpy as np
 
@@ -96,12 +97,11 @@ class ParticleViewer():
         glPopMatrix()
 
     def draw_triangle(self,center,scale=1,angle=0,color=(1,1,1),fill=True):
-        # Default to solid color
         if len(color) == 3:
-          color = (color[0],color[1],color[2],1)
+          color = (*color,1)
 
         glPushMatrix()
-        if(fill):
+        if fill:
           glPolygonMode(GL_FRONT_AND_BACK,GL_FILL)
         else:
           glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
@@ -114,7 +114,43 @@ class ParticleViewer():
         glVertex2f(-5.*scale,  3.*scale)
         glEnd()
         glPopMatrix()
-        return
+
+    def draw_ellipse(self, center, scale, orient=0, color=(1,1,1), fill=False):
+        if len(color) == 3:
+            color = (*color,1)
+        glPushMatrix()
+        glTranslatef(*center,0)
+        glRotatef(orient,0,0,1)
+        glColor4f(*color)
+        if fill:
+            glBegin(GL_TRIANGLE_FAN)
+            glVertex2f(0,0)
+        else:
+            glBegin(GL_LINE_LOOP)
+        for t in range(0,361):
+            theta = t/180*pi
+            glVertex2f(scale[0]*cos(theta), scale[1]*sin(theta))
+        glEnd()
+        glPopMatrix()
+
+    def draw_wedge(self, center, radius, orient, span, color=(1,1,1), fill=True):
+        if len(color) == 3:
+            color = (*color,1)
+        glPushMatrix()
+        glTranslatef(*center,0)
+        glRotatef(orient,0,0,1)
+        glColor4f(*color)
+        if fill:
+            glBegin(GL_TRIANGLE_FAN)
+        else:
+            glBegin(GL_LINE_LOOP)
+        glVertex2f(0,0)
+        for t in range(round(-span/2), round(span/2)):
+            theta = t/180*pi
+            glVertex2f(radius*cos(theta), radius*sin(theta))
+        glEnd()
+        glPopMatrix()
+        
 
     def draw_landmarks(self):
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
@@ -166,11 +202,18 @@ class ParticleViewer():
                                color=color, fill=True)
 
         # Draw the robot at the best particle location
-        est = self.robot.world.particle_filter.pose_estimate()
-        rx = est[0]
-        ry = est[1]
-        rtheta = math.degrees(est[2])
-        self.draw_triangle((rx,ry),scale=2,angle=rtheta, color=(0,0,1,0.5))
+        (rx,ry,theta) = self.robot.world.particle_filter.pose_estimate()
+        hdg = math.degrees(theta)
+        self.draw_triangle((rx,ry),scale=2,angle=hdg, color=(0,0,1,0.5))
+
+        # Draw the error ellipse and heading error wedge
+        (xy_var, theta_var) = self.robot.world.particle_filter.variance_estimate()
+        (w,v) = np.linalg.eigh(xy_var)
+        alpha = atan2(v[1,0],v[0,0])
+        self.draw_ellipse((rx,ry), w**0.5, alpha/pi*180, color=(0,1,1))
+        self.draw_wedge((rx,ry), 25wwwww, hdg, max(5, sqrt(theta_var)*360),
+                        color=(0,1,1,0.4))
+        
 
         # Draw the landmarks last, so they go on top of the particles
         self.draw_landmarks()
@@ -193,11 +236,13 @@ class ParticleViewer():
         var = np.var(weights)
         print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
-
+        (xy_var,theta_var) = pf.variance_estimate()
+        print ('xy_var=', xy_var, '  theta_var=', theta_var)
+        
     def report_pose(self):
-        est = self.robot.world.particle_filter.pose_estimate()
-        hdg = math.degrees(est[2])
-        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (est[0], est[1], hdg))
+        (x,y,theta) = self.robot.world.particle_filter.pose_estimate()
+        hdg = math.degrees(theta)
+        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (x, y, hdg))
 
     async def forward(self,distance):
         handle = self.robot.drive_straight(distance_mm(distance), speed_mmps(50),
