@@ -123,7 +123,7 @@ class StateMachineProgram(StateNode):
                 dsize = (2*shape[1], 2*shape[0])
                 annotated_im = cv2.resize(im, dsize)
             # Aruco annotation
-            if self.aruco and self.robot.world.aruco.seenMarkers is not None:
+            if self.aruco and self.robot.world.aruco.seen_markers is not None:
                 annotated_im = self.robot.world.aruco.annotate(annotated_im,scale_factor)
             # Other annotators can run here if the user supplies them.
             annotated_im = self.user_annotate(annotated_im)
