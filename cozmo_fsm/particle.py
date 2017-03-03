@@ -506,7 +506,7 @@ class SLAMParticle(Particle):
         if isinstance(lm_id, cozmo.objects.LightCube):
             lm_orient = sensor_orient
         else:  # AruCo marker
-            lm_orient = p.theta + sensor_orient
+            lm_orient = sensor_orient  # NEED TO ADD p.theta
         landmark_mu =  (lm_x, lm_y, lm_orient)
         landmark_sigma = (1,1,1)  # *** FIX THIS
         self.landmarks[lm_id] = (landmark_mu, landmark_sigma)
@@ -561,7 +561,7 @@ class SLAMSensorModel(SensorModel):
                 sensor_bearing = atan2(marker.camera_coords[0], marker.camera_coords[2])
                 # For AruCo, sensor_orient is a relative orientation that must
                 # be converted to asbolute for each particle separately.
-                sensor_orient = lm.opencv_rotation[2] * (pi/180)
+                sensor_orient = marker.opencv_rotation[2] * (pi/180)
             if id not in particles[0].landmarks:
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
