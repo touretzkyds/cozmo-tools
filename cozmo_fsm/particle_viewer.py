@@ -217,7 +217,6 @@ class ParticleViewer():
         glRotatef(90,0,0,1)
         glScalef(self.scale, self.scale, self.scale)
         glTranslatef(-self.translation[0], -self.translation[1], 0.)
-        glScalef(0.5, 0.5, 0.5)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 

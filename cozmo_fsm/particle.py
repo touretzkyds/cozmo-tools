@@ -451,7 +451,7 @@ class ParticleFilter():
         self.install_new_particles()
 
     def jitter_new_particles(self):
-        dist_jitter = 0.2 # mm
+        dist_jitter = 2 # mm
         hdg_jitter = 0.01 # radians
 
         x_jitter = np.random.normal(0, dist_jitter, size=self.num_particles)
