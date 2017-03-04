@@ -316,14 +316,6 @@ class ParticleViewer():
             self.report_variance(pf)
         elif key == b' ':     # update display (used when normal update is disabled)
             glutPostRedisplay()
-        elif key == b'q': #kill window
-        elif key == b'z':     # initialize
-            pf.initializer.initialize(pf.particles)
-        elif key == b'v':     # display weight variance
-            self.report_variance(pf)
-            return
-        elif key == b' ':     # update display (useful when normal update is disabled)
-            glutPostRedisplay()
         elif key == b'+':     # zoom in
             self.scale *= 1.25
             self.print_display_params()
