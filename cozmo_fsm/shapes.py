@@ -28,10 +28,8 @@ class Circle(Shape):
         self.radius = radius
 
     def __repr__(self):
-        return '<Circle (%s,%s) r=%s>' % \
-               ( ('%5.1f' % self.center[0,0]).strip(),
-                 ('%5.1f' % self.center[1,0]).strip(),
-                 ('%5.1f' % self.radius).strip() )
+        return '<Circle (%.1f,%.1f) r=%.1f>' % \
+               (self.center[0,0], self.center[1,0], self.radius)
 
     def instantiate(self, tmat):
         return Circle(center=tmat.dot(self.center), radius=self.radius)        

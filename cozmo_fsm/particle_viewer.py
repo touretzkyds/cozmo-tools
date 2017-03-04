@@ -18,7 +18,7 @@ RUNNING = False
 
 class ParticleViewer():
     def __init__(self, robot,
-                 width=512, height=512,
+                 width=512, height=512, scale=1.0,
                  windowName = "particle viewer",
                  bgcolor = (0,0,0)):
         self.robot = robot
@@ -26,6 +26,8 @@ class ParticleViewer():
         self.height = height
         self.bgcolor = bgcolor
         self.aspect = self.width/self.height
+        self.translation = [0., 0.]  # Translation in mm
+        self.scale = scale
         self.windowName = windowName
         self.thread = None
 
@@ -53,6 +55,7 @@ class ParticleViewer():
         glutReshapeFunc(self.reshape)
         glutIdleFunc(glutPostRedisplay) # Constantly update screen
         glutKeyboardFunc(self.keyPressed)
+        glutSpecialFunc(self.specialKeyPressed)
         glutDisplayFunc(self.display)
         glutMainLoop()
 
@@ -65,6 +68,7 @@ class ParticleViewer():
         self.thread = Thread(target=self.initialize_window)
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
+        print("Type 'h' in the particle viewer window for help.")
 
     def draw_rectangle(self, center, width=10, height=None,
                        angle=0, color=(1,1,1), fill=True):
@@ -153,6 +157,8 @@ class ParticleViewer():
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         glRotatef(90,0,0,1)
+        glScalef(self.scale, self.scale, self.scale)
+        glTranslatef(-self.translation[0], -self.translation[1], 0.)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
@@ -228,12 +234,68 @@ class ParticleViewer():
             self.robot.loop.create_task(self.turn(22.5))
         elif key == b'd':     # right
             self.robot.loop.create_task(self.turn(-22.5))
+        elif key == b'D':     # right
+            self.robot.loop.create_task(self.turn(-90))
         elif key == b'z':     # randomize
             pf.initializer.initialize(pf.particles)
         elif key == b'v':     # display weight variance
             self.report_variance(pf)
         elif key == b'q': #kill window
+        elif key == b'z':     # initialize
+            pf.initializer.initialize(pf.particles)
+        elif key == b'v':     # display weight variance
+            self.report_variance(pf)
+            return
+        elif key == b' ':     # update display (useful when normal update is disabled)
+            glutPostRedisplay()
+        elif key == b'+':     # zoom in
+            self.scale *= 1.25
+            self.print_display_params()
+            return
+        elif key == b'-':     # zoom out
+            self.scale /= 1.25
+            self.print_display_params()
+            return
+        elif key == b'c':     # center map
+            self.translation = [0., 0.]
+            self.print_display_params()
+            return
+        elif key == b'h':     # print help
+            self.print_help()
+            return
+        elif key == b'q':     #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
         self.report_pose()
 
+    def specialKeyPressed(self, key, mouseX, mouseY):
+        # arrow keys for translation
+        incr = 25.0    # millimeters
+        if key == GLUT_KEY_UP:
+            self.translation[0] += incr / self.scale
+        elif key == GLUT_KEY_DOWN:
+            self.translation[0] -= incr / self.scale
+        elif key == GLUT_KEY_LEFT:
+            self.translation[1] += incr / self.scale
+        elif key == GLUT_KEY_RIGHT:
+            self.translation[1] -= incr / self.scale
+        self.print_display_params()
+
+    def print_display_params(self):
+        print('scale=%.2f translation=[%.1f, %.1f]' %
+              (self.scale, *self.translation))
+
+    def print_help(self):
+        print("""
+Particle viewer commands:
+  w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
+  W/A/S/D    Drive robot +/- 25 mm or turn +/- 90 degrees
+    e        Evaluate particles using current sensor info
+    r        Resample particles (evaluates first)
+    z        Reset particles (randomize, or all 0 for SLAM)
+  arrows     Translate the view up/down/left/right
+    c        Center the view (zero translation)
+    +        Zoom in
+    -        Zoom out
+    h        Print this help text
+""")

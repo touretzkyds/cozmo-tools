@@ -41,7 +41,7 @@ class Joint():
         if self.type == 'fixed':
             qval = 'fixed'
         else:
-            qval = "q=" + ("%7.2f deg." % (self.q*180/math.pi)).strip()
+            qval = "q=%.2f deg." % (self.q*180/math.pi)
         return "<Joint '%s' %s>" % (self.name, qval)
 
     def this_joint_to_this_link(self):
