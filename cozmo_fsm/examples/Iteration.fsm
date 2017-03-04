@@ -7,12 +7,20 @@
 
 from cozmo_fsm import *
 
+class PrintIt(StateNode):
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        if isinstance(event,DataEvent):
+            print('I got some data: ', event.data)
+
 class Iteration(StateMachineProgram):
     $setup{
 	outer_loop: Iterate(['alpha', 'bravo', 'charlie'])
 	outer_loop =SayData=> Say() =C=> inner_loop
 
-          inner_loop: Iterate(4) =SayData=> Say() =CNext=> inner_loop
+          inner_loop: Iterate(4) =D=> PrintIt() =Next=> inner_loop
+          # When inner iteration is done, it posts a completion event.
           inner_loop =CNext=> outer_loop
 
 	outer_loop =C=> Say('Done')

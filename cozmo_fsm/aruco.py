@@ -1,8 +1,8 @@
 import cv2, numpy, math
 
 class ArucoMarker(object):
-  def __init__(self,markerID,bbox,translation,rotation):
-    self.id = markerID
+  def __init__(self,marker_id,bbox,translation,rotation):
+    self.id = marker_id
     self.bbox = bbox
 
     # OpenCV Pose information
@@ -23,40 +23,42 @@ class ArucoMarker(object):
 
 
 class Aruco(object):
-    def __init__(self,arucolibname,markerSize = 50):
+    def __init__(self,arucolibname, marker_size=50):
         self.arucolibname = arucolibname
         self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
-        self.seenMarkers = dict()
-        self.seenMarkerObjects = []
+        self.seen_marker_ids = dict()
+        self.seen_marker_objects = []
         self.ids = []
         self.corners = []
 
         #added for pose estimation
-        self.markerSize = markerSize #these units will be pose est units!!
-        self.axisLength = markerSize*0.5
+        self.marker_size = marker_size #these units will be pose est units!!
+        self.axis_length = marker_size*0.5
         self.image_size = (240,320)
         self.focal_len = 290
-        self.cameraMatrix = numpy.array([[self.focal_len,0,self.image_size[0]/2],
-		                                 [0,self.focal_len,self.image_size[1]/2],
-										 [0,0,1]]).astype(float)
-        self.distortionArray = numpy.array([[0,0,0,0,0]]).astype(float)
+        self.camera_matrix = numpy.array([[self.focal_len,0,self.image_size[0]/2],
+                                          [0,self.focal_len,self.image_size[1]/2],
+                                          [0,0,1]]).astype(float)
+        self.distortion_array = numpy.array([[0,0,0,0,0]]).astype(float)
 
     def process_image(self,gray):
-        self.seenMarkers = []
-        self.seenMarkerObjects = dict()
+        self.seen_marker_ids = []
+        self.seen_markers = dict()
         (self.corners,self.ids,_) = \
             cv2.aruco.detectMarkers(gray,self.aruco_lib,parameters=self.aruco_params)
         if self.ids is None: return
 
         #estimate poses
-        (self.rvecs,self.tvecs) = cv2.aruco.estimatePoseSingleMarkers(self.corners, \
-                                    self.markerSize,self.cameraMatrix,self.distortionArray)
+        (self.rvecs,self.tvecs) = \
+            cv2.aruco.estimatePoseSingleMarkers(self.corners,
+                                                self.marker_size,self.camera_matrix,
+                                                self.distortion_array)
 
         for i in range(len(self.ids)):
             marker = ArucoMarker(self.ids[i][0], self.corners[i],self.tvecs[i][0],self.rvecs[i][0])
-            self.seenMarkers.append(marker.id)
-            self.seenMarkerObjects[marker.id] = marker
+            self.seen_marker_ids.append(marker.id)
+            self.seen_markers[marker.id] = marker
 
     def annotate(self, image, scale_factor):
         scaled_corners = [ numpy.multiply(corner, scale_factor) for corner in self.corners ]

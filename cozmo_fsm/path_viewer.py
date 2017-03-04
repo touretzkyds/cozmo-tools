@@ -13,7 +13,7 @@ import numpy as np
 
 RUNNING = False
 
-from .shapes import *
+from .rrt_shapes import *
 
 the_rrt = None
 the_items = []  # each item is a tuple (tree,color)
@@ -60,8 +60,7 @@ class PathViewer():
         glutMainLoop()
 
     def start_thread(self): # Displays in background
-        global RUNNING, the_rrt
-        self.rrt = the_rrt
+        global RUNNING
         if RUNNING:
             return
         else:

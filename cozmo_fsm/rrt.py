@@ -4,7 +4,7 @@ import random
 import time
 
 from .transform import wrap_angle
-from .shapes import *
+from .rrt_shapes import *
 
 class RRTNode():
     def __init__(self, parent=None, x=0, y=0, q=0):
@@ -112,7 +112,6 @@ class RRT():
             return None
         if swapped:
             (treeB, treeA) = (treeA, treeB)
-        print('iterations=',i)
         return self.get_path(treeA, treeB)
 
     def get_path(self, treeA, treeB):
@@ -126,11 +125,13 @@ class RRT():
         # need to be reversed
         nodeB = treeB[-1]
         pathB = []
+        prev_heading = wrap_angle(nodeB.q + pi)
         while nodeB.parent is not None:
             nodeB = nodeB.parent
-            nodeB.q = wrap_angle(nodeB.q + pi)
+            (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
             pathB.append(nodeB)
-        return (treeA, treeB, pathA + pathB)
+        self.path = pathA + pathB
+        return (treeA, treeB, self.path)
 
     def make_robot_parts(self,robot):
         result = []

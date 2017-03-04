@@ -8,6 +8,7 @@ from OpenGL.GLU import *
 
 from threading import Thread  # for backgrounding window
 import math
+from math import sin, cos, pi, atan2, sqrt
 import array
 import numpy as np
 
@@ -21,7 +22,7 @@ class ParticleViewer():
                  width=512, height=512, scale=1.0,
                  windowName = "particle viewer",
                  bgcolor = (0,0,0)):
-        self.robot = robot
+        self.robot=robot
         self.width = width
         self.height = height
         self.bgcolor = bgcolor
@@ -100,12 +101,11 @@ class ParticleViewer():
         glPopMatrix()
 
     def draw_triangle(self,center,scale=1,angle=0,color=(1,1,1),fill=True):
-        # Default to solid color
         if len(color) == 3:
-          color = (color[0],color[1],color[2],1)
+          color = (*color,1)
 
         glPushMatrix()
-        if(fill):
+        if fill:
           glPolygonMode(GL_FRONT_AND_BACK,GL_FILL)
         else:
           glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
@@ -118,35 +118,93 @@ class ParticleViewer():
         glVertex2f(-5.*scale,  3.*scale)
         glEnd()
         glPopMatrix()
-        return
+
+    def draw_ellipse(self, center, scale, orient=0, color=(1,1,1), fill=False):
+        if len(color) == 3:
+            color = (*color,1)
+        glPushMatrix()
+        glTranslatef(*center,0)
+        glRotatef(orient,0,0,1)
+        glColor4f(*color)
+        if fill:
+            glBegin(GL_TRIANGLE_FAN)
+            glVertex2f(0,0)
+        else:
+            glBegin(GL_LINE_LOOP)
+        for t in range(0,361):
+            theta = t/180*pi
+            glVertex2f(scale[0]*cos(theta), scale[1]*sin(theta))
+        glEnd()
+        glPopMatrix()
+
+    def draw_wedge(self, center, radius, orient, span, color=(1,1,1), fill=True):
+        if len(color) == 3:
+            color = (*color,1)
+        glPushMatrix()
+        glTranslatef(*center,0)
+        glRotatef(orient,0,0,1)
+        glColor4f(*color)
+        if fill:
+            glBegin(GL_TRIANGLE_FAN)
+        else:
+            glBegin(GL_LINE_LOOP)
+        glVertex2f(0,0)
+        for t in range(round(-span/2), round(span/2)):
+            theta = t/180*pi
+            glVertex2f(radius*cos(theta), radius*sin(theta))
+        glEnd()
+        glPopMatrix()
 
     def draw_landmarks(self):
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
-        if landmarks:
-            for (id,specs) in landmarks.items():
-                coords = specs.position.x_y_z
-                angle = specs.rotation.angle_z.degrees
-                glPushMatrix()
-                if isinstance(id, cozmo.objects.LightCube):
-                    seen = id.is_visible
-                    label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)
-                else:
-                    seen = id in self.robot.world.aruco.seenMarkers
-                    label = id
-                if seen:
-                    color = (0.5, 1, 0.3, 0.75)
-                else:
-                    color = (0, 0.5, 0, 0.75)
-                self.draw_rectangle(coords,20,50,angle=angle,color=color)
-                glColor4f(0., 0., 0., 1.)
-                glTranslatef(*coords)
-                glRotatef(angle-90, 0., 0., 1.)
-                label_str = ascii(label)
-                glTranslatef(3.-7*len(label_str), -5., 0.) 
-                glScalef(0.1,0.1,0.1)
-                for char in label_str:
-                    glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
-                glPopMatrix()
+        if not landmarks: return
+        for (id,specs) in landmarks.items():
+            if isinstance(id, cozmo.objects.LightCube):
+                seen = id.is_visible
+                label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)
+            else:
+                seen = id in self.robot.world.aruco.seen_marker_ids
+                label = id
+            if seen:
+                color = (0.5, 1, 0.3, 0.75)
+            else:
+                color = (0, 0.5, 0, 0.75)
+            if isinstance(specs, cozmo.util.Pose):
+                self.draw_landmark_from_pose(id, specs, label, color)
+            else:
+                self.draw_landmark_from_particle(id, specs, label, color)
+
+    def draw_landmark_from_pose(self, id, specs, label, color):
+        coords = (specs.position.x, specs.position.y, 0.)
+        angle = specs.rotation.angle_z.degrees
+        glPushMatrix()
+        glColor4f(*color)
+        self.draw_rectangle(coords,20,50,angle=angle,color=color)
+        glColor4f(0., 0., 0., 1.)
+        glTranslatef(*coords)
+        glRotatef(angle-90, 0., 0., 1.)
+        label_str = ascii(label)
+        glTranslatef(3.-7*len(label_str), -5., 0.)
+        glScalef(0.1,0.1,0.1)
+        for char in label_str:
+            glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
+        glPopMatrix()
+
+    def draw_landmark_from_particle(self, id, specs, label, color):
+        coords = (specs[0][0], specs[0][1], 0.)
+        angle = specs[0][2] * (180/pi)
+        glPushMatrix()
+        glColor4f(*color)
+        self.draw_rectangle(coords,20,50,angle=angle,color=color)
+        glColor4f(0., 0., 0., 1.)
+        glTranslatef(*coords)
+        glRotatef(angle-90, 0., 0., 1.)
+        label_str = ascii(label)
+        glTranslatef(3.-7*len(label_str), -5., 0.)
+        glScalef(0.1,0.1,0.1)
+        for char in label_str:
+            glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
+        glPopMatrix()
 
     def display(self):
         glMatrixMode(GL_PROJECTION)
@@ -159,6 +217,7 @@ class ParticleViewer():
         glRotatef(90,0,0,1)
         glScalef(self.scale, self.scale, self.scale)
         glTranslatef(-self.translation[0], -self.translation[1], 0.)
+        glScalef(0.5, 0.5, 0.5)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
@@ -171,11 +230,18 @@ class ParticleViewer():
                                color=color, fill=True)
 
         # Draw the robot at the best particle location
-        est = self.robot.world.particle_filter.pose_estimate()
-        rx = est[0]
-        ry = est[1]
-        rtheta = math.degrees(est[2])
-        self.draw_triangle((rx,ry),scale=2,angle=rtheta, color=(0,0,1,0.5))
+        (rx,ry,theta) = self.robot.world.particle_filter.pose_estimate()
+        (xy_var, theta_var) = self.robot.world.particle_filter.variance_estimate()
+        hdg = math.degrees(theta)
+        self.draw_triangle((rx,ry),scale=2,angle=hdg, color=(1,1,0,0.7))
+
+        # Draw the error ellipse and heading error wedge
+        (w,v) = np.linalg.eigh(xy_var)
+        alpha = atan2(v[1,0],v[0,0])
+        self.draw_ellipse((rx,ry), w**0.5, alpha/pi*180, color=(0,1,1))
+        self.draw_wedge((rx,ry), 25, hdg, max(5, sqrt(theta_var)*360),
+                        color=(0,1,1,0.4))
+        
 
         # Draw the landmarks last, so they go on top of the particles
         self.draw_landmarks()
@@ -198,11 +264,13 @@ class ParticleViewer():
         var = np.var(weights)
         print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
-
+        (xy_var,theta_var) = pf.variance_estimate()
+        print ('xy_var=', xy_var, '  theta_var=', theta_var)
+        
     def report_pose(self):
-        est = self.robot.world.particle_filter.pose_estimate()
-        hdg = math.degrees(est[2])
-        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (est[0], est[1], hdg))
+        (x,y,theta) = self.robot.world.particle_filter.pose_estimate()
+        hdg = math.degrees(theta)
+        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (x, y, hdg))
 
     async def forward(self,distance):
         handle = self.robot.drive_straight(distance_mm(distance), speed_mmps(50),
@@ -228,10 +296,16 @@ class ParticleViewer():
             pf.resample()
         elif key == b'w':     # forward
             self.robot.loop.create_task(self.forward(10))
+        elif key == b'W':     # forward
+            self.robot.loop.create_task(self.forward(25))
         elif key == b's':     # back
             self.robot.loop.create_task(self.forward(-10))
+        elif key == b'S':     # back
+            self.robot.loop.create_task(self.forward(-25))
         elif key == b'a':     # left
             self.robot.loop.create_task(self.turn(22.5))
+        elif key == b'A':     # left
+            self.robot.loop.create_task(self.turn(90))
         elif key == b'd':     # right
             self.robot.loop.create_task(self.turn(-22.5))
         elif key == b'D':     # right
@@ -240,6 +314,8 @@ class ParticleViewer():
             pf.initializer.initialize(pf.particles)
         elif key == b'v':     # display weight variance
             self.report_variance(pf)
+        elif key == b' ':     # update display (used when normal update is disabled)
+            glutPostRedisplay()
         elif key == b'q': #kill window
         elif key == b'z':     # initialize
             pf.initializer.initialize(pf.particles)

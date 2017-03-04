@@ -453,9 +453,11 @@ class ParticleFilter():
     def jitter_new_particles(self):
         dist_jitter = 0.2 # mm
         hdg_jitter = 0.01 # radians
+
         x_jitter = np.random.normal(0, dist_jitter, size=self.num_particles)
         y_jitter = np.random.normal(0, dist_jitter, size=self.num_particles)
         theta_jitter = np.random.normal(0, hdg_jitter, size=self.num_particles)
+
         new_x = self.new_x; new_y = self.new_y; new_theta = self.new_theta
         particles = self.particles
         j = 0

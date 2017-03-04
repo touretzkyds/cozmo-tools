@@ -40,10 +40,8 @@ class ParentFails(StateNode):
 
 class Iterate(StateNode):
     """Iterates over an iterable, posting DataEvents.  Completes when done."""
-    def __init__(self,iterable):
+    def __init__(self,iterable=None):
         super().__init__()
-        if isinstance(iterable, int):
-            iterable = range(iterable)
         self.iterable = iterable
 
     class NextEvent(Event): pass
@@ -51,6 +49,12 @@ class Iterate(StateNode):
     def start(self,event=None):
         if self.running: return
         super().start(event)
+        if isinstance(event, DataEvent):
+            self.iterable = event.data
+        if isinstance(self.iterable, int):
+            self.iterable = range(self.iterable)
+        if self.iterable is None:
+            raise ValueError('~s has nothing to iterate on.' % repr(self))
         if not isinstance(event, self.NextEvent):
             self.iterator = self.iterable.__iter__()
         try:
@@ -206,6 +210,88 @@ class DriveTurn(DriveWheels):
             self.stop_wheels()
             self.post_completion()
 
+
+class DriveArc(DriveWheels):
+    def ang2dist(self, angle, radius):
+        return (angle / 360) * 2 * pi * radius
+
+    def dist2ang(self, distance, radius):
+        return (distance / (2 * pi * radius)) * 360
+
+    def __init__(self, radius=0, angle=None, distance=None,
+                 speed=None, angspeed=None,
+                 **kwargs):
+        if isinstance(radius, cozmo.util.Distance):
+            radius = radius.distance_mm
+        if isinstance(angle, cozmo.util.Angle):
+            angle = angle.degrees
+        if isinstance(speed, cozmo.util.Speed):
+            speed = speed.speed_mmps
+        if isinstance(angspeed, cozmo.util.Angle):
+            angspeed = angspeed.degrees
+
+        wheelbase = 45    # robot's wheelbase in mm
+        if radius != 0:
+            if angle is not None:
+                self.angle = angle
+            elif distance is not None:
+                self.angle = self.dist2ang(distance, radius)
+            else:
+                raise ValueError('DriveArc requires an angle or distance.')
+
+            if  speed is not None:
+                pass
+            elif angspeed is not None:
+                speed = self.ang2dist(angspeed, radius)
+            else:
+                speed = 40 # degrees/second
+            if angle < 0:
+                speed = -speed
+
+            lspeed = speed * (1 - wheelbase / radius)
+            rspeed = speed * (1 + wheelbase / radius)
+
+        else:  # radius is 0
+            self.angle = angle
+            if angspeed is None:
+                angspeed = 40 # degrees/second
+            s = angspeed
+            if angle < 0:
+                s = -s
+            lspeed = -s
+            rspeed = s
+
+        super().__init__(lspeed, rspeed, **kwargs)
+        self.polling_interval = 0.05
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        self.last_heading = self.robot.pose.rotation.angle_z.degrees
+        self.traveled = 0
+
+    def poll(self):
+        """See how far we've traveled"""
+        p0 = self.last_heading
+        p1 = self.robot.pose.rotation.angle_z.degrees
+        self.last_heading = p1
+        # Assume we're polling quickly enough that diff will be small;
+        # typically only about 1 degree.  So diff will be large only
+        # if the heading has passed through 360 degrees since the last
+        # call to poll().  Use 90 degrees as an arbitrary large threshold.
+        diff = p1 - p0
+        if diff  < -90.0:
+            diff += 360.0
+        elif diff > 90.0:
+            diff -= 360.0
+        self.traveled += diff
+
+        if self.angle is not None and abs(self.traveled) > abs(self.angle):
+            self.poll_handle.cancel()
+            self.stop_wheels()
+            self.post_completion()
+
+
 #________________ Action Nodes ________________
 
 class ActionNode(StateNode):
@@ -305,6 +391,7 @@ class Say(ActionNode):
 
 
 class Forward(ActionNode):
+    """ Moves forward a specified distance. Can accept a Distance as a Dataevent."""
     def __init__(self, distance=distance_mm(50),
                  speed=speed_mmps(50), abort_on_stop=True, **action_kwargs):
         if isinstance(distance, (int,float)):
@@ -323,12 +410,19 @@ class Forward(ActionNode):
         # super's init must come last because it checks self.action_kwargs
         super().__init__(abort_on_stop)
 
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Distance):
+            self.distance = event.data
+        super().start(event)
+
     def action_launcher(self):
         return self.robot.drive_straight(self.distance, self.speed,
                                          **self.action_kwargs)
 
 
 class Turn(ActionNode):
+    """Turns by a specified angle. Can accapet an Angle as a DataEvent."""
     def __init__(self, angle=degrees(90), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
@@ -337,6 +431,12 @@ class Turn(ActionNode):
         self.angle = angle
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data
+        super().start(event)
 
     def action_launcher(self):
         return self.robot.turn_in_place(self.angle, **self.action_kwargs)
