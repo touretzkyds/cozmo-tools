@@ -120,6 +120,8 @@ class SensorModel():
     def set_landmarks(self,landmarks):
         self.landmarks = landmarks
 
+    def look_for_new_landmarks(self): pass  # SLAM only
+
     def compute_robot_motion(self):
         # How much did we move since last evaluation?
         dx = self.robot.pose.position.x - self.last_evaluate_pose.position.x
@@ -412,10 +414,12 @@ class ParticleFilter():
 
     def update_weights(self):
         # Clip the log_weight values and calculate the new weights.
-        if max(p.log_weight for p in self.particles) >= self.min_log_weight:
+        max_weight = max(p.log_weight for p in self.particles)
+        if max_weight >= self.min_log_weight:
             wt_inc = 0.0
         else:
             wt_inc = - self.min_log_weight / 2.0
+            print('wt_inc',wt_inc,'applied for max_weight',max_weight)
         exp_weights = self.exp_weights
         particles = self.particles
         for i in range(self.num_particles):
@@ -479,6 +483,9 @@ class ParticleFilter():
             p.log_weight = 0.0
             p.weight = 1.0
 
+    def clear_landmarks(self):
+        print('Not SLAM.  Landmarks are fixed in this particle filter.')
+
 #================ Particle SLAM ================
 
 class SLAMParticle(Particle):
@@ -490,18 +497,60 @@ class SLAMParticle(Particle):
         return '<SLAMParticle (%.2f, %.2f) %.1f deg. log_wt=%f, %d-lm>' % \
                (self.x, self.y, self.theta*180/pi, self.log_weight, len(self.landmarks))
 
+    sigma_r = 50
+    sigma_alpha = 15 * (pi/180)
+    sensor_variance_Qt = np.array([[sigma_r**2, 0             ],
+                                [0,          sigma_alpha**2]])
+
+    @staticmethod
+    def sensor_jacobian_H(dx, dy, dist):
+        """Jacobian of sensor values (r, alpha) wrt particle state x,y
+           where (dx,dy) is vector from particle to lm, and
+           r = sqrt(dx**2 + dy**2), alpha = atan2(dy,dx)"""
+        q = dist**2
+        sqr_q = dist
+        return np.array([[dx/sqr_q, dy/sqr_q],
+                         [-dy/q    , dx/q     ]])
+
     def add_landmark(self, lm_id, sensor_dist, sensor_bearing, sensor_orient):
-        world_bearing = self.theta + sensor_bearing
-        lm_x = self.x + sensor_dist * cos(world_bearing)
-        lm_y = self.y + sensor_dist * sin(world_bearing)
+        direction = self.theta + sensor_bearing
+        dx = sensor_dist * cos(direction)
+        dy = sensor_dist * sin(direction)
+        lm_x = self.x + dx
+        lm_y = self.y + dy
+
         if isinstance(lm_id, cozmo.objects.LightCube):
             lm_orient = sensor_orient
         else:  # AruCo marker
-            lm_orient = sensor_orient  # NEED TO ADD p.theta
-        landmark_mu =  (lm_x, lm_y, lm_orient)
-        landmark_sigma = (1,1,1)  # *** FIX THIS
-        self.landmarks[lm_id] = (landmark_mu, landmark_sigma)
+            lm_orient = sensor_orient - self.theta
 
+        lm_mu =  np.array([[lm_x], [lm_y]])
+        H = self.sensor_jacobian_H(dx, dy, sensor_dist)
+        Hinv = np.linalg.inv(H)
+        Q = self.sensor_variance_Qt
+        lm_sigma = Hinv.dot(Q.dot(Hinv.T))
+        self.landmarks[lm_id] = (lm_mu, lm_orient, lm_sigma)
+
+    def update_landmark(self, id, sensor_dist, sensor_bearing, sensor_orient,
+                        dx, dy, I=np.eye(2)):
+        # (dx,dy) is vector from particle to SENSOR position of lm
+        (old_mu, old_orient, old_sigma) = self.landmarks[id]
+        H = self.sensor_jacobian_H(dx, dy, sensor_dist)
+        Ql =  H.dot(old_sigma.dot(H.T)) + self.sensor_variance_Qt
+        Ql_inv = np.linalg.inv(Ql)
+        K = old_sigma.dot((H.T).dot(Ql_inv))
+        z = np.array([[sensor_dist], [sensor_bearing]])
+        # (ex,ey) is vector from particle to MAP position of lm
+        ex = old_mu[0,0] - self.x
+        ey = old_mu[1,0] - self.y
+        h = np.array([[sqrt(ex**2+ey**2)], [atan2(ey,ex) - self.theta]])
+        new_mu = old_mu + K.dot(z - h)
+        new_sigma = (I - K.dot(H)).dot(old_sigma)
+        # Should be deriving H for (x,y,phi) instead of (x,y), to update orient
+        # For now, just do exponential averaging to update phi
+        new_orient = wrap_angle(old_orient +     # *** HACK: FIX IT
+                                0.1*wrap_angle(sensor_orient - old_orient))
+        self.landmarks[id] = (new_mu, new_orient, new_sigma)
 
 class SLAMSensorModel(SensorModel):
     @staticmethod
@@ -512,19 +561,26 @@ class SLAMSensorModel(SensorModel):
     def is_aruco(x):
         return isinstance(x, ArucoMarker)
     
-    def __init__(self, robot, landmark_test=None, landmarks=dict(), distance_variance=200):
+    def __init__(self, robot, landmark_test=None, landmarks=dict(),
+                 distance_variance=200):
         if landmark_test is None:
             landmark_test = self.is_cube
         self.landmark_test = landmark_test
         self.distance_variance = distance_variance
         super().__init__(robot,landmarks)
 
-    def evaluate(self,particles,force=False):
-        # Returns true if particles were evaluated.
-        # Called with force=True from particle_viewer to force evaluation.
+    def look_for_new_landmarks(self, particles):
+        self.evaluate(particles, force=True, just_looking=True)
+        self.landmarks = particles[0].landmarks
 
-        # Only evaluate if the robot moved enough for evaluation to be worthwhile.
+    def evaluate(self, particles, force=False, just_looking=False):
+        # Returns true if particles were evaluated.
+        # Call with force=True from particle_viewer to skip distance traveled check.
+        # Call with just_looking=True to just look for new landmarks; no evaluation.
+
         (dist,turn_angle) = self.compute_robot_motion()
+        # Unless forced, only evaluate if the robot moved enoug
+        # for evaluation to be worthwhile.
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         evaluated = False
@@ -534,53 +590,67 @@ class SLAMSensorModel(SensorModel):
             seen_markers = self.robot.world.aruco.seen_markers
         except:
             seen_markers = dict()
-        seen_landmarks = [cube for cube in self.robot.world.light_cubes.values() \
-                          if cube.is_visible and self.landmark_test(cube)] + \
-            [marker.id for marker in seen_markers.values() if self.landmark_test(marker)]
+        seen_landmarks = \
+            [cube for cube in self.robot.world.light_cubes.values()
+                 if cube.is_visible and self.landmark_test(cube)] + \
+            [marker.id for marker in seen_markers.values()
+                 if self.landmark_test(marker)]
         # Process each seen landmark:
         for id in seen_landmarks:
             if isinstance(id, cozmo.objects.LightCube):
-                sensor_dx = id.pose.position.x - self.robot.pose.position.x
-                sensor_dy = id.pose.position.y - self.robot.pose.position.y
-                sensor_dist = sqrt(sensor_dx*sensor_dx + sensor_dy*sensor_dy)
-                angle = atan2(sensor_dy,sensor_dx)
-                sensor_bearing = wrap_angle(angle-self.robot.pose.rotation.angle_z.radians)
-                sensor_orient = wrap_angle(angle -  id.pose.rotation.angle_z.radians)
+                # sdk values are in SDK's coordinate system, not ours
+                sdk_dx = id.pose.position.x - self.robot.pose.position.x
+                sdk_dy = id.pose.position.y - self.robot.pose.position.y
+                sensor_dist = sqrt(sdk_dx**2 + sdk_dy**2)
+                sdk_bearing = atan2(sdk_dy,sdk_dx)
+                # sensor_bearing is lm bearing relative to robot centerline
+                sensor_bearing = \
+                    wrap_angle(sdk_bearing-self.robot.pose.rotation.angle_z.radians)
+                # sensor_orient is lm bearing relative to cube's North
+                sensor_orient = \
+                    wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
             else:  # lm is an AruCo marker
                 marker = seen_markers[id]
                 sensor_dist = marker.camera_distance
-                sensor_bearing = atan2(marker.camera_coords[0], marker.camera_coords[2])
-                # For AruCo, sensor_orient is a relative orientation that must
-                # be converted to asbolute for each particle separately.
-                sensor_orient = marker.opencv_rotation[2] * (pi/180)
+                sensor_bearing = atan2(marker.camera_coords[0],
+                                       marker.camera_coords[2])
+                # For AruCo, sensor_orient is a relative value that must
+                # be converted to asbolute for each particle separately since
+                # we don't have an independent coordinate system to measure by.
+                sensor_orient = sensor_bearing - marker.opencv_rotation[2] * (pi/180)
             if id not in particles[0].landmarks:
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
                     p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
                 continue
-            # If we get here, we've seen a familiar landmark
+            # If we reach here, we're seeing a familiar landmark, so evaluate
+            if just_looking:
+                continue
             evaluated = True
             for p in particles:
                 # Use sensed bearing and distance to get
-                # particle's estimate of landmark position on its
-                # map.  Compare to actual map position.
-                landmark_spec = p.landmarks[id]
-                lm_x = landmark_spec[0][0]
-                lm_y = landmark_spec[0][1]
-                lm_orient = landmark_spec[0][2]
-                landmark_sigma = landmark_spec[1]
-                world_bearing = p.theta + sensor_bearing
-                predicted_pos_x = p.x + sensor_dist * cos(world_bearing)
-                predicted_pos_y = p.y + sensor_dist * sin(world_bearing)
-                dx = lm_x - predicted_pos_x
-                dy = lm_y - predicted_pos_y
-                error1_sq = dx*dx + dy*dy
-                p.log_weight -= error1_sq / self.distance_variance
-                # Update landmark pose -- HACK FOR NOW
-                new_mu = ( (lm_x+predicted_pos_x)/2,
-                           (lm_y+predicted_pos_y)/2,
-                           lm_orient )
-                p.landmarks[id] = (new_mu, landmark_sigma)
+                # particle's prediction of landmark position in
+                # the world.  Compare to its stored map position.
+                if isinstance(id, cozmo.objects.LightCube):
+                    abs_sensor_orient = sensor_orient
+                else:  # ArUco marker
+                    abs_sensor_orient = wrap_angle(sensor_orient - p.theta)
+                sensor_direction = p.theta + sensor_bearing
+                dx = sensor_dist * cos(sensor_direction)
+                dy = sensor_dist * sin(sensor_direction)
+                predicted_lm_x = p.x + dx
+                predicted_lm_y = p.y + dy
+                (lm_mu, lm_orient, lm_sigma) = p.landmarks[id]
+                map_lm_x = lm_mu[0,0]
+                map_lm_y = lm_mu[1,0]
+                error_x = map_lm_x - predicted_lm_x
+                error_y = map_lm_y - predicted_lm_y
+                error1_sq = error_x**2 + error_y**2
+                error2_sq = (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
+                p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
+                # Update landmark in this particle's map
+                p.update_landmark(id, sensor_dist, sensor_bearing, abs_sensor_orient,
+                                  dx, dy)
         return evaluated
     
 
@@ -594,6 +664,11 @@ class SLAMParticleFilter(ParticleFilter):
             kwargs['initializer'] = RobotPosition(0,0,0)
         super().__init__(robot, **kwargs)
         self.new_landmarks = [None] * self.num_particles
+
+    def clear_landmarks(self):
+        for p in self.particles:
+            p.landmarks.clear()
+        self.sensor_model.landmarks.clear()
 
     def update_weights(self):
         var = super().update_weights()

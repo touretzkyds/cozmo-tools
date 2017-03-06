@@ -16,6 +16,7 @@ import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees
 
 RUNNING = False
+REDISPLAY = True   # toggle this to suspend constant redisplay
 
 class ParticleViewer():
     def __init__(self, robot,
@@ -54,7 +55,7 @@ class ParticleViewer():
 
         # Function bindings
         glutReshapeFunc(self.reshape)
-        glutIdleFunc(glutPostRedisplay) # Constantly update screen
+        glutIdleFunc(self.idle) # Constantly update screen
         glutKeyboardFunc(self.keyPressed)
         glutSpecialFunc(self.specialKeyPressed)
         glutDisplayFunc(self.display)
@@ -71,16 +72,14 @@ class ParticleViewer():
         self.thread.start()
         print("Type 'h' in the particle viewer window for help.")
 
-    def draw_rectangle(self, center, width=10, height=None,
+    def draw_rectangle(self, center, size=(10,10),
                        angle=0, color=(1,1,1), fill=True):
         # Default to solid color and square window
         if len(color)==3:
-          color = (color[0],color[1],color[2],1)
-        if height is None:
-          height = width
+          color = (*color,1)
 
         # Calculate vertices as offsets from center
-        w = width/2; h = height/2
+        w = size[0]/2; h = size[1]/2
         v1 = (-w,-h); v2 = (w,-h); v3 = (w,h); v4 = (-w,h)
 
         # Draw the rectangle
@@ -100,7 +99,10 @@ class ParticleViewer():
         glEnd()
         glPopMatrix()
 
-    def draw_triangle(self,center,scale=1,angle=0,color=(1,1,1),fill=True):
+    def draw_triangle(self, center, height=1, angle=0, tip_offset=0,
+                      color=(1,1,1), fill=True):
+        half = height / 2
+        aspect = 3/5
         if len(color) == 3:
           color = (*color,1)
 
@@ -112,10 +114,11 @@ class ParticleViewer():
         glColor4f(*color)
         glTranslatef(*center,0)
         glRotatef(angle,0,0,1)
+        glTranslatef(tip_offset,0,0)
         glBegin(GL_TRIANGLES)
-        glVertex2f( 5.*scale,  0.)
-        glVertex2f(-5.*scale, -3.*scale)
-        glVertex2f(-5.*scale,  3.*scale)
+        glVertex2f( half,  0.)
+        glVertex2f(-half, -aspect*half)
+        glVertex2f(-half,  aspect*half)
         glEnd()
         glPopMatrix()
 
@@ -177,9 +180,13 @@ class ParticleViewer():
     def draw_landmark_from_pose(self, id, specs, label, color):
         coords = (specs.position.x, specs.position.y, 0.)
         angle = specs.rotation.angle_z.degrees
+        if isinstance(id, cozmo.objects.LightCube):
+            size = (44,44)
+        else:
+            size = (20,50)
         glPushMatrix()
         glColor4f(*color)
-        self.draw_rectangle(coords,20,50,angle=angle,color=color)
+        self.draw_rectangle(coords, size=size, angle=angle, color=color)
         glColor4f(0., 0., 0., 1.)
         glTranslatef(*coords)
         glRotatef(angle-90, 0., 0., 1.)
@@ -191,20 +198,32 @@ class ParticleViewer():
         glPopMatrix()
 
     def draw_landmark_from_particle(self, id, specs, label, color):
-        coords = (specs[0][0], specs[0][1], 0.)
-        angle = specs[0][2] * (180/pi)
+        (lm_mu, lm_orient, lm_sigma) = specs
+        coords = (lm_mu[0,0], lm_mu[1,0])
         glPushMatrix()
         glColor4f(*color)
-        self.draw_rectangle(coords,20,50,angle=angle,color=color)
+        if isinstance(id, cozmo.objects.LightCube):
+            size = (44,44)
+        else:
+            size = (20,50)
+        self.draw_rectangle(coords, size=size,
+                            angle=lm_orient*(180/pi), color=color)
         glColor4f(0., 0., 0., 1.)
-        glTranslatef(*coords)
-        glRotatef(angle-90, 0., 0., 1.)
+        glTranslatef(*coords,0)
+        glRotatef(lm_orient*(180/pi)-90, 0., 0., 1.)
         label_str = ascii(label)
         glTranslatef(3.-7*len(label_str), -5., 0.)
         glScalef(0.1,0.1,0.1)
         for char in label_str:
             glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
         glPopMatrix()
+        ellipse_color = (color[1], color[2], color[0], 1)
+        self.draw_particle_landmark_ellipse(lm_mu, lm_sigma, ellipse_color)
+
+    def draw_particle_landmark_ellipse(self,coords,sigma,color):
+        (w,v) = np.linalg.eigh(sigma)
+        alpha = atan2(v[1,0],v[0,0])
+        self.draw_ellipse(coords, w**(1/2), alpha*(180/pi), color=color)
 
     def display(self):
         glMatrixMode(GL_PROJECTION)
@@ -225,27 +244,32 @@ class ParticleViewer():
         for p in self.robot.world.particle_filter.particles:
             pscale = 1 - p.weight
             color=(1,pscale,pscale)
-            self.draw_triangle((p.x,p.y), angle=math.degrees(p.theta),
+            self.draw_triangle((p.x,p.y), height=10, angle=math.degrees(p.theta),
                                color=color, fill=True)
 
         # Draw the robot at the best particle location
         (rx,ry,theta) = self.robot.world.particle_filter.pose_estimate()
         (xy_var, theta_var) = self.robot.world.particle_filter.variance_estimate()
         hdg = math.degrees(theta)
-        self.draw_triangle((rx,ry),scale=2,angle=hdg, color=(1,1,0,0.7))
+        self.draw_triangle((rx,ry), height=100, angle=hdg, tip_offset=-10,
+                           color=(1,1,0,0.7))
 
         # Draw the error ellipse and heading error wedge
         (w,v) = np.linalg.eigh(xy_var)
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse((rx,ry), w**0.5, alpha/pi*180, color=(0,1,1))
-        self.draw_wedge((rx,ry), 25, hdg, max(5, sqrt(theta_var)*360),
+        self.draw_wedge((rx,ry), 75, hdg, max(5, sqrt(theta_var)*360),
                         color=(0,1,1,0.4))
-        
 
         # Draw the landmarks last, so they go on top of the particles
         self.draw_landmarks()
 
         glutSwapBuffers()
+
+    def idle(self):
+        global REDISPLAY
+        if REDISPLAY:
+            glutPostRedisplay()
 
     def reshape(self,width,height):
         glViewport(0,0,width,height)
@@ -276,15 +300,27 @@ class ParticleViewer():
                                            in_parallel=True,
                                            should_play_anim=False)
         await handle.wait_for_completed()
+        pf = self.robot.world.particle_filter
+        self.robot.loop.call_later(0.1,
+                                   pf.sensor_model.look_for_new_landmarks,
+                                   pf.particles)
         self.report_pose()
 
     async def turn(self,angle):
         handle = self.robot.turn_in_place(degrees(angle), in_parallel=True)
         await handle.wait_for_completed()
+        pf = self.robot.world.particle_filter
+        self.robot.loop.call_later(0.1,
+                                   pf.sensor_model.look_for_new_landmarks,
+                                   pf.particles)
         self.report_pose()
 
     def keyPressed(self,key,mouseX,mouseY):
         pf = self.robot.world.particle_filter
+        translate_wasd = 10 # millimeters
+        translate_WASD = 40
+        rotate_wasd = 22.5  # degrees
+        rotate_WASD = 90
         global particles
         if key == b'e':       # evaluate
             pf.sensor_model.evaluate(pf.particles,force=True)
@@ -294,23 +330,26 @@ class ParticleViewer():
             pf.update_weights()
             pf.resample()
         elif key == b'w':     # forward
-            self.robot.loop.create_task(self.forward(10))
+            self.robot.loop.create_task(self.forward(translate_wasd))
         elif key == b'W':     # forward
-            self.robot.loop.create_task(self.forward(25))
+            self.robot.loop.create_task(self.forward(translate_WASD))
         elif key == b's':     # back
-            self.robot.loop.create_task(self.forward(-10))
+            self.robot.loop.create_task(self.forward(-translate_wasd))
         elif key == b'S':     # back
-            self.robot.loop.create_task(self.forward(-25))
+            self.robot.loop.create_task(self.forward(-translate_WASD))
         elif key == b'a':     # left
-            self.robot.loop.create_task(self.turn(22.5))
+            self.robot.loop.create_task(self.turn(rotate_wasd))
         elif key == b'A':     # left
-            self.robot.loop.create_task(self.turn(90))
+            self.robot.loop.create_task(self.turn(rotate_WASD))
         elif key == b'd':     # right
-            self.robot.loop.create_task(self.turn(-22.5))
+            self.robot.loop.create_task(self.turn(-rotate_wasd))
         elif key == b'D':     # right
-            self.robot.loop.create_task(self.turn(-90))
+            self.robot.loop.create_task(self.turn(-rotate_WASD))
         elif key == b'z':     # randomize
             pf.initializer.initialize(pf.particles)
+        elif key == b'c':     # clear landmarks
+            pf.clear_landmarks()
+            print('Landmarks cleared.')
         elif key == b'v':     # display weight variance
             self.report_variance(pf)
         elif key == b' ':     # update display (used when normal update is disabled)
@@ -323,19 +362,20 @@ class ParticleViewer():
             self.scale /= 1.25
             self.print_display_params()
             return
-        elif key == b'c':     # center map
-            self.translation = [0., 0.]
-            self.print_display_params()
-            return
         elif key == b'h':     # print help
             self.print_help()
             return
+        elif key == b'$':     # toggle redisplay for debugging
+            global REDISPLAY
+            REDISPLAY = not REDISPLAY
         elif key == b'q':     #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
+        glutPostRedisplay()
         self.report_pose()
 
     def specialKeyPressed(self, key, mouseX, mouseY):
+        pf = self.robot.world.particle_filter
         # arrow keys for translation
         incr = 25.0    # millimeters
         if key == GLUT_KEY_UP:
@@ -346,7 +386,10 @@ class ParticleViewer():
             self.translation[1] += incr / self.scale
         elif key == GLUT_KEY_RIGHT:
             self.translation[1] -= incr / self.scale
-        self.print_display_params()
+        elif key == GLUT_KEY_HOME:
+            self.translation = [0., 0.]
+            self.print_display_params()
+        glutPostRedisplay()
 
     def print_display_params(self):
         print('scale=%.2f translation=[%.1f, %.1f]' %
@@ -356,12 +399,13 @@ class ParticleViewer():
         print("""
 Particle viewer commands:
   w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
-  W/A/S/D    Drive robot +/- 25 mm or turn +/- 90 degrees
+  W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
     e        Evaluate particles using current sensor info
     r        Resample particles (evaluates first)
-    z        Reset particles (randomize, or all 0 for SLAM)
+    z        Reset particle positions (randomize, or all 0 for SLAM)
+    c        Clear landmarks (for SLAM)
   arrows     Translate the view up/down/left/right
-    c        Center the view (zero translation)
+   Home      Center the view (zero translation)
     +        Zoom in
     -        Zoom out
     h        Print this help text
