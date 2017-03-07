@@ -290,7 +290,7 @@ def runfsm(module_name, running_modules=dict()):
     the_module = running_modules[module_name]
     the_class = the_module.__getattribute__(module_name) \
                 if module_name in dir(the_module) else None
-    if not isinstance(the_class,type) or not issubclass(the_class,cozmo_fsm.StateNode):
+    if not isinstance(the_class,type) or not issubclass(the_class,StateNode):
         cprint("Module %s does not contain a StateNode class named %s.\n" %
               (module_name, module_name), color="red")
         return       
@@ -380,10 +380,6 @@ def cli_loop(robot):
         while cli_loop._line == '':
             if robot.is_on_charger:
                 if not cli_loop.charger_warned:
-                    # next two lines are a bug fix from mwesley @ anki
-                    msg = _clad_to_engine_iface.RequestAvailableObjects()
-                    robot.world.conn.send_msg(msg)
-                    # end bug fix
                     print("** On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
                     cli_loop.charger_warned = True
             else:
