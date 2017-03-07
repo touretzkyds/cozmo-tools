@@ -189,8 +189,7 @@ from cozmo._clad import _clad_to_engine_iface  # fix charger pose bug
 
 from event_monitor import monitor, unmonitor
 
-import cozmo_fsm
-from cozmo_fsm import StateMachineProgram, tracefsm, TextMsgEvent, CozmoKinematics
+from cozmo_fsm import *
 
 try:
     import world_viewer
@@ -356,26 +355,24 @@ def run(sdk_conn):
         robot.erouter.robot = robot
         cozmo_fsm.evbase.robot_for_loading = robot
     except: pass
-    cli_loop(robot,True)
+    cli_loop(robot)
 
-def cli_loop(robot,intro_msg):
+def cli_loop(robot):
     global ans, RUNNING, running_fsm
     cli_loop.charger_warned = False
 
     robot.kine = CozmoKinematics(robot)
-    world = robot.world
-    light_cubes = world.light_cubes
-    cube1 = light_cubes[cozmo.objects.LightCube1Id]
-    cube2 = light_cubes[cozmo.objects.LightCube2Id]
-    cube3 = light_cubes[cozmo.objects.LightCube3Id]
-    charger = robot.world.charger
-    if intro_msg:
-        exec("print();print('Variables:', dir())")
-    try:
-        exec("from cozmo_fsm import *")
-    except: pass
-    cli_loop._console = code.InteractiveConsole()
+    cli_globals = globals()
+    cli_globals['world'] = robot.world
+    cli_globals['light_cubes'] = world.light_cubes
+    cli_globals['cube1'] = light_cubes[cozmo.objects.LightCube1Id]
+    cli_globals['cube2'] = light_cubes[cozmo.objects.LightCube2Id]
+    cli_globals['cube3'] = light_cubes[cozmo.objects.LightCube3Id]
+    cli_globals['charger'] = robot.world.charger
+    cli_globals['ans'] = None
+    cli_globals['res'] = None
 
+    cli_loop._console = code.InteractiveConsole()
     while True:
         if RUNNING == False:
             return
@@ -420,7 +417,7 @@ def cli_loop(robot,intro_msg):
             ans = None
         elif cli_loop._line[0:6] == 'await ':
             cli_loop._do_await = True
-            cli_loop._line = 'global ans, res; ans=' + cli_loop._line[6:]
+            cli_loop._line = 'ans=' + cli_loop._line[6:]
         elif cli_loop._line[0:5] == 'exit':
             # Clean up
             try:
@@ -432,9 +429,9 @@ def cli_loop(robot,intro_msg):
             server.socket.close()
             RUNNING=False
         else:
-            cli_loop._line = 'global ans, res; ans=' + cli_loop._line
+            cli_loop._line = 'ans=' + cli_loop._line
         try:
-            exec(cli_loop._line)
+            exec(cli_loop._line, cli_globals)
             if cli_loop._do_await:
                 print("Can't use await outside of an async def.")
                 ans = None # ans = await ans
