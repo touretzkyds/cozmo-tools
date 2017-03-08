@@ -14,8 +14,7 @@ class RRTNode():
         self.q = q
 
     def __repr__(self):
-        return '<RRTNode (%s,%s) %d deg>' % \
-            ( ('%5.1f'% self.x).strip(), ('%5.1f' % self.y).strip(), self.q/pi*180)
+        return '<RRTNode (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
 
 
 class RRT():

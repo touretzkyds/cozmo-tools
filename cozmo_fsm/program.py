@@ -19,6 +19,7 @@ class StateMachineProgram(StateNode):
                  world_viewer=False,
                  cam_viewer=True,
                  particle_viewer = False,
+                 particle_viewer_scale = 1.0,
                  annotate_cube = True,
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
@@ -32,6 +33,7 @@ class StateMachineProgram(StateNode):
         self.world_viewer = world_viewer
         self.cam_viewer = cam_viewer
         self.particle_viewer = particle_viewer
+        self.particle_viewer_scale = particle_viewer_scale
         self.annotate_cube = annotate_cube
         self.aruco = aruco
         if self.aruco:
@@ -68,7 +70,8 @@ class StateMachineProgram(StateNode):
 
         if self.particle_viewer:
             if self.particle_viewer is True:
-                self.particle_viewer = ParticleViewer(self.robot)
+                self.particle_viewer = \
+                    ParticleViewer(self.robot, scale=self.particle_viewer_scale)
             self.particle_viewer.start_thread()
 
         # Request camera image stream

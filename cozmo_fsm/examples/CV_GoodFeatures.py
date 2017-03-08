@@ -17,14 +17,11 @@ class CV_GoodFeatures(StateMachineProgram):
         dummy = numpy.array([[0]*320])
         cv2.imshow('features',dummy)
 
-        cv2.createTrackbar('maxFeatures','features',1,100,lambda self: None)
-        cv2.setTrackbarPos('maxFeatures', 'features', 50)
+        cv2.createTrackbar('maxFeatures','features',50,100,lambda self: None)
 
-        cv2.createTrackbar('qualityLevel','features',1,100,lambda self: None)
-        cv2.setTrackbarPos('qualityLevel', 'features', 10)
+        cv2.createTrackbar('qualityLevel','features',10,1000,lambda self: None)
 
-        cv2.createTrackbar('minDistance','features',0,50,lambda self: None)
-        cv2.setTrackbarPos('minDistance', 'features', 5)
+        cv2.createTrackbar('minDistance','features',5,50,lambda self: None)
 
         self.colors = np.random.randint(0,255,(101,3),dtype=np.int)
 
@@ -32,11 +29,15 @@ class CV_GoodFeatures(StateMachineProgram):
 
     def user_image(self,image,gray):
         maxFeat = cv2.getTrackbarPos('maxFeatures','features')
-        quality = cv2.getTrackbarPos('qualityLevel','features') / 1000
-        minDist = cv2.getTrackbarPos('minDistance','features')
-        self.corners = cv2.goodFeaturesToTrack(gray, maxFeat, quality, minDist)
+        quality = max(1,cv2.getTrackbarPos('qualityLevel','features'))
+        cv2.setTrackbarPos('qualityLevel', 'features', quality) # don't allow zero
+        minDist = max(1,cv2.getTrackbarPos('minDistance','features'))
+        cv2.setTrackbarPos('minDistance', 'features', minDist) # don't allow zero
+        qualityLevel = quality / 1000
+        self.corners = cv2.goodFeaturesToTrack(gray, maxFeat, qualityLevel, minDist)
 
     def user_annotate(self,image):
+        if not self.corners: return image
         i = 0
         for corner in self.corners:
             x,y = corner.ravel()
