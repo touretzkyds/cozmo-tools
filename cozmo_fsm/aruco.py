@@ -34,12 +34,12 @@ class Aruco(object):
 
         #added for pose estimation
         self.marker_size = marker_size #these units will be pose est units!!
-        self.axis_length = marker_size*0.5
         self.image_size = (240,320)
         self.focal_len = 290
-        self.camera_matrix = numpy.array([[self.focal_len,0,self.image_size[0]/2],
-                                          [0,self.focal_len,self.image_size[1]/2],
-                                          [0,0,1]]).astype(float)
+        self.camera_matrix = \
+            numpy.array([[self.focal_len, 0,               self.image_size[0]/2],
+                         [0,              -self.focal_len, self.image_size[1]/2],
+                         [0,              0,               1]]).astype(float)
         self.distortion_array = numpy.array([[0,0,0,0,0]]).astype(float)
 
     def process_image(self,gray):
@@ -52,7 +52,8 @@ class Aruco(object):
         #estimate poses
         (self.rvecs,self.tvecs) = \
             cv2.aruco.estimatePoseSingleMarkers(self.corners,
-                                                self.marker_size,self.camera_matrix,
+                                                self.marker_size,
+                                                self.camera_matrix,
                                                 self.distortion_array)
 
         for i in range(len(self.ids)):

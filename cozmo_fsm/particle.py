@@ -617,7 +617,7 @@ class SLAMSensorModel(SensorModel):
                 # For AruCo, sensor_orient is a relative value that must
                 # be converted to asbolute for each particle separately since
                 # we don't have an independent coordinate system to measure by.
-                sensor_orient = sensor_bearing - marker.opencv_rotation[2] * (pi/180)
+                sensor_orient = sensor_bearing - marker.opencv_rotation[1] * (pi/180)
             if id not in particles[0].landmarks:
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
@@ -651,6 +651,9 @@ class SLAMSensorModel(SensorModel):
                 # Update landmark in this particle's map
                 p.update_landmark(id, sensor_dist, sensor_bearing, abs_sensor_orient,
                                   dx, dy)
+        # **** if evaluated, translate the log_weights if necessary,
+        # **** then compute the exp_weights, pose, and variance and store in pf
+        # **** so particle_viewer doesn't have to recompute them
         return evaluated
     
 
