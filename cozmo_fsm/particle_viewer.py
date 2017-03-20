@@ -17,7 +17,6 @@ from cozmo.util import distance_mm, speed_mmps, degrees
 
 RUNNING = False
 REDISPLAY = True   # toggle this to suspend constant redisplay
-
 class ParticleViewer():
     def __init__(self, robot,
                  width=512, height=512, scale=1.0,
@@ -248,8 +247,8 @@ class ParticleViewer():
                                color=color, fill=True)
 
         # Draw the robot at the best particle location
-        (rx,ry,theta) = self.robot.world.particle_filter.pose_estimate()
-        (xy_var, theta_var) = self.robot.world.particle_filter.variance_estimate()
+        (rx,ry,theta) = self.robot.world.particle_filter.pose
+        (xy_var, theta_var) = self.robot.world.particle_filter.variance
         hdg = math.degrees(theta)
         self.draw_triangle((rx,ry), height=100, angle=hdg, tip_offset=-10,
                            color=(1,1,0,0.7))
@@ -287,11 +286,11 @@ class ParticleViewer():
         var = np.var(weights)
         print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
-        (xy_var,theta_var) = pf.variance_estimate()
+        (xy_var,theta_var) = pf.variance
         print ('xy_var=', xy_var, '  theta_var=', theta_var)
         
     def report_pose(self):
-        (x,y,theta) = self.robot.world.particle_filter.pose_estimate()
+        (x,y,theta) = self.robot.world.particle_filter.pose
         hdg = math.degrees(theta)
         print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (x, y, hdg))
 
@@ -301,18 +300,14 @@ class ParticleViewer():
                                            should_play_anim=False)
         await handle.wait_for_completed()
         pf = self.robot.world.particle_filter
-        self.robot.loop.call_later(0.1,
-                                   pf.sensor_model.look_for_new_landmarks,
-                                   pf.particles)
+        self.robot.loop.call_later(0.1, pf.look_for_new_landmarks)
         self.report_pose()
 
     async def turn(self,angle):
         handle = self.robot.turn_in_place(degrees(angle), in_parallel=True)
         await handle.wait_for_completed()
         pf = self.robot.world.particle_filter
-        self.robot.loop.call_later(0.1,
-                                   pf.sensor_model.look_for_new_landmarks,
-                                   pf.particles)
+        self.robot.loop.call_later(0.1, pf.look_for_new_landmarks)
         self.report_pose()
 
     def keyPressed(self,key,mouseX,mouseY):
@@ -352,8 +347,6 @@ class ParticleViewer():
             print('Landmarks cleared.')
         elif key == b'v':     # display weight variance
             self.report_variance(pf)
-        elif key == b' ':     # update display (used when normal update is disabled)
-            glutPostRedisplay()
         elif key == b'+':     # zoom in
             self.scale *= 1.25
             self.print_display_params()
@@ -365,9 +358,10 @@ class ParticleViewer():
         elif key == b'h':     # print help
             self.print_help()
             return
-        elif key == b'$':     # toggle redisplay for debugging
+        elif key == b' ':     # toggle redisplay for debugging
             global REDISPLAY
             REDISPLAY = not REDISPLAY
+            print('Redisplay ',('off','on')[REDISPLAY],'.',sep='')
         elif key == b'q':     #kill window
             glutDestroyWindow(self.window)
             glutLeaveMainLoop()
@@ -408,5 +402,6 @@ Particle viewer commands:
    Home      Center the view (zero translation)
     +        Zoom in
     -        Zoom out
+  space      Toggle redisplay (for debugging)
     h        Print this help text
 """)

@@ -27,8 +27,8 @@ class Aruco(object):
         self.arucolibname = arucolibname
         self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
-        self.seen_marker_ids = dict()
-        self.seen_marker_objects = []
+        self.seen_marker_ids = []
+        self.seen_marker_objects = dict()
         self.ids = []
         self.corners = []
 
@@ -44,7 +44,7 @@ class Aruco(object):
 
     def process_image(self,gray):
         self.seen_marker_ids = []
-        self.seen_markers = dict()
+        self.seen_marker_objects = dict()
         (self.corners,self.ids,_) = \
             cv2.aruco.detectMarkers(gray,self.aruco_lib,parameters=self.aruco_params)
         if self.ids is None: return
@@ -59,7 +59,7 @@ class Aruco(object):
         for i in range(len(self.ids)):
             marker = ArucoMarker(self.ids[i][0], self.corners[i],self.tvecs[i][0],self.rvecs[i][0])
             self.seen_marker_ids.append(marker.id)
-            self.seen_markers[marker.id] = marker
+            self.seen_marker_objects[marker.id] = marker
 
     def annotate(self, image, scale_factor):
         scaled_corners = [ numpy.multiply(corner, scale_factor) for corner in self.corners ]

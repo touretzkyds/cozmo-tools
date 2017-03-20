@@ -120,8 +120,6 @@ class SensorModel():
     def set_landmarks(self,landmarks):
         self.landmarks = landmarks
 
-    def look_for_new_landmarks(self): pass  # SLAM only
-
     def compute_robot_motion(self):
         # How much did we move since last evaluation?
         dx = self.robot.pose.position.x - self.last_evaluate_pose.position.x
@@ -146,12 +144,12 @@ class ArucoDistanceSensorModel(SensorModel):
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
-        # Cache seen_markers because vision is in another thread.
-        seen_markers = self.robot.world.aruco.seen_markers
+        # Cache seen_marker_objects because vision is in another thread.
+        seen_marker_objects = self.robot.world.aruco.seen_marker_objects
         # Process each seen marker:
-        for id in seen_markers:
+        for id in seen_marker_objects:
             if id in self.landmarks:
-                sensor_dist = seen_markers[id].camera_distance
+                sensor_dist = seen_marker_objects[id].camera_distance
                 landmark_spec = self.landmarks[id]
                 lm_x = landmark_spec.position.x
                 lm_y = landmark_spec.position.y
@@ -178,12 +176,12 @@ class ArucoBearingSensorModel(SensorModel):
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
-        # Cache seen_markers because vision is in another thread.
-        seen_markers = self.robot.world.aruco.seen_markers
+        # Cache seen_marker_objects because vision is in another thread.
+        seen_marker_objects = self.robot.world.aruco.seen_marker_objects
         # Process each seen marker:
-        for id in seen_markers:
+        for id in seen_marker_objects:
             if id in self.landmarks:
-                sensor_coords = seen_markers[id].camera_coords
+                sensor_coords = seen_marker_objects[id].camera_coords
                 sensor_bearing = atan2(sensor_coords[0], sensor_coords[2])
                 landmark_spec = self.landmarks[id]
                 lm_x = landmark_spec.position.x
@@ -211,13 +209,13 @@ class ArucoCombinedSensorModel(SensorModel):
         if not force and dist < 5 and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
-        # Cache seen_markers because vision is in another thread.
-        seen_markers = self.robot.world.aruco.seen_markers
+        # Cache seen_marker_objects because vision is in another thread.
+        seen_marker_objects = self.robot.world.aruco.seen_marker_objects
         # Process each seen marker:
-        for id in seen_markers:
+        for id in seen_marker_objects:
             if id in self.landmarks:
-                sensor_dist = seen_markers[id].camera_distance
-                sensor_coords = seen_markers[id].camera_coords
+                sensor_dist = seen_marker_objects[id].camera_distance
+                sensor_coords = seen_marker_objects[id].camera_coords
                 sensor_bearing = atan2(sensor_coords[0], sensor_coords[2])
                 landmark_spec = self.landmarks[id]
                 lm_x = landmark_spec.position.x
@@ -366,6 +364,8 @@ class ParticleFilter():
         self.new_y = np.empty(self.num_particles)
         self.new_theta = np.empty(self.num_particles)
         self.cdf = np.empty(self.num_particles)
+        self.pose = (0., 0., 0.)
+        self.variance = (np.array([[0,0],[0,0]]), 0.)
 
     def move(self):
         self.motion_model.move(self.particles)
@@ -386,9 +386,12 @@ class ParticleFilter():
             hsin += sin(p.theta) * p.weight
             hcos += cos(p.theta) * p.weight
             weight_sum += p.weight
+        if weight_sum == 0:
+            weight_sum = 1
         cx /= weight_sum
         cy /= weight_sum
-        return (cx, cy, atan2(hsin,hcos))
+        self.pose = (cx, cy, atan2(hsin,hcos))
+        return self.pose
 
     def variance_estimate(self):
         weight = var_xx = var_xy = var_yy = r_sin = r_cos = 0
@@ -409,8 +412,9 @@ class ParticleFilter():
                            [var_xy, var_yy]]) / weight
         Rsq = r_sin**2 + r_cos**2
         Rav = sqrt(Rsq) / weight
-        theta_var = 1 - Rav
-        return (xy_var, theta_var)
+        theta_var = max(0, 1 - Rav)
+        self.variance = (xy_var, theta_var)
+        return self.variance
 
     def update_weights(self):
         # Clip the log_weight values and calculate the new weights.
@@ -482,6 +486,8 @@ class ParticleFilter():
             p.theta = new_theta[i]
             p.log_weight = 0.0
             p.weight = 1.0
+
+    def look_for_new_landmarks(self): pass  # SLAM only
 
     def clear_landmarks(self):
         print('Not SLAM.  Landmarks are fixed in this particle filter.')
@@ -569,10 +575,6 @@ class SLAMSensorModel(SensorModel):
         self.distance_variance = distance_variance
         super().__init__(robot,landmarks)
 
-    def look_for_new_landmarks(self, particles):
-        self.evaluate(particles, force=True, just_looking=True)
-        self.landmarks = particles[0].landmarks
-
     def evaluate(self, particles, force=False, just_looking=False):
         # Returns true if particles were evaluated.
         # Call with force=True from particle_viewer to skip distance traveled check.
@@ -587,13 +589,13 @@ class SLAMSensorModel(SensorModel):
         self.last_evaluate_pose = self.robot.pose
         # Cache seen marker objects because vision is in another thread.
         try:
-            seen_markers = self.robot.world.aruco.seen_markers
+            seen_marker_objects = self.robot.world.aruco.seen_marker_objects
         except:
-            seen_markers = dict()
+            seen_marker_objects = dict()
         seen_landmarks = \
             [cube for cube in self.robot.world.light_cubes.values()
                  if cube.is_visible and self.landmark_test(cube)] + \
-            [marker.id for marker in seen_markers.values()
+            [marker.id for marker in seen_marker_objects.values()
                  if self.landmark_test(marker)]
         # Process each seen landmark:
         for id in seen_landmarks:
@@ -610,7 +612,7 @@ class SLAMSensorModel(SensorModel):
                 sensor_orient = \
                     wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
             else:  # lm is an AruCo marker
-                marker = seen_markers[id]
+                marker = seen_marker_objects[id]
                 sensor_dist = marker.camera_distance
                 sensor_bearing = atan2(marker.camera_coords[0],
                                        marker.camera_coords[2])
@@ -651,9 +653,17 @@ class SLAMSensorModel(SensorModel):
                 # Update landmark in this particle's map
                 p.update_landmark(id, sensor_dist, sensor_bearing, abs_sensor_orient,
                                   dx, dy)
-        # **** if evaluated, translate the log_weights if necessary,
-        # **** then compute the exp_weights, pose, and variance and store in pf
-        # **** so particle_viewer doesn't have to recompute them
+        if evaluated:
+            wmax = - np.inf
+            for p in particles:
+                wmax = max(wmax, p.log_weight)
+            min_log_weight = self.robot.world.particle_filter.min_log_weight
+            if wmax < min_log_weight:
+                wt_inc = min_log_weight - wmax
+                # print('wmax=',wmax,'wt_inc=',wt_inc)
+                for p in particles:
+                    p.log_weight += wt_inc
+        self.robot.world.particle_filter.variance_estimate()
         return evaluated
     
 
@@ -693,3 +703,8 @@ class SLAMParticleFilter(ParticleFilter):
         new_landmarks = self.new_landmarks
         for i in range(self.num_particles):
             particles[i].landmarks = new_landmarks[i]
+
+    def look_for_new_landmarks(self):
+        self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
+        self.sensor_model.landmarks = self.particles[0].landmarks
+

@@ -48,8 +48,10 @@ class StateMachineProgram(StateNode):
         # Create a particle filter
         if self.particle_filter:
             if self.particle_filter is True:
-                self.particle_filter = ParticleFilter(self.robot)
-            self.robot.world.particle_filter = self.particle_filter
+                self.particle_filter = SLAMParticleFilter(self.robot)
+            pf = self.particle_filter
+            pf.primed = False  # haven't processed a camera image yet
+            self.robot.world.particle_filter = pf
         else:
             self.robot.world.particle_filter = None
 
@@ -126,9 +128,13 @@ class StateMachineProgram(StateNode):
                 dsize = (2*shape[1], 2*shape[0])
                 annotated_im = cv2.resize(im, dsize)
             # Aruco annotation
-            if self.aruco and self.robot.world.aruco.seen_markers is not None:
+            if self.aruco and \
+                   len(self.robot.world.aruco.seen_marker_ids) > 0:
                 annotated_im = self.robot.world.aruco.annotate(annotated_im,scale_factor)
             # Other annotators can run here if the user supplies them.
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
             cv2.imshow(self.windowName,annotated_im)
+        pf = self.robot.world.particle_filter
+        if pf and not pf.primed:
+            pf.look_for_new_landmarks()
