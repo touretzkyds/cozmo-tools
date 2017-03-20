@@ -184,7 +184,9 @@ def text_message(msg):
 def show_stuff(spec):
     global running_fsm
     if spec == 'active':
-        if not running_fsm.running:
+        if not running_fsm:
+            print('No state machine present.')
+        elif not running_fsm.running:
             print('State machine is not running.')
         else:
             show_active(running_fsm,0)
