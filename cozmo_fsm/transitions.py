@@ -1,4 +1,5 @@
 import random
+import re
 
 from .base import *
 from .events import *
@@ -184,6 +185,27 @@ class TextMsgTrans(Transition):
             self.fire(event)
         else:
             raise TypeError('%s is not a TextMsgEvent' % event)
+
+class HearTrans(Transition):
+    """Transition fires if speech event matches pattern."""
+    def __init__(self,pattern=None):
+        super().__init__()
+        if pattern:
+            pattern = re.compile(pattern)
+        self.pattern = pattern
+
+    def start(self,event=None):
+        if self.running: return
+        super().start(event)
+        self.robot.erouter.add_listener(self, SpeechEvent, None)
+
+    def handle_event(self,event):
+        super().handle_event(event)
+        result = self.pattern.match(event.string)
+        if result:
+            rec_event = HearEvent(event.string,event.words,result)
+            self.fire(rec_event)
+
 
 class RandomTrans(Transition):
     """Picks a destination node at random."""

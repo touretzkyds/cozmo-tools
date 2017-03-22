@@ -11,7 +11,7 @@ from .aruco import *
 from .particle import *
 from .cozmo_kin import *
 from .particle_viewer import ParticleViewer
-
+from .speech import SpeechListener, Thesaurus
 
 class StateMachineProgram(StateNode):
     def __init__(self,
@@ -24,6 +24,8 @@ class StateMachineProgram(StateNode):
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
                  particle_filter = True,
+                 speech = False,
+                 thesaurus = Thesaurus()
                  ):
         super().__init__()
         self.name = self.__class__.__name__.lower()
@@ -39,6 +41,8 @@ class StateMachineProgram(StateNode):
         if self.aruco:
             self.robot.world.aruco = Aruco(arucolibname)
         self.particle_filter = particle_filter
+        self.speech = speech
+        self.thesaurus = thesaurus
 
     def start(self):
         self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
@@ -80,6 +84,11 @@ class StateMachineProgram(StateNode):
         self.robot.camera.image_stream_enabled = True
         self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                            self.process_image)
+
+        # Start speech recognition
+        if self.speech:
+            self.speech_listener = SpeechListener(self.robot,self.thesaurus)
+            self.speech_listener.start()
 
         # Call parent's start() to launch the state machine
         super().start()

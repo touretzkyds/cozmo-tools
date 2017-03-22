@@ -45,6 +45,21 @@ class TextMsgEvent(Event):
         super().__init__()
         self.source = message
 
+class SpeechEvent(Event):
+    """Results of speech recognition process."""
+    def __init__(self,string,words):
+        super().__init__()
+        self.string = string
+        self.words = words
+
+class HearEvent(Event):
+    """Hear something that matched a pattern."""
+    def __init__(self,string,words,result):
+        super().__init__()
+        self.string = string
+        self.words = words
+        self.result = result
+        
 #________________ Cozmo-generated events ________________
 
 class CozmoGeneratedEvent(Event):
