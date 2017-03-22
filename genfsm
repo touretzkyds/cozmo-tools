@@ -411,7 +411,8 @@ transition_names = dict(
     Aruco = 'ArucoTrans',
     Next = 'NextTrans',
     CNext = 'CNextTrans',
-    SayData = 'SayDataTrans'
+    SayData = 'SayDataTrans',
+    Hear = 'HearTrans'
     )
 
 def gen_name(base_name, name_counts=dict()):
