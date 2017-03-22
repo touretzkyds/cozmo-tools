@@ -37,7 +37,7 @@ class CV_GoodFeatures(StateMachineProgram):
         self.corners = cv2.goodFeaturesToTrack(gray, maxFeat, qualityLevel, minDist)
 
     def user_annotate(self,image):
-        if not self.corners: return image
+        if self.corners is None: return image
         i = 0
         for corner in self.corners:
             x,y = corner.ravel()
