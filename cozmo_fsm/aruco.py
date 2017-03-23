@@ -34,7 +34,7 @@ class Aruco(object):
 
         #added for pose estimation
         self.marker_size = marker_size #these units will be pose est units!!
-        self.image_size = (240,320)
+        self.image_size = (320,240)
         self.focal_len = 290
         self.camera_matrix = \
             numpy.array([[self.focal_len, 0,               self.image_size[0]/2],
