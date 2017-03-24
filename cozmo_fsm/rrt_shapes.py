@@ -1,5 +1,6 @@
 from cozmo_fsm import transform
-from math import sqrt
+from math import sqrt, pi
+import numpy as np
 
 class Shape():
     def __init__(self):
@@ -7,10 +8,12 @@ class Shape():
         self.rotmat = transform.identity()
     
     def __repr__(self):
-        return "<%s >" % (self.__class.__name)
+        return "<%s >" % (self.__class__.__name__)
 
     def collides(self, shape):
-        if isinstance(shape, Polygon):
+        if isinstance(shape, Rectangle):
+            return self.collides_rect(shape)
+        elif isinstance(shape, Polygon):
             return self.collides_poly(shape)
         elif isinstance(shape, Circle):
             return self.collides_circle(shape)
@@ -26,6 +29,7 @@ class Circle(Shape):
         super().__init__()
         self.center = center
         self.radius = radius
+        self.orient = 0.
 
     def __repr__(self):
         return '<Circle (%.1f,%.1f) r=%.1f>' % \
@@ -34,6 +38,9 @@ class Circle(Shape):
     def instantiate(self, tmat):
         return Circle(center=tmat.dot(self.center), radius=self.radius)        
 
+    def collides_rect(self,rect):
+        return rect.collides_circle(self)
+        
     def collides_poly(self,poly):
         return poly.collides(self)
 
@@ -43,33 +50,85 @@ class Circle(Shape):
         dist = sqrt(dx*dx + dy*dy)
         return dist < (self.radius + circle.radius)
         
-class Rectangle(Shape):
-    def __init__(self, corners=None, dimensions=None, orient=0):
-        if corners:
-            pt0 = pt1 = corners[0]
-            pt2 = pt3 = corners[1]
-            # fix pt1 and pt3 ...
-        elif dimensions:
-            pt0 = transform.point(0,0,0).dot(aboutZ(orient))
-            pt1 = transform.point(dimensions[0], 0, 0).dot(aboutZ(orient))
-            pt2 = transform.point(dimensions[0], dimensions[1], 0).dot(aboutZ(orient))
-            pt3 = transform.point(0, dimensions[1], 0).dot(aboutZ(orient))
-        super().__init__(vertices=(pt0,pt1,pt2,pt3))
-
 class Polygon(Shape):
     def __init__(self, vertices=None):
-      self.vertices = tuple(vertices)
-      N = len(vertices)
-      self.edges = tuple( (vertices[i], vertices[(i+1) % N]) for i in range(N) )
-      center_x = mean(v[0,0] for v in vertices)
-      center_y = mean(v[1,0] for v in vertices)
-      center_z = mean(v[2,0] for v in vertices)
-      self.center = transform.point(center_x, center_y, center_z, 1.0)
+      self.vertices = vertices
+      N = vertices.shape[1]
+      self.edges = tuple( (vertices[:,i:i+1], vertices[:,(i+1)%N:((i+1)%N)+1])
+                          for i in range(N) )
+      center = vertices.mean(1).resize(4,1)
 
     def collides_poly(poly): pass
 
-    def collides_circle(circle): pass
+    def collides_circle(circle):
+        raise ValueError()
 
+class Rectangle(Polygon):
+    def __init__(self, center=None, dimensions=None, orient=0):
+        self.center = center
+        self.dimensions = dimensions
+        self.orient = orient
+        dx2 = dimensions[0]/2
+        dy2 = dimensions[1]/2
+        vertices = np.array([[-dx2,  dx2, dx2, -dx2 ],
+                             [-dy2, -dy2, dy2,  dy2 ],
+                             [  0,    0,   0,    0  ],
+                             [  1,    1,   1,    1  ]])
+        self.unrot = transform.aboutZ(-orient)
+        center_ex = self.unrot.dot(center)
+        extents = transform.translate(center_ex[0],center_ex[1]).dot(vertices)
+        # Extents measured along the rectangle's axes, not world axes
+        self.min_Ex = min(extents[0,:])
+        self.max_Ex = max(extents[0,:])
+        self.min_Ey = min(extents[1,:])
+        self.max_Ey = max(extents[1,:])
+        vertices = transform.aboutZ(orient).dot(vertices)
+        vertices = transform.translate(center[0],center[1]).dot(vertices)
+        super().__init__(vertices=vertices)
+
+    def __repr__(self):
+        return '<Rectangle (%.1f,%.1f) %.1fx%.1f %.1f deg>' % \
+               (self.center[0,0],self.center[1,0],*self.dimensions,
+                self.orient*(180/pi))
+
+    def instantiate(self, tmat):
+        dimensions = (self.max_Ex-self.min_Ex, self.max_Ey-self.min_Ey)
+        return Rectangle(center=tmat.dot(self.center), orient=self.orient,
+                         dimensions=dimensions)
+
+    def collides_rect(self,other):
+        # Test others edges in our reference frame
+        o_verts = self.unrot.dot(other.vertices)
+        o_min_x = min(o_verts[0,:])
+        o_max_x = max(o_verts[0,:])
+        o_min_y = min(o_verts[1,:])
+        o_max_y = max(o_verts[1,:])
+        if o_max_x <= self.min_Ex or self.max_Ex <= o_min_x or \
+               o_max_y <= self.min_Ey or self.max_Ey <= o_min_y:
+            return False
+
+        if self.orient == other.orient: return True
+
+        # Test our edges in other's reference frame
+        s_verts = other.unrot.dot(self.vertices)
+        s_min_x = min(s_verts[0,:])
+        s_max_x = max(s_verts[0,:])
+        s_min_y = min(s_verts[1,:])
+        s_max_y = max(s_verts[1,:])
+        if s_max_x <= other.min_Ex or other.max_Ex <= s_min_x or  \
+               s_max_y <= other.min_Ey or other.max_Ey <= s_min_y:
+            return False
+        return True
+            
+    def collides_circle(self,circle):
+        p = self.unrot.dot(circle.center)[0:2,0]
+        pmin = p - circle.radius
+        pmax = p + circle.radius
+        if pmax[0] <= self.min_Ex or self.max_Ex <= pmin[0] or \
+           pmax[1] <= self.min_Ey or self.max_Ey <= pmin[1]:
+            return False
+        # Need corner tests here
+        return True
 
 #================ Compound Shapes ================
 

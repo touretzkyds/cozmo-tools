@@ -153,15 +153,27 @@ class PathViewer():
 
     def draw_robot(self,parts):
         for part in parts:
-            self.draw_circle(center=(part.center[0,0],part.center[1,0]),
-                             radius=part.radius,
-                             color=(1,1,0,0.7), fill=False)
+            if isinstance(part,Circle):
+                self.draw_circle(center=(part.center[0,0],part.center[1,0]),
+                                 radius=part.radius,
+                                 color=(1,1,0,0.7), fill=False)
+            elif isinstance(part,Rectangle):
+                self.draw_rectangle(center=(part.center[0,0],part.center[1,0]),
+                                    width=part.max_Ex-part.min_Ex,
+                                    height=part.max_Ey-part.min_Ey,
+                                    color=(1,1,0,0.7), fill=False)
 
     def draw_obstacle(self,obst):
         if isinstance(obst,Circle):
             self.draw_circle(center=(obst.center[0,0],obst.center[1,0]),
                              radius=obst.radius,
                              color=(1,0,0,0.5), fill=True)
+        elif isinstance(obst,Rectangle):
+            self.draw_rectangle(center = (obst.center[0], obst.center[1]),
+                                angle = obst.orient*(180/pi),
+                                width = obst.max_Ex - obst.min_Ex,
+                                height = obst.max_Ey - obst.min_Ey,
+                                color=(1,0,0,0.5), fill=True)
 
     def add_tree(self, tree, color):
         global the_items

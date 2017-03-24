@@ -80,7 +80,9 @@ class RRT():
         parts = []
         for part in self.robot_parts:
             center = transform.point(part.center[0,0]+node.x, part.center[1,0]+node.y)
-            this_part = Circle(center=center, radius=part.radius)
+            tmat = transform.translate(center[0,0],center[1,0]) \
+                      .dot(transform.aboutZ(part.orient))
+            this_part = part.instantiate(tmat)
             parts.append(this_part)
         return parts
 
@@ -109,7 +111,7 @@ class RRT():
                 (treeB, treeA) = (treeA, treeB)
                 swapped = not swapped
         if i == self.max_iter-1:
-            return None
+            return (treeA, treeB, None)
         if swapped:
             (treeB, treeA) = (treeA, treeB)
         return self.get_path(treeA, treeB)
@@ -141,4 +143,3 @@ class RRT():
                 robot_obst = joint.collision_model.instantiate(tmat)
                 result.append(robot_obst)
         return result
-

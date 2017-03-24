@@ -7,7 +7,9 @@ from .rrt_shapes import *
 
 class CozmoKinematics(Kinematics):
     def __init__(self,robot):
-        base_frame = Joint('base', collision_model=Circle(transform.point(), radius=50))
+        base_frame = Joint('base',
+                           collision_model=Rectangle(transform.point(),
+                                                     dimensions=(95,60)))
 
         # cor is center of rotation
         cor_frame = Joint('cor', parent=base_frame, r=-20.)
@@ -23,9 +25,10 @@ class CozmoKinematics(Kinematics):
         shoulder_frame = Joint('shoulder', parent=base_frame,
                                type='revolute', getter=self.get_shoulder,
                                d=21., r=-39., alpha=pi/2)
-        lift_attach_frame = Joint('lift_attach', parent=shoulder_frame, type='revolute',
-                                  getter=self.get_lift_attach, r=66.,
-                                  collision_model=Circle(transform.point(), radius=10))
+        lift_attach_frame = \
+            Joint('lift_attach', parent=shoulder_frame, type='revolute',
+                  getter=self.get_lift_attach, r=66.,
+                  collision_model=Circle(transform.point(), radius=10))
 
         # Positive head angle is up, so z must point to the right.
         # With x pointing forward, y must point up.

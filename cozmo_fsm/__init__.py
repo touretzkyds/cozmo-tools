@@ -8,3 +8,4 @@ from .cozmo_kin import *
 from .rrt import *
 from .path_viewer import PathViewer
 from .speech import *
+from .worldmap import WorldMap
