@@ -160,7 +160,11 @@ class ParticleViewer():
     def draw_landmarks(self):
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
         if not landmarks: return
-        for (id,specs) in landmarks.items():
+        # Extract keys and values as quickly as we can because
+        # dictionary can change while we're iterating.
+        id_list = list(landmarks.keys())
+        specs_list = list(landmarks.values())
+        for (id,specs) in zip(id_list,specs_list):
             if isinstance(id, cozmo.objects.LightCube):
                 seen = id.is_visible
                 label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)

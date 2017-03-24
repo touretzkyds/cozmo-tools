@@ -141,7 +141,7 @@ class ArucoDistanceSensorModel(SensorModel):
 
         # Only evaluate if the robot moved enough for evaluation to be worthwhile.
         (dist,turn_angle) = self.compute_robot_motion()
-        if not force and dist < 5 and abs(turn_angle) < math.radians(5):
+        if (not force) and (dist < 5) and abs(turn_angle) < math.radians(5):
             return False
         self.last_evaluate_pose = self.robot.pose
         # Cache seen_marker_objects because vision is in another thread.
@@ -327,7 +327,7 @@ class CubeSensorModel(SensorModel):
                     #predicted_orient = wrap_angle(p.theta - lm_orient + predicted_bearing)
                     # simplifies to...
                     predicted_orient = wrap_angle(atan2(lm_y-p.y, lm_x-p.x) - lm_orient)
-                    error2_sq = ((predicted_orient - sensor_orient)*sensor_dist)**2
+                    error2_sq = (sensor_dist*wrap_angle(predicted_orient - sensor_orient))**2
 
                     error_sq = error1_sq + error2_sq
                     p.log_weight -= error_sq / self.distance_variance
@@ -528,7 +528,7 @@ class SLAMParticle(Particle):
         if isinstance(lm_id, cozmo.objects.LightCube):
             lm_orient = sensor_orient
         else:  # AruCo marker
-            lm_orient = sensor_orient - self.theta
+            lm_orient = sensor_orient + self.theta
 
         lm_mu =  np.array([[lm_x], [lm_y]])
         H = self.sensor_jacobian_H(dx, dy, sensor_dist)
@@ -549,13 +549,15 @@ class SLAMParticle(Particle):
         # (ex,ey) is vector from particle to MAP position of lm
         ex = old_mu[0,0] - self.x
         ey = old_mu[1,0] - self.y
-        h = np.array([[sqrt(ex**2+ey**2)], [atan2(ey,ex) - self.theta]])
+        h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)]])
         new_mu = old_mu + K.dot(z - h)
         new_sigma = (I - K.dot(H)).dot(old_sigma)
         # Should be deriving H for (x,y,phi) instead of (x,y), to update orient
         # For now, just do exponential averaging to update phi
-        new_orient = wrap_angle(old_orient +     # *** HACK: FIX IT
-                                0.1*wrap_angle(sensor_orient - old_orient))
+        computed_orient = sensor_orient + self.theta
+        ori_c = 9*cos(old_orient) + cos(computed_orient)
+        ori_s = 9*sin(old_orient) + sin(computed_orient)
+        new_orient = atan2(ori_s, ori_c)
         self.landmarks[id] = (new_mu, new_orient, new_sigma)
 
 class SLAMSensorModel(SensorModel):
@@ -581,12 +583,13 @@ class SLAMSensorModel(SensorModel):
         # Call with just_looking=True to just look for new landmarks; no evaluation.
 
         (dist,turn_angle) = self.compute_robot_motion()
-        # Unless forced, only evaluate if the robot moved enoug
+        # Unless forced, only evaluate if the robot moved enough
         # for evaluation to be worthwhile.
-        if not force and dist < 5 and abs(turn_angle) < math.radians(5):
+        if (not force) and (dist < 5) and abs(turn_angle) < math.radians(5):
             return False
         evaluated = False
-        self.last_evaluate_pose = self.robot.pose
+        if not just_looking:
+            self.last_evaluate_pose = self.robot.pose
         # Cache seen marker objects because vision is in another thread.
         try:
             seen_marker_objects = self.robot.world.aruco.seen_marker_objects
@@ -619,24 +622,21 @@ class SLAMSensorModel(SensorModel):
                 # For AruCo, sensor_orient is a relative value that must
                 # be converted to asbolute for each particle separately since
                 # we don't have an independent coordinate system to measure by.
-                sensor_orient = sensor_bearing - marker.opencv_rotation[1] * (pi/180)
+                # Also, OpenCV's rotation has the wrong sign, so we must fix it.
+                sensor_orient = - marker.opencv_rotation[1] * (pi/180)
             if id not in particles[0].landmarks:
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
                     p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
                 continue
-            # If we reach here, we're seeing a familiar landmark, so evaluate
             if just_looking:
                 continue
+            # If we reach here, we're seeing a familiar landmark, so evaluate
             evaluated = True
             for p in particles:
                 # Use sensed bearing and distance to get
                 # particle's prediction of landmark position in
                 # the world.  Compare to its stored map position.
-                if isinstance(id, cozmo.objects.LightCube):
-                    abs_sensor_orient = sensor_orient
-                else:  # ArUco marker
-                    abs_sensor_orient = wrap_angle(sensor_orient - p.theta)
                 sensor_direction = p.theta + sensor_bearing
                 dx = sensor_dist * cos(sensor_direction)
                 dy = sensor_dist * sin(sensor_direction)
@@ -651,7 +651,7 @@ class SLAMSensorModel(SensorModel):
                 error2_sq = (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
                 p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
                 # Update landmark in this particle's map
-                p.update_landmark(id, sensor_dist, sensor_bearing, abs_sensor_orient,
+                p.update_landmark(id, sensor_dist, sensor_bearing, sensor_orient,
                                   dx, dy)
         if evaluated:
             wmax = - np.inf
@@ -691,7 +691,7 @@ class SLAMParticleFilter(ParticleFilter):
 
     def jitter_new_particles(self):
         super().jitter_new_particles()
-        particles = self.particles
+        particles = self.particles  # make local for faster access
         new_indices = self.new_indices
         new_landmarks = self.new_landmarks
         for i in range(self.num_particles):
@@ -699,12 +699,12 @@ class SLAMParticleFilter(ParticleFilter):
 
     def install_new_particles(self):
         super().install_new_particles()
-        particles = self.particles
+        particles = self.particles  # make local for faster access
         new_landmarks = self.new_landmarks
         for i in range(self.num_particles):
             particles[i].landmarks = new_landmarks[i]
 
     def look_for_new_landmarks(self):
+        """Calls evaluate() to find landmarks and add them to the maps."""
         self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
         self.sensor_model.landmarks = self.particles[0].landmarks
-
