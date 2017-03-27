@@ -21,6 +21,7 @@ class StateMachineProgram(StateNode):
                  cam_viewer=True,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
+                 path_viewer = False,
                  annotate_cube = True,
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
