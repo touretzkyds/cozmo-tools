@@ -13,6 +13,7 @@ import numpy as np
 
 RUNNING = False
 
+from . import opengl
 from .rrt_shapes import *
 
 the_rrt = None
@@ -34,18 +35,8 @@ class PathViewer():
         self.thread = None
 
     def initialize_window(self):
-        # OpenGL params
-        glutInit()
-        glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-        glutInitWindowSize(self.width,self.height)
-
-        # Default to drawing outlines of shapes
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
-
-        # Killing window should not directly kill main program
-        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
-
-        self.window = glutCreateWindow(self.windowName)
+        self.window = \
+            opengl.create_window(self.windowName, (self.width,self.height))
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
 
@@ -57,7 +48,6 @@ class PathViewer():
         glutReshapeFunc(self.reshape)
         glutIdleFunc(glutPostRedisplay) # Constantly update screen
         glutDisplayFunc(self.display)
-        glutMainLoop()
 
     def start_thread(self): # Displays in background
         global RUNNING
@@ -65,10 +55,12 @@ class PathViewer():
             return
         else:
             RUNNING = True
-        self.thread = Thread(target=self.initialize_window)
+        self.initialize_window()
+        """
+        self.thread = Thread(target=None)
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
-
+        """
     def draw_rectangle(self, center, width=4, height=None,
                        angle=0, color=(1,1,1), fill=True):
         # Default to solid color and square shape

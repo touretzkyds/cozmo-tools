@@ -12,6 +12,7 @@ from .particle import *
 from .cozmo_kin import *
 from .particle_viewer import ParticleViewer
 from .speech import SpeechListener, Thesaurus
+from . import opengl
 
 class StateMachineProgram(StateNode):
     def __init__(self,
@@ -92,6 +93,10 @@ class StateMachineProgram(StateNode):
 
         # Call parent's start() to launch the state machine
         super().start()
+
+        print('done=',opengl.INIT_DONE)
+        if opengl.INIT_DONE:
+            opengl.launch_main_loop()
 
     def stop(self):
         super().stop()

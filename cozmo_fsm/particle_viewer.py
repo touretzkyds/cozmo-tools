@@ -11,9 +11,12 @@ import math
 from math import sin, cos, pi, atan2, sqrt
 import array
 import numpy as np
+import time
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees
+
+from . import opengl
 
 RUNNING = False
 REDISPLAY = True   # toggle this to suspend constant redisplay
@@ -33,18 +36,8 @@ class ParticleViewer():
         self.thread = None
 
     def initialize_window(self):
-        # OpenGL params
-        glutInit()
-        glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-        glutInitWindowSize(self.width,self.height)
-
-        # Default to drawing outlines of shapes
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
-
-        # Killing window should not directly kill main program
-        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
-
-        self.window = glutCreateWindow(self.windowName)
+        self.window = \
+            opengl.create_window(self.windowName,(self.width,self.height))
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
 
@@ -58,7 +51,10 @@ class ParticleViewer():
         glutKeyboardFunc(self.keyPressed)
         glutSpecialFunc(self.specialKeyPressed)
         glutDisplayFunc(self.display)
-        glutMainLoop()
+
+    def xidle():
+        while True:
+            time.sleep(1)
 
     def start_thread(self): # Displays in background
         global RUNNING
@@ -66,9 +62,12 @@ class ParticleViewer():
             return
         else:
             RUNNING = True
-        self.thread = Thread(target=self.initialize_window)
+        self.initialize_window()
+        """
+        self.thread = Thread(target=self.idle)
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
+        """
         print("Type 'h' in the particle viewer window for help.")
 
     def draw_rectangle(self, center, size=(10,10),
