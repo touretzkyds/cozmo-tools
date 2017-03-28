@@ -304,10 +304,13 @@ class ActionNode(StateNode):
         super().__init__()
         if 'in_parallel' not in self.action_kwargs:
             self.action_kwargs['in_parallel'] = True
+        if 'num_retries' not in self.action_kwargs:
+            self.action_kwargs['num_retries'] = 2
         self.cozmo_action_handle = None
 
     def start(self,event=None):
         super().start(event)
+        self.retry_count = 0
         self.launch_or_retry()
 
     def launch_or_retry(self):
@@ -345,10 +348,17 @@ class ActionNode(StateNode):
                 print('CANCELLED: ***>',self,self.cozmo_action_handle)
                 self.post_completion()
             elif self.cozmo_action_handle.failure_reason[0] == 'retry':
-                print("*** ACTION %s FAILED WITH CODE 'retry': TREATING AS COMPLETE" %
-                      self.cozmo_action_handle)
-                self.post_completion()
+                if self.retry_count < self.action_kwargs['num_retries']:
+                    print("*** ACTION %s FAILED WITH CODE 'retry': TRYING AGAIN" %
+                        self.cozmo_action_handle)
+                    self.retry_count += 1
+                    self.launch_or_retry()
+                else:
+                    print("*** RETRY COUNT EXCEEDED: FAILING")
+                    self.post_failure(self.cozmo_action_handle)
             else:
+                print("*** ACTION %s FAILED AND CAN'T BE RETRIED." %
+                      self.cozmo_action_handle)
                 self.post_failure(self.cozmo_action_handle)
 
     def stop(self):
@@ -487,6 +497,22 @@ class SetLiftAngle(SetLiftHeight):
         height_pct = (angle - min_theta) / angle_range
         super().__init__(height_pct, abort_on_stop=abort_on_stop, **action_kwargs)
 
+
+class PickUpObject(ActionNode):
+    def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
+        self.object = object
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop=abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and \
+                isinstance(event.data,cozmo.objects.LightCube):
+            self.object = event.data
+        super().start(event)
+
+    def action_launcher(self):
+        return self.robot.pickup_object(self.object, **self.action_kwargs)
 
 #________________ Animations ________________
 
