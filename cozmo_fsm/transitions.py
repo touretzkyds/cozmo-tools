@@ -188,6 +188,8 @@ class TextMsgTrans(Transition):
 
 class HearTrans(Transition):
     """Transition fires if speech event matches pattern."""
+    wildcard = re.compile('.*')
+    
     def __init__(self,pattern=None):
         super().__init__()
         if pattern:
@@ -197,11 +199,17 @@ class HearTrans(Transition):
     def start(self,event=None):
         if self.running: return
         super().start(event)
-        self.robot.erouter.add_listener(self, SpeechEvent, None)
+        if self.pattern is None:
+            self.robot.erouter.add_wildcard_listener(self, SpeechEvent, None)
+        else:
+            self.robot.erouter.add_listener(self, SpeechEvent, None)
 
     def handle_event(self,event):
         super().handle_event(event)
-        result = self.pattern.match(event.string)
+        if self.pattern is None:
+            result = self.wildcard.match(event.string)
+        else:
+            result = self.pattern.match(event.string)
         if result:
             rec_event = HearEvent(event.string,event.words,result)
             self.fire(rec_event)
