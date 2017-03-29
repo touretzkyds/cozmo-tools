@@ -512,7 +512,47 @@ class PickUpObject(ActionNode):
         super().start(event)
 
     def action_launcher(self):
+        if self.object is None:
+            raise ValueError('No object to pick up')
         return self.robot.pickup_object(self.object, **self.action_kwargs)
+
+class PlaceObjectOnGroundHere(ActionNode):
+    def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
+        self.object = object
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop=abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and \
+                isinstance(event.data,cozmo.objects.LightCube):
+            self.object = event.data
+        super().start(event)
+
+    def action_launcher(self):
+        if self.object is None:
+            raise ValueError('No object to place')
+        return self.robot.place_object_on_ground_here(self.object, **self.action_kwargs)
+
+class PlaceOnObject(ActionNode):
+    def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
+        self.object = object
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop=abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and \
+                isinstance(event.data,cozmo.objects.LightCube):
+            self.object = event.data
+        super().start(event)
+
+    def action_launcher(self):
+        if self.object is None:
+            raise ValueError('No object to place')
+        return self.robot.place_on_object(self.object, **self.action_kwargs)
+
+
 
 #________________ Animations ________________
 

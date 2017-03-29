@@ -37,6 +37,8 @@ class EventRouter:
         self.dispatch_table = dict()
         # listener_registry: listener -> (event_class, source)...
         self.listener_registry = dict()
+        # wildcard registry: true if listener is a wildcard (should run last)
+        self.wildcard_registry = dict()
         # event generator objects
         self.event_generators = dict()
 
@@ -64,7 +66,18 @@ class EventRouter:
         reg_entry.append((event_class,source))
         self.listener_registry[listener] = reg_entry
 
+    # Transitions like =Hear('\w')=> must use None as a source because
+    # they do the matching themselves instead of relying on the event
+    # router. So to distinguish a wildcard =Hear=> transition from
+    # all the other Hear transitions, we must register it specially.
+    def add_wildcard_listener(self, listener, event_class, source):
+        self.add_listener(listener, event_class, source)
+        self.wildcard_registry[listener.handle_event] = True
+
     def remove_listener(self, listener, event_class, source):
+        try:
+            del self.wildcard_registry[listener.handle_event]
+        except: pass
         if not issubclass(event_class, Event):
             raise TypeError('% is not an Event' % event_class)
         source_dict = self.dispatch_table.get(event_class)
@@ -78,7 +91,7 @@ class EventRouter:
             del source_dict[source]
         if len(source_dict) == 0:   # no one listening for this event
             del self.dispatch_table[event_class]
-            # remove the cozmo event handler if there was one
+            # remove the cozmo SDK event handler if there was one
             if event_class.cozmo_evt_type:
                 coztype = event_class.cozmo_evt_type
                 world = self.robot.world
@@ -98,10 +111,19 @@ class EventRouter:
         if source_dict is None:  # no listeners for this event type
             return []
         matches = source_dict.get(event.source, [])
-        wildcards = source_dict.get(None, [])
-        if wildcards:
-            matches = matches + wildcards
-        return matches
+        if event.source is None:
+            none_matches = matches
+            matches = []
+        else:
+            none_matches = source_dict.get(None, [])
+        wildcards = []
+        for handler in none_matches:
+            if self.wildcard_registry.get(handler,False) is True:
+                wildcards.append(handler)
+            else:
+                matches.append(handler)
+        # wildcard handlers must come last in the list
+        return matches + wildcards
 
     def post(self,event):
         if not isinstance(event,Event):
