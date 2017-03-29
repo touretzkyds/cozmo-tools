@@ -575,6 +575,7 @@ class SLAMSensorModel(SensorModel):
             landmark_test = self.is_cube
         self.landmark_test = landmark_test
         self.distance_variance = distance_variance
+        self.candidate_landmarks = dict()
         super().__init__(robot,landmarks)
 
     def evaluate(self, particles, force=False, just_looking=False):
@@ -625,9 +626,15 @@ class SLAMSensorModel(SensorModel):
                 # Also, OpenCV's rotation has the wrong sign, so we must fix it.
                 sensor_orient = - marker.opencv_rotation[1] * (pi/180)
             if id not in particles[0].landmarks:
+                seen_count = self.candidate_landmarks.get(id,0)
+                if seen_count < 5:
+                    # add 2 because we're going to subtract 1 at the end
+                    self.candidate_landmarks[id] = seen_count + 2
+                    continue
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
                     p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
+                del self.candidate_landmarks[id]
                 continue
             if just_looking:
                 continue
@@ -663,7 +670,14 @@ class SLAMSensorModel(SensorModel):
                 # print('wmax=',wmax,'wt_inc=',wt_inc)
                 for p in particles:
                     p.log_weight += wt_inc
-        self.robot.world.particle_filter.variance_estimate()
+            self.robot.world.particle_filter.variance_estimate()
+
+        # Update the candidate landmarks and delete any losers
+        for id in tuple(self.candidate_landmarks.keys()):
+            self.candidate_landmarks[id] -= 1
+            if self.candidate_landmarks[id] <= 0:
+                del self.candidate_landmarks[id]
+
         return evaluated
     
 
