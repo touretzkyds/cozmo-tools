@@ -95,7 +95,6 @@ class StateMachineProgram(StateNode):
         # Call parent's start() to launch the state machine
         super().start()
 
-        print('done=',opengl.INIT_DONE)
         if opengl.INIT_DONE:
             opengl.launch_main_loop()
 

@@ -48,19 +48,18 @@ class PathViewer():
         glutReshapeFunc(self.reshape)
         glutIdleFunc(glutPostRedisplay) # Constantly update screen
         glutDisplayFunc(self.display)
+        glutKeyboardFunc(self.keyPressed)
 
     def start_thread(self): # Displays in background
         global RUNNING
         if RUNNING:
             return
-        else:
-            RUNNING = True
-        self.initialize_window()
-        """
-        self.thread = Thread(target=None)
+        RUNNING = True
+        opengl.init()
+        self.thread = Thread(target=self.initialize_window)
         self.thread.daemon = True #ending fg program will kill bg program
         self.thread.start()
-        """
+
     def draw_rectangle(self, center, width=4, height=None,
                        angle=0, color=(1,1,1), fill=True):
         # Default to solid color and square shape
@@ -202,3 +201,6 @@ class PathViewer():
         self.aspect = self.width/self.height
         self.display()
         glutPostRedisplay()
+
+    def keyPressed(self,key):
+        print('key pressed',key)

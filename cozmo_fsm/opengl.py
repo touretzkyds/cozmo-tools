@@ -13,6 +13,7 @@ INIT_DONE = False
 def init():
     global INIT_DONE
     if not INIT_DONE:
+        print('opengl init calling glutInit()')
         glutInit()
         glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
 
@@ -29,10 +30,7 @@ def create_window(name,size=(500,500)):
     w = glutCreateWindow(name)
     return w
 
-def mainloop():
-    glutMainLoop()
-
 def launch_main_loop():
-    thread = Thread(target=mainloop)
+    thread = Thread(target=glutMainLoop)
     thread.daemon = True #ending fg program will kill bg program
     thread.start()
