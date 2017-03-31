@@ -32,6 +32,7 @@ class StateMachineProgram(StateNode):
                  rrt = None,
                  path_viewer = False,
                  speech = False,
+                 speech_debug = False,
                  thesaurus = Thesaurus()
                  ):
         super().__init__()
@@ -52,6 +53,7 @@ class StateMachineProgram(StateNode):
         self.rrt = rrt
         self.path_viewer = path_viewer
         self.speech = speech
+        self.speech_debug = speech_debug
         self.thesaurus = thesaurus
 
     def start(self):
@@ -107,7 +109,7 @@ class StateMachineProgram(StateNode):
 
         # Start speech recognition if requested
         if self.speech:
-            self.speech_listener = SpeechListener(self.robot,self.thesaurus)
+            self.speech_listener = SpeechListener(self.robot,self.thesaurus,debug=self.speech_debug)
             self.speech_listener.start()
 
         # Call parent's start() to launch the state machine, which
