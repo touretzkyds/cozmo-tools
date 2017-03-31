@@ -5,6 +5,9 @@ import time
 
 from .transform import wrap_angle
 from .rrt_shapes import *
+from .worldmap import Wall, wall_marker_dict
+
+#---------------- RRTNode ----------------
 
 class RRTNode():
     def __init__(self, parent=None, x=0, y=0, q=0):
@@ -17,24 +20,35 @@ class RRTNode():
         return '<RRTNode (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
 
 
+#---------------- RRT Path Planner ----------------
+
+class StartCollides(Exception): pass
+class GoalCollides(Exception): pass
+class MaxIterations(Exception): pass
+
 class RRT():
     def __init__(self, robot, max_iter=1000, step_size=5, tolsq=16,
-                 obstacles=[],
+                 obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
-        # Each tree is an array of RRTNodes starting at element 1.
-        # Element 0 contains the current size of the tree.
-        # We pre-allocate the storage to speed things up.
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
         self.tolsq = tolsq
-        self.obstacles = obstacles
         self.robot_parts = self.make_robot_parts(robot)
         self.bounds = bounds
+        self.obstacles = obstacles
+        self.auto_obstacles = auto_obstacles
+        self.treeA = []
+        self.treeB = []
+        self.start = None
+        self.goal = None
 
     REACHED = 'reached'
     COLLISION = 'collision' 
     INTERPOLATE = 'interpolate'
+
+    def set_obstacles(self,obstacles):
+        self.obstacles = obstacles
 
     def nearest_node(self, tree, target_node):
         best_distance = inf
@@ -94,8 +108,14 @@ class RRT():
         return False        
 
     def plan_path(self, start, goal):
+        if self.auto_obstacles:
+            self.obstacles = self.generate_obstacles()
         self.start = start
         self.goal = goal
+        if self.collides(start):
+            raise StartCollides()
+        if self.collides(goal):
+            raise GoalCollides()
         treeA = [start]
         treeB = [goal]
         self.treeA = treeA
@@ -110,11 +130,12 @@ class RRT():
                     break
                 (treeB, treeA) = (treeA, treeB)
                 swapped = not swapped
-        if i == self.max_iter-1:
-            return (treeA, treeB, None)
         if swapped:
             (treeB, treeA) = (treeA, treeB)
-        return self.get_path(treeA, treeB)
+        if status is self.REACHED:
+            return self.get_path(treeA, treeB)
+        else:
+            raise MaxIterations()
 
     def get_path(self, treeA, treeB):
         nodeA = treeA[-1]
@@ -143,3 +164,40 @@ class RRT():
                 robot_obst = joint.collision_model.instantiate(tmat)
                 result.append(robot_obst)
         return result
+
+    def generate_obstacles(self):
+        self.robot.world.world_map.generate_map()
+        result = []
+        for obj in self.robot.world.world_map.objects:
+            if isinstance(obj, Wall):
+                result = result + self.generate_wall_obstacle(obj)
+        return result
+
+    def generate_wall_obstacle(self,wall):
+        wall_spec = wall_marker_dict[wall.id]
+        half_length = wall.length / 2
+        widths = []
+        last_x = -half_length
+        edges = [ [0, -half_length, 0., 1.] ]
+        for (center,width) in wall_spec.doorways:
+            left_edge = center - width/2 - half_length
+            edges.append([0., left_edge, 0., 1.])
+            widths.append(left_edge - last_x)
+            right_edge = center + width/2 - half_length
+            edges.append([0., right_edge, 0., 1.])
+            last_x = right_edge
+        edges.append([0., half_length, 0., 1.])
+        widths.append(half_length-last_x)
+        edges = np.array(edges).T
+        edges = transform.aboutZ(wall.theta).dot(edges)
+        edges = transform.translate(wall.x,wall.y).dot(edges)
+        obst = []
+        for i in range(0,len(widths)):
+            center = edges[:,2*i:2*i+2].mean(1).reshape(4,1)
+            dimensions=(4.0, widths[i])
+            r = Rectangle(center=center,
+                          dimensions=dimensions,
+                          orient=wall.theta )
+            obst.append(r)
+        return obst
+

@@ -6,12 +6,11 @@ from OpenGL.GLUT import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
-from threading import Thread  # for backgrounding window
 from math import pi, sin, cos
 import array
 import numpy as np
 
-RUNNING = False
+WINDOW = None
 
 from . import opengl
 from .rrt_shapes import *
@@ -32,11 +31,16 @@ class PathViewer():
         self.bgcolor = bgcolor
         self.aspect = self.width/self.height
         self.windowName = windowName
-        self.thread = None
+        self.translation = [0., 0.]  # Translation in mm
+        self.scale = 1
 
     def initialize_window(self):
-        self.window = \
-            opengl.create_window(self.windowName, (self.width,self.height))
+        global WINDOW
+        if not WINDOW:
+            WINDOW = \
+                opengl.create_window(self.windowName, (self.width,self.height))
+        else:
+            glutSetWindow(WINDOW)
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
 
@@ -46,19 +50,16 @@ class PathViewer():
 
         # Function bindings
         glutReshapeFunc(self.reshape)
-        glutIdleFunc(glutPostRedisplay) # Constantly update screen
         glutDisplayFunc(self.display)
         glutKeyboardFunc(self.keyPressed)
+        glutSpecialFunc(self.specialKeyPressed)
 
-    def start_thread(self): # Displays in background
-        global RUNNING
-        if RUNNING:
-            return
-        RUNNING = True
-        opengl.init()
-        self.thread = Thread(target=self.initialize_window)
-        self.thread.daemon = True #ending fg program will kill bg program
-        self.thread.start()
+    def start(self): # Displays in background
+        self.initialize_window()
+
+    def clear(self):
+        global the_items
+        the_items = []
 
     def draw_rectangle(self, center, width=4, height=None,
                        angle=0, color=(1,1,1), fill=True):
@@ -179,6 +180,8 @@ class PathViewer():
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         glRotatef(90,0,0,1)
+        glScalef(self.scale, self.scale, self.scale)
+        glTranslatef(-self.translation[0], -self.translation[1], 0.)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
@@ -190,7 +193,8 @@ class PathViewer():
         for obst in the_rrt.obstacles:
             self.draw_obstacle(obst)
 
-        self.draw_robot(the_rrt.parts_to_node(the_rrt.start))
+        if the_rrt.start:
+            self.draw_robot(the_rrt.parts_to_node(the_rrt.start))
 
         glutSwapBuffers()
 
@@ -202,5 +206,46 @@ class PathViewer():
         self.display()
         glutPostRedisplay()
 
-    def keyPressed(self,key):
-        print('key pressed',key)
+    def keyPressed(self,key,mouseX,mouseY):
+        if key == b'+':     # zoom in
+            self.scale *= 1.25
+            self.print_display_params()
+            return
+        elif key == b'-':     # zoom out
+            self.scale /= 1.25
+            self.print_display_params()
+            return
+        elif key == b'h':     # print help
+            self.print_help()
+            return
+
+    def specialKeyPressed(self, key, mouseX, mouseY):
+        # arrow keys for translation
+        incr = 25.0    # millimeters
+        if key == GLUT_KEY_UP:
+            self.translation[0] += incr / self.scale
+        elif key == GLUT_KEY_DOWN:
+            self.translation[0] -= incr / self.scale
+        elif key == GLUT_KEY_LEFT:
+            self.translation[1] += incr / self.scale
+        elif key == GLUT_KEY_RIGHT:
+            self.translation[1] -= incr / self.scale
+        elif key == GLUT_KEY_HOME:
+            self.translation = [0., 0.]
+            self.print_display_params()
+        glutPostRedisplay()
+
+    def print_display_params(self):
+        print('scale=%.2f translation=[%.1f, %.1f]' %
+              (self.scale, *self.translation))
+
+    def print_help(self):
+        print("""
+Path viewer commands:
+  arrows     Translate the view up/down/left/right
+   Home      Center the view (zero translation)
+    +        Zoom in
+    -        Zoom out
+  space      Toggle redisplay (for debugging)
+    h        Print this help text
+""")

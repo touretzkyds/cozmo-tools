@@ -582,13 +582,13 @@ class SLAMSensorModel(SensorModel):
         # Returns true if particles were evaluated.
         # Call with force=True from particle_viewer to skip distance traveled check.
         # Call with just_looking=True to just look for new landmarks; no evaluation.
+        evaluated = False
 
         (dist,turn_angle) = self.compute_robot_motion()
         # Unless forced, only evaluate if the robot moved enough
         # for evaluation to be worthwhile.
         if (not force) and (dist < 5) and abs(turn_angle) < math.radians(5):
-            return False
-        evaluated = False
+            return evaluated
         if not just_looking:
             self.last_evaluate_pose = self.robot.pose
         # Cache seen marker objects because vision is in another thread.
@@ -678,11 +678,12 @@ class SLAMSensorModel(SensorModel):
             if self.candidate_landmarks[id] <= 0:
                 del self.candidate_landmarks[id]
 
+        self.robot.world.particle_filter.variance_estimate()
         return evaluated
     
 
 class SLAMParticleFilter(ParticleFilter):
-    def __init__(self, robot, landmark_test=SLAMSensorModel.is_cube, **kwargs):
+    def __init__(self, robot, landmark_test=SLAMSensorModel.is_aruco, **kwargs):
         if 'sensor_model' not in kwargs or kwargs['sensor_model'] == 'default':
             kwargs['sensor_model'] = SLAMSensorModel(robot, landmark_test=landmark_test)
         if 'particle_factory' not in kwargs:

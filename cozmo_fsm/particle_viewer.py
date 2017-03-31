@@ -6,20 +6,19 @@ from OpenGL.GLUT import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
-from threading import Thread  # for backgrounding window
 import math
 from math import sin, cos, pi, atan2, sqrt
 import array
 import numpy as np
-import time
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees
 
 from . import opengl
 
-RUNNING = False
 REDISPLAY = True   # toggle this to suspend constant redisplay
+WINDOW = None
+
 class ParticleViewer():
     def __init__(self, robot,
                  width=512, height=512, scale=1.0,
@@ -33,11 +32,14 @@ class ParticleViewer():
         self.translation = [0., 0.]  # Translation in mm
         self.scale = scale
         self.windowName = windowName
-        self.thread = None
 
     def initialize_window(self):
-        self.window = \
-            opengl.create_window(self.windowName,(self.width,self.height))
+        global WINDOW
+        if WINDOW is None:
+            WINDOW = \
+                opengl.create_window(self.windowName,(self.width,self.height))
+        else:
+            glutSetWindow(WINDOW)
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
 
@@ -47,27 +49,12 @@ class ParticleViewer():
 
         # Function bindings
         glutReshapeFunc(self.reshape)
-        glutIdleFunc(self.idle) # Constantly update screen
         glutKeyboardFunc(self.keyPressed)
         glutSpecialFunc(self.specialKeyPressed)
         glutDisplayFunc(self.display)
 
-    def xidle():
-        while True:
-            time.sleep(1)
-
-    def start_thread(self): # Displays in background
-        global RUNNING
-        if RUNNING:
-            return
-        else:
-            RUNNING = True
+    def start(self): # Displays in background
         self.initialize_window()
-        """
-        self.thread = Thread(target=self.idle)
-        self.thread.daemon = True #ending fg program will kill bg program
-        self.thread.start()
-        """
         print("Type 'h' in the particle viewer window for help.")
 
     def draw_rectangle(self, center, size=(10,10),
@@ -228,6 +215,8 @@ class ParticleViewer():
         self.draw_ellipse(coords, w**(1/2), alpha*(180/pi), color=color)
 
     def display(self):
+        global REDISPLAY
+        if not REDISPLAY: return
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         w = self.width / 2
@@ -267,11 +256,6 @@ class ParticleViewer():
         self.draw_landmarks()
 
         glutSwapBuffers()
-
-    def idle(self):
-        global REDISPLAY
-        if REDISPLAY:
-            glutPostRedisplay()
 
     def reshape(self,width,height):
         glViewport(0,0,width,height)
@@ -361,7 +345,7 @@ class ParticleViewer():
         elif key == b'h':     # print help
             self.print_help()
             return
-        elif key == b' ':     # toggle redisplay for debugging
+        elif key == b'$':     # toggle redisplay for debugging
             global REDISPLAY
             REDISPLAY = not REDISPLAY
             print('Redisplay ',('off','on')[REDISPLAY],'.',sep='')
@@ -405,6 +389,6 @@ Particle viewer commands:
    Home      Center the view (zero translation)
     +        Zoom in
     -        Zoom out
-  space      Toggle redisplay (for debugging)
+    $        Toggle redisplay (for debugging)
     h        Print this help text
 """)

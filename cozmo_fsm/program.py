@@ -11,6 +11,9 @@ from .aruco import *
 from .particle import *
 from .cozmo_kin import *
 from .particle_viewer import ParticleViewer
+from .worldmap import WorldMap
+from .rrt import RRT
+from .path_viewer import PathViewer
 from .speech import SpeechListener, Thesaurus
 from . import opengl
 
@@ -21,11 +24,13 @@ class StateMachineProgram(StateNode):
                  cam_viewer=True,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
-                 path_viewer = False,
                  annotate_cube = True,
                  aruco=True,
                  arucolibname=cv2.aruco.DICT_4X4_250,
                  particle_filter = True,
+                 world_map = None,
+                 rrt = None,
+                 path_viewer = False,
                  speech = False,
                  thesaurus = Thesaurus()
                  ):
@@ -43,6 +48,9 @@ class StateMachineProgram(StateNode):
         if self.aruco:
             self.robot.world.aruco = Aruco(arucolibname)
         self.particle_filter = particle_filter
+        self.world_map = world_map
+        self.rrt = rrt
+        self.path_viewer = path_viewer
         self.speech = speech
         self.thesaurus = thesaurus
 
@@ -50,7 +58,7 @@ class StateMachineProgram(StateNode):
         self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
-        self.set_polling_interval(0.050)
+        self.set_polling_interval(0.050)  # for kine and motion model update
         # Create a particle filter
         if self.particle_filter:
             if self.particle_filter is True:
@@ -60,6 +68,10 @@ class StateMachineProgram(StateNode):
             self.robot.world.particle_filter = pf
         else:
             self.robot.world.particle_filter = None
+        # World map and path planner
+        self.robot.world.world_map = \
+                self.world_map or WorldMap(self.robot)
+        self.robot.world.rrt = self.rrt or RRT(self.robot)
 
         # Launch viewers
         if self.world_viewer:
@@ -80,23 +92,28 @@ class StateMachineProgram(StateNode):
             if self.particle_viewer is True:
                 self.particle_viewer = \
                     ParticleViewer(self.robot, scale=self.particle_viewer_scale)
-            self.particle_viewer.start_thread()
+            self.particle_viewer.start()
+
+        if self.path_viewer:
+            if self.path_viewer is True:
+                self.path_viewer = \
+                    PathViewer(self.robot.world.rrt)
+            self.path_viewer.start()
 
         # Request camera image stream
         self.robot.camera.image_stream_enabled = True
         self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                            self.process_image)
 
-        # Start speech recognition
+        # Start speech recognition if requested
         if self.speech:
             self.speech_listener = SpeechListener(self.robot,self.thesaurus)
             self.speech_listener.start()
 
-        # Call parent's start() to launch the state machine
+        # Call parent's start() to launch the state machine, which
+        # may create additional windows.  Then launch GLUT main loop.
         super().start()
-
-        if opengl.INIT_DONE:
-            opengl.launch_main_loop()
+        opengl.launch_main_loop()
 
     def stop(self):
         super().stop()
