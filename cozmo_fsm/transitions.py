@@ -167,42 +167,23 @@ class ArucoTrans(Transition):
             self.fire()
 
 
-class TextMsgTrans(Transition):
-    """Transition fires when message matches."""
-    def __init__(self,message=None):
-        super().__init__()
-        self.source = message
-
-    def start(self,event=None):
-        if self.running: return
-        super().start(event)
-        # The 'source' is the message text.
-        self.robot.erouter.add_listener(self, TextMsgEvent, self.source)
-
-    def handle_event(self,event):
-        super().handle_event(event)
-        if isinstance(event,TextMsgEvent): # erouter checked for match
-            self.fire(event)
-        else:
-            raise TypeError('%s is not a TextMsgEvent' % event)
-
-class HearTrans(Transition):
-    """Transition fires if speech event matches pattern."""
+class PatternMatchTrans(Transition):
     wildcard = re.compile('.*')
     
-    def __init__(self,pattern=None):
+    def __init__(self, pattern=None, event_type=None):
         super().__init__()
         if pattern:
             pattern = re.compile(pattern)
         self.pattern = pattern
-
+        self.event_type = event_type
+    
     def start(self,event=None):
         if self.running: return
         super().start(event)
         if self.pattern is None:
-            self.robot.erouter.add_wildcard_listener(self, SpeechEvent, None)
+            self.robot.erouter.add_wildcard_listener(self, self.event_type, None)
         else:
-            self.robot.erouter.add_listener(self, SpeechEvent, None)
+            self.robot.erouter.add_listener(self, self.event_type, None)
 
     def handle_event(self,event):
         super().handle_event(event)
@@ -211,8 +192,18 @@ class HearTrans(Transition):
         else:
             result = self.pattern.match(event.string)
         if result:
-            rec_event = HearEvent(event.string,event.words,result)
-            self.fire(rec_event)
+            match_event = self.event_type(event.string,event.words,result)
+            self.fire(match_event)
+
+class TextMsgTrans(PatternMatchTrans):
+    """Transition fires when text message event matches pattern."""
+    def __init__(self,pattern=None):
+        super().__init__(pattern,TextMsgEvent)
+
+class HearTrans(PatternMatchTrans):
+    """Transition fires if speech event matches pattern."""
+    def __init__(self,pattern=None):
+        super().__init__(pattern,SpeechEvent)
 
 
 class RandomTrans(Transition):
