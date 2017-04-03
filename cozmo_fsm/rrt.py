@@ -3,9 +3,10 @@ import numpy as np
 import random
 import time
 
+import cozmo_fsm.transform
 from .transform import wrap_angle
 from .rrt_shapes import *
-from .worldmap import Wall, wall_marker_dict
+from .worldmap import Wall, wall_marker_dict, LightCubeObst
 
 #---------------- RRTNode ----------------
 
@@ -171,6 +172,8 @@ class RRT():
         for obj in self.robot.world.world_map.objects:
             if isinstance(obj, Wall):
                 result = result + self.generate_wall_obstacle(obj)
+            elif isinstance(obj, LightCubeObst):
+                result.append(self.generate_cube_obstacle(obj))
         return result
 
     def generate_wall_obstacle(self,wall):
@@ -201,3 +204,9 @@ class RRT():
             obst.append(r)
         return obst
 
+    def generate_cube_obstacle(self,obj):
+        r = Rectangle(center=transform.point(obj.x, obj.y),
+                      dimensions=obj.size[0:2],
+                      orient=obj.theta)
+        return r
+    

@@ -95,12 +95,14 @@ class StateMachineProgram(StateNode):
                 self.particle_viewer = \
                     ParticleViewer(self.robot, scale=self.particle_viewer_scale)
             self.particle_viewer.start()
+        self.robot.world.particle_viewer = self.particle_viewer
 
         if self.path_viewer:
             if self.path_viewer is True:
                 self.path_viewer = \
                     PathViewer(self.robot.world.rrt)
             self.path_viewer.start()
+        self.robot.world.path_viewer = self.path_viewer
 
         # Request camera image stream
         self.robot.camera.image_stream_enabled = True

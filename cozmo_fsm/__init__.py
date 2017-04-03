@@ -9,3 +9,4 @@ from .rrt import *
 from .path_viewer import PathViewer
 from .speech import *
 from .worldmap import WorldMap
+from .pilot import *
