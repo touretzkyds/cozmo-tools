@@ -362,7 +362,7 @@ def cli_loop(robot):
     global ans, RUNNING, running_fsm
     cli_loop.charger_warned = False
 
-    robot.kine = CozmoKinematics(robot)
+    #robot.kine = CozmoKinematics(robot)
     cli_globals = globals()
     cli_globals['world'] = robot.world
     cli_globals['light_cubes'] = world.light_cubes
@@ -395,7 +395,7 @@ def cli_loop(robot):
             except EOFError:
                 print("EOF.\nType 'exit' to exit.\n")
                 continue
-        robot.kine.get_pose()
+        #robot.kine.get_pose()
         if cli_loop._line[0] == '!':
             do_shell_command(cli_loop._line[1:])
             continue

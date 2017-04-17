@@ -237,7 +237,9 @@ def cli_loop(robot):
     cli_globals['cube3'] = light_cubes[cozmo.objects.LightCube3Id]
     cli_globals['charger'] = robot.world.charger
     cli_globals['ans'] = None
-    cli_globals['res'] = None
+
+    running_fsm = StateMachineProgram(cam_viewer=False)
+    running_fsm.start()
 
     cli_loop._console = code.InteractiveConsole()
     while True:
@@ -264,7 +266,9 @@ def cli_loop(robot):
             except EOFError:
                 print("EOF.\nType 'exit' to exit.\n")
                 continue
-        robot.kine.get_pose()
+            try:
+                robot.kine.get_pose()
+            except: pass
         if cli_loop._line[0] == '!':
             do_shell_command(cli_loop._line[1:])
             continue
