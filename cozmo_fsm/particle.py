@@ -487,6 +487,16 @@ class ParticleFilter():
             p.log_weight = 0.0
             p.weight = 1.0
 
+    def set_pose(self,x,y,theta):
+        for i in range(self.num_particles):
+            p = self.particles[i]
+            p.x = x
+            p.y = y
+            p.theta = theta
+            p.log_weight = 0.0
+            p.weight = 1.0
+        self.variance_estimate()
+
     def look_for_new_landmarks(self): pass  # SLAM only
 
     def clear_landmarks(self):

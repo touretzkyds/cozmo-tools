@@ -14,15 +14,15 @@ MAIN_LOOP_LAUNCHED = False
 # Maintain a registry of display functions for our windows
 WINDOW_REGISTRY = []
 
+# List of window creation requests that need to be satisfied
+CREATION_QUEUE = []
+
 def init():
     global INIT_DONE
     if not INIT_DONE:
         INIT_DONE = True
         glutInit()
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
-
-        # Default to drawing outlines of shapes
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
 
         # Killing window should not directly kill main program
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
@@ -35,17 +35,23 @@ def create_window(name,size=(500,500)):
     WINDOW_REGISTRY.append(w)
     return w
 
-def idle():
-    for window in WINDOW_REGISTRY:
-        glutSetWindow(window)
-        glutPostRedisplay()
+def event_loop():
+    global CREATION_QUEUE
+    while True:
+        for window in WINDOW_REGISTRY:
+            glutSetWindow(window)
+            glutPostRedisplay()
+        glutMainLoopEvent()
+        # Process any requests for new windows
+        queue = CREATION_QUEUE
+        CREATION_QUEUE = []
+        for req in queue:
+            req()  # invoke the window creator
 
-def launch_main_loop():
-    if not INIT_DONE: return   # no windows were created
+def launch_event_loop():
     global MAIN_LOOP_LAUNCHED
     if MAIN_LOOP_LAUNCHED: return
     MAIN_LOOP_LAUNCHED = True
-    glutIdleFunc(idle)
-    thread = Thread(target=glutMainLoop)
+    thread = Thread(target=event_loop)
     thread.daemon = True #ending fg program will kill bg program
     thread.start()

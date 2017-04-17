@@ -151,19 +151,21 @@ class DataTrans(Transition):
 
 class ArucoTrans(Transition):
     """Fires if one of the specified markers is visible"""
-    def __init__(self,markers=None):
+    def __init__(self,marker_ids=None):
         super().__init__()
         self.polling_interval = 0.1
-        self.markers = markers
+        if isinstance(marker_ids,(list,tuple)):
+            marker_ids = set(marker_ids)
+        self.marker_ids = marker_ids
 
     def poll(self,event=None):
-        if self.markers is None:
-            if self.robot.world.aruco.seenMarkers != []:
+        if self.marker_ids is None:
+            if self.robot.world.aruco.seen_marker_ids != []:
                 self.fire()
-        elif isinstance(self.markers,set):
-            if self.markers.intersection(self.robot.world.aruco.seenMarkers) != set():
+        elif isinstance(self.marker_ids,set):
+            if self.marker_ids.intersection(self.robot.world.aruco.seen_marker_ids) != set():
                 self.fire()
-        elif self.markers in self.robot.world.aruco.seenMarkers:
+        elif self.marker_ids in self.robot.world.aruco.seen_marker_ids:
             self.fire()
 
 

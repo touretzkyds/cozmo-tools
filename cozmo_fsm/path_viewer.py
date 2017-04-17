@@ -6,6 +6,7 @@ from OpenGL.GLUT import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+import time
 from math import pi, sin, cos
 import array
 import numpy as np
@@ -34,25 +35,24 @@ class PathViewer():
         self.translation = [0., 0.]  # Translation in mm
         self.scale = 1
 
-    def initialize_window(self):
+    def window_creator(self):
         global WINDOW
-        if not WINDOW:
-            WINDOW = \
-                opengl.create_window(self.windowName, (self.width,self.height))
-        else:
-            glutSetWindow(WINDOW)
+        WINDOW = opengl.create_window(self.windowName, (self.width,self.height))        
+        glutDisplayFunc(self.display)
+        glutReshapeFunc(self.reshape)
+        glutKeyboardFunc(self.keyPressed)
+        glutSpecialFunc(self.specialKeyPressed)
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
-
         # Enable transparency
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        # Function bindings
-        glutReshapeFunc(self.reshape)
-        glutDisplayFunc(self.display)
-        glutKeyboardFunc(self.keyPressed)
-        glutSpecialFunc(self.specialKeyPressed)
+    def initialize_window(self):
+        if not WINDOW:
+            opengl.CREATION_QUEUE.append(self.window_creator)
+        while not WINDOW:
+            time.sleep(0.1)
 
     def start(self): # Displays in background
         self.initialize_window()

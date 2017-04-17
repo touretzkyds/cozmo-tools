@@ -6,6 +6,7 @@ from OpenGL.GLUT import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+import time
 import math
 from math import sin, cos, pi, atan2, sqrt
 import array
@@ -33,23 +34,33 @@ class ParticleViewer():
         self.scale = scale
         self.windowName = windowName
 
+<<<<<<< HEAD
     def initialize_window(self):
         if not WINDOW:
             opengl.CREATION_QUEUE.append(self.window_creator)
         while not WINDOW:
             time.sleep(0.1)
+=======
+    def window_creator(self):
+        global WINDOW
+        WINDOW = opengl.create_window(self.windowName, (self.width,self.height))        
+        glutDisplayFunc(self.display)
+        glutReshapeFunc(self.reshape)
+        glutKeyboardFunc(self.keyPressed)
+        glutSpecialFunc(self.specialKeyPressed)
+>>>>>>> master
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
-
         # Enable transparency
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        # Function bindings
-        glutReshapeFunc(self.reshape)
-        glutKeyboardFunc(self.keyPressed)
-        glutSpecialFunc(self.specialKeyPressed)
-        glutDisplayFunc(self.display)
+    def initialize_window(self):
+        if not WINDOW:
+            opengl.CREATION_QUEUE.append(self.window_creator)
+        while not WINDOW:
+            print('particle sleep')
+            time.sleep(0.1)
 
     def start(self): # Displays in background
         self.initialize_window()
@@ -373,6 +384,7 @@ class ParticleViewer():
     def print_display_params(self):
         print('scale=%.2f translation=[%.1f, %.1f]' %
               (self.scale, *self.translation))
+        glutPostRedisplay()
 
     def print_help(self):
         print("""

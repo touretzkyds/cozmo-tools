@@ -49,11 +49,19 @@ Author:     David S. Touretzky, Carnegie Mellon University
 """
 
 # All that stuff we really need in order to get going.
-import sys, os, platform, subprocess
+import atexit 
 import code
-import time, datetime
-import traceback
+import datetime
+import logging
+import os
+import platform
 import re
+import readline 
+import rlcompleter 
+import subprocess
+import sys
+import time
+import traceback
 from importlib import __import__, reload
 
 try:
@@ -61,11 +69,6 @@ try:
 except:
     def cprint(string,color=None):
         print(string)
-
-# This should be in your '.pythonstartup' file, but I put it also here just in case...
-import readline 
-import rlcompleter 
-import atexit 
 
 import cozmo
 from cozmo.util import *
@@ -187,17 +190,33 @@ def show_stuff(spec):
         if not running_fsm:
             print('No state machine present.')
         elif not running_fsm.running:
-            print('State machine is not running.')
+            print("State machine '%s' is not running." % running_fsm.name)
         else:
             show_active(running_fsm,0)
-    elif spec == 'camviewer' or spec=='viewer':
+    elif spec == 'cam_viewer' or spec=='viewer':
         if running_fsm:
             running_fsm.stop()
-        running_fsm = StateMachineProgram().set_name("CamViewer").now()
-    elif spec == "worldviewer":
+        running_fsm = StateMachineProgram(cam_viewer=True).set_name("CamViewer").now()
+    elif spec == "particle_viewer":
+        if not robot.world.particle_viewer:
+            robot.world.particle_viewer = \
+                ParticleViewer(robot)
+            robot.world.particle_viewer.start()
+    elif spec == "path_viewer":
+        if not robot.world.path_viewer:
+            robot.world.path_viewer = \
+                PathViewer(world.rrt)
+            robot.world.path_viewer.start()
+    elif spec == "world_viewer":
         world_viewer.viewer(robot)
     else:
-        print('Invalid option.  Type "show active|camviewer|worldviewer".')
+        print("""Invalid option. Try one of:
+  show active
+  show viewer
+  show world_viewer
+  show particle_viewer
+  show path_viewer
+  """)
 
 def show_active(node,depth):
     if node.running: print('  '*depth, node)
@@ -228,7 +247,6 @@ def cli_loop(robot):
     global ans, RUNNING, running_fsm
     cli_loop.charger_warned = False
 
-    robot.kine = CozmoKinematics(robot)
     cli_globals = globals()
     cli_globals['world'] = robot.world
     cli_globals['light_cubes'] = world.light_cubes
@@ -311,6 +329,15 @@ def cli_loop(robot):
             traceback.print_exc()
             print()
 
+def suppress_filter(log_record):
+    if log_record.levelno == logging.ERROR and \
+       log_record.msg.startswith("Received a custom object type:"):
+        return False
+    if log_record.msg.startswith("Defined: ") and \
+       len(log_record.args) > 0 and \
+       isinstance(log_record.args[0], cozmo.objects.CustomObject):
+        return False
+    return True
 
 logging_is_setup = False
 
@@ -319,6 +346,7 @@ def start_connection():
     if not logging_is_setup:
         cozmo.setup_basic_logging()
         logging_is_setup = True
+    cozmo.logger.addFilter(suppress_filter)
     cozmo.robot.Robot.drive_off_charger_on_connect = False
     try:
         if len(sys.argv) >= 2:

@@ -123,6 +123,15 @@ class DriveWheels(CoroutineNode):
         self.r_wheel_speed = r_wheel_speed
         self.kwargs = kwargs
 
+    def start(self,event=None):
+        if (isinstance(event,DataEvent) and isinstance(event.data,(list,tuple)) and
+                len(event.data) == 2):
+            (lspeed,rspeed) = event.data
+            if isinstance(lspeed,(int,float)) and isinstance(rspeed,(int,float)):
+                self.l_wheel_speed = lspeed
+                self.r_wheel_speed = rspeed
+        super().start(event)
+
     def coroutine_launcher(self):
         return self.robot.drive_wheels(self.l_wheel_speed,self.r_wheel_speed,**self.kwargs)
 
@@ -156,6 +165,8 @@ class DriveForward(DriveWheels):
 
     def start(self,event=None):
         if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Distance):
+            self.distance = event.data.distance_mm
         self.start_position = self.robot.pose.position
         super().start(event)
 
@@ -182,10 +193,13 @@ class DriveTurn(DriveWheels):
         self.speed = speed
         self.kwargs = kwargs
         super().__init__(-speed,speed,**self.kwargs)
+        # Call parent init before setting polling interval.
         self.polling_interval = 0.05
 
     def start(self,event=None):
         if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data.degrees
         super().start(event)
         self.last_heading = self.robot.pose.rotation.angle_z.degrees
         self.traveled = 0
@@ -212,15 +226,13 @@ class DriveTurn(DriveWheels):
 
 
 class DriveArc(DriveWheels):
-    def ang2dist(self, angle, radius):
-        return (angle / 360) * 2 * pi * radius
-
-    def dist2ang(self, distance, radius):
-        return (distance / (2 * pi * radius)) * 360
-
-    def __init__(self, radius=0, angle=None, distance=None,
-                 speed=None, angspeed=None,
-                 **kwargs):
+    """Negative radius means right turn; negative angle means drive
+    backwards.  This node can be passed a DataEvent with a dict
+    containing any of the arguments accepted by __init__: radius,
+    angle, distance, speed, and angspeed.  Values must already be in
+    the appropriate units (degrees, mm, deg/sec, or mm/sec)."""
+    def __init__(self, radius=0, angle=0, distance=None,
+                 speed=None, angspeed=None, **kwargs):
         if isinstance(radius, cozmo.util.Distance):
             radius = radius.distance_mm
         if isinstance(angle, cozmo.util.Angle):
@@ -229,13 +241,19 @@ class DriveArc(DriveWheels):
             speed = speed.speed_mmps
         if isinstance(angspeed, cozmo.util.Angle):
             angspeed = angspeed.degrees
+        self.calculate_wheel_speeds(radius, angle, distance, speed, angspeed)
+        super().__init__(self.l_wheel_speed, self.r_wheel_speed, **kwargs)
+        # Call parent init before setting polling interval.
+        self.polling_interval = 0.05
 
+    def calculate_wheel_speeds(self, radius=0, angle=None, distance=None,
+                               speed=None, angspeed=None):
         wheelbase = 45    # robot's wheelbase in mm
         if radius != 0:
             if angle is not None:
-                self.angle = angle
+                pass
             elif distance is not None:
-                self.angle = self.dist2ang(distance, radius)
+                angle = self.dist2ang(distance, radius)
             else:
                 raise ValueError('DriveArc requires an angle or distance.')
 
@@ -246,29 +264,35 @@ class DriveArc(DriveWheels):
             else:
                 speed = 40 # degrees/second
             if angle < 0:
-                speed = -speed
+                speed = - speed
 
-            lspeed = speed * (1 - wheelbase / radius)
-            rspeed = speed * (1 + wheelbase / radius)
+            self.angle = angle
+            self.l_wheel_speed = speed * (1 + wheelbase / radius)
+            self.r_wheel_speed = speed * (1 - wheelbase / radius)
 
         else:  # radius is 0
-            self.angle = angle
             if angspeed is None:
                 angspeed = 40 # degrees/second
             s = angspeed
             if angle < 0:
                 s = -s
-            lspeed = -s
-            rspeed = s
+            self.angle = angle
+            self.l_wheel_speed = -s
+            self.r_wheel_speed = s
 
-        super().__init__(lspeed, rspeed, **kwargs)
-        self.polling_interval = 0.05
+    def ang2dist(self, angle, radius):
+        return (angle / 360) * 2 * pi * radius
+
+    def dist2ang(self, distance, radius):
+        return (distance / (2 * pi * radius)) * 360
 
     def start(self,event=None):
         if self.running: return
-        super().start(event)
+        if isinstance(event,DataEvent) and isinstance(event.data,dict):
+            self.calculate_wheel_speeds(**event.data)
         self.last_heading = self.robot.pose.rotation.angle_z.degrees
         self.traveled = 0
+        super().start(event)
 
     def poll(self):
         """See how far we've traveled"""
@@ -286,7 +310,7 @@ class DriveArc(DriveWheels):
             diff -= 360.0
         self.traveled += diff
 
-        if self.angle is not None and abs(self.traveled) > abs(self.angle):
+        if abs(self.traveled) > abs(self.angle):
             self.poll_handle.cancel()
             self.stop_wheels()
             self.post_completion()

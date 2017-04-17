@@ -1,4 +1,5 @@
 from math import pi, inf, sin, cos, atan2, sqrt
+from cozmo.objects import CustomObject
 
 from .transform import wrap_angle
 
@@ -24,14 +25,26 @@ class LightCubeObst():
 
     def __repr__(self):
         return '<LightCubeObst %d: (%.1f,%.1f) @ %d deg.>' % \
-               (self.id, self.x, self.y, self.theta)
+               (self.id, self.x, self.y, self.theta*180/pi)
+
+class CustomCubeObst():
+    def __init__(self, type, x, y, theta):
+        self.type = type
+        self.x = x
+        self.y = y
+        self.theta = theta
+        self.size = (50., 50., 50.)
+
+    def __repr__(self):
+        return '<CustomCubeObst %s: (%.1f,%.1f) @ %d deg.>' % \
+               (self.type, self.x, self.y, self.theta*180/pi)
 
 #================ WorldMap ================
 
 class WorldMap():
     def __init__(self,robot):
         self.robot = robot
-        self.objects = []
+        self.objects = dict()
         
     def generate_map(self):
         self.generate_walls()
@@ -54,7 +67,7 @@ class WorldMap():
         #        self.objects.remove(obj)
         # Now infer the walls from the markers
         for (id,markers) in seen_markers.items():
-            self.objects.append(self.infer_wall(id,markers))
+            self.objects[id] = self.infer_wall(id,markers)
 
     def infer_wall(self,id,markers):
         # Just use one marker for now; should really do least squares fit
@@ -73,7 +86,7 @@ class WorldMap():
         
     def add_cubes(self):
         for (id,cube) in self.robot.world.light_cubes.items():
-            if cube.is_visible:
+            if cube.pose and cube.pose.is_valid:
                 diff = cube.pose - self.robot.pose
                 (dx,dy,_) = diff.position.x_y_z
                 dist = sqrt(dx*dx + dy*dy)
@@ -83,8 +96,26 @@ class WorldMap():
                 world_x = rob_x + dist * cos(world_bearing)
                 world_y = rob_y + dist * sin(world_bearing)
                 world_orient = rob_theta + diff.rotation.angle_z.radians
-                self.objects.append(LightCubeObst(id, world_x, world_y, world_orient))
+                self.objects[cube] = LightCubeObst(id, world_x, world_y, world_orient)
             
+    def update_object(self,obj):
+        if isinstance(obj, CustomObject):
+            diff = obj.pose - self.robot.pose
+            (dx,dy,_) = diff.position.x_y_z
+            dist = sqrt(dx*dx + dy*dy)
+            bearing = atan2(dy,dx)
+            (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
+            world_bearing = wrap_angle(rob_theta + bearing)
+            world_x = rob_x + dist * cos(world_bearing)
+            world_y = rob_y + dist * sin(world_bearing)
+            world_orient = rob_theta + diff.rotation.angle_z.radians
+            t = obj.object_type
+            self.objects[t] = CustomCubeObst(t, world_x, world_y, world_orient)
+
+    
+    def handle_object_observed(self, evt, **kwargs):
+        if isinstance(evt.obj, CustomObject):
+            self.update_object(evt.obj)
 
 #================ Actual Walls ================
 
@@ -101,30 +132,3 @@ class WallSpec():
         for id in ids:
             wall_marker_dict[id] = self
 
-def make_walls():
-    w1 = WallSpec(length=620,
-                  markers={ 53 : (+1, ( 70.,50.)),  # +1 = front markers
-                            65 : (+1, (235.,50.)),
-                            59 : (+1, (375.,50.)),
-                            55 : (+1, (544.,50.)),
-                            45 : (-1, ( 70.,50.)),  # -1 = back markers
-                            64 : (-1, (238.,50.)),
-                            37 : (-1, (380.,50.)),
-                            67 : (-1, (544.,50.)) },
-                  doorways = [ (160., 77.), (470., 77.) ])  # (center, width)
-    w2 = WallSpec(length=620,
-                  markers={ 41 : (+1, ( 70.,50.)),  # +1 = front markers
-                            56 : (+1, (235.,50.)),
-                            80 : (+1, (375.,50.)),
-                            68 : (+1, (544.,50.)),
-                            44 : (-1, ( 70.,50.)),  # -1 = back markers
-                            62 : (-1, (238.,50.)),
-                            38 : (-1, (380.,50.)),
-                            50 : (-1, (544.,50.)) },
-                  doorways = [ (160., 77.), (470., 77.) ])  # (center, width)
-    w3 = WallSpec(length=215,
-                  markers={ 0 : (+1, ( 45.,50.)),
-                            1 : (+1, (145.,50.)) },
-                  doorways = [ (105., 77.) ])  # (center, width)
-
-make_walls()

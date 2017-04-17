@@ -195,9 +195,9 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
     if color is None:
         glEnableClientState(GL_COLOR_ARRAY)
         if highlight:
-            glColorPointer(3, GL_FLOAT, 0, cube_colors_1.tostring())
+            glColorPointer(3, GL_FLOAT, 0, cube_colors_1.tobytes())
         else:
-            glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tostring())
+            glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tobytes())
     else:
         if not highlight:
             s = 0.5   # scale down the brightness if necessary
@@ -210,13 +210,13 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
         verts[i+2] *= size[2]
     if body:
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
-        glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
+        glVertexPointer(3, GL_FLOAT, 0, verts.tobytes())
+        glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tobytes())
     if edges:
         # begin wireframe
         for i in range(0,24): verts[i] *= 1.02
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-        glVertexPointer(3, GL_FLOAT, 0, verts.tostring())
+        glVertexPointer(3, GL_FLOAT, 0, verts.tobytes())
         glDisableClientState(GL_COLOR_ARRAY)
         if body:
             if highlight:
@@ -229,7 +229,7 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
             else:
                 s = 0.7   # scale down the brightness if necessary
                 glColor3f(color[0]*s, color[1]*s, color[2]*s)
-        glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tostring())
+        glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tobytes())
         # end wireframe
     glDisableClientState(GL_COLOR_ARRAY)
     glDisableClientState(GL_VERTEX_ARRAY)
@@ -245,7 +245,7 @@ def make_light_cube(cube_number):
     glNewList(c, GL_COMPILE)
     glPushMatrix()
     glTranslatef(*p)
-    rotmat = array.array('f',quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)).tostring()
+    rotmat = array.array('f',quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)).tobytes()
     glMultMatrixf(rotmat)
     #
     if lcube.pose.is_comparable(robot.pose):
@@ -274,7 +274,7 @@ def make_custom_objects():
         obj_size = (obj.x_size_mm, obj.y_size_mm, obj.z_size_mm)
         glPushMatrix()
         glTranslatef(*p)
-        glRotatef(obj.pose.rotation.angle_z.degrees, 0, 1, 0)
+        glRotatef(obj.pose.rotation.angle_z.degrees, 0, 0, 1)
         comparable = obj.pose.origin_id == 0 or obj.pose.is_comparable(robot.pose)
         if isinstance(obj, cozmo.objects.FixedCustomObject):
             obj_color = color_yellow
@@ -456,7 +456,7 @@ def display():
         wscale, 0,      0,      0,
         0,      wscale, 0,      0,
         0,      0,      wscale, 0,
-        0,      0,      0,      1]).tostring()
+        0,      0,      0,      1]).tobytes()
     glMultMatrixf(rotmat)
     # Model transformation switches to robot coordinates: z is up, x forward, y left.
     # View transformation moves the camera, keeping it pointed at the fixation point.

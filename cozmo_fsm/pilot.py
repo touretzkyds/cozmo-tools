@@ -1,18 +1,25 @@
 from .base import *
 from .rrt import *
+from .nodes import Turn, Forward
+import time
+
+from cozmo.util import distance_mm, speed_mmps
 
 class NavStep():
     FORWARD = "forward"
     BACKWARD = "backward"
     HEADING = "heading"
+<<<<<<< HEAD
     ARC = "arc"
+=======
+>>>>>>> master
 
     def __init__(self, type, params):
         self.type = type
         self.params = params
 
     def __repr__(self):
-        return '<NavStep %.1f,%.1f>' % params
+        return '<NavStep %.1f,%.1f>' % self.params
 
 class NavPlan():
     def __init__(self, steps=[]):
@@ -24,6 +31,8 @@ class NavPlan():
         for node in path:
             steps.append(NavStep(NavStep.FORWARD,
                                  (node.x, node.y, node.q)))
+        if path[-2].x == path[-1].x and path[-2].y == path[-1].y:
+            steps[-1].type = NavStep.HEADING
         return NavPlan(steps)
 
 class PilotToPose(StateNode):
@@ -32,15 +41,16 @@ class PilotToPose(StateNode):
         self.target_pose = pose
 
     def start(self,event=None):
-        pose = self.robot.pose
-        start = RRTNode(x=pose.position.x, y=pose.position.y,
-                        q=pose.rotation.angle_z.radians)
+        super().start(event)
+        (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
+        start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
         tpose = self.target_pose
-        goal = RRTNode(x=tpose.position.x, y=tpose.position.y,
-                       q=tpose.rotation.angle_z.radians)
+        goal_node = RRTNode(x=tpose.position.x, y=tpose.position.y,
+                            q=tpose.rotation.angle_z.radians)
 
         try:
-            (treeA, treeB, path) = self.robot.world.rrt.plan_path(start,goal)
+            (treeA, treeB, path) = \
+                    self.robot.world.rrt.plan_path(start_node,goal_node)
         except StartCollides:
             print('Start collides!')
             self.post_failure()
@@ -58,7 +68,34 @@ class PilotToPose(StateNode):
         if self.robot.world.path_viewer:
             self.robot.world.path_viewer.add_tree(path, (1,1,0,0.5))
 
-        # smooth the path...
-
         # construct nav plan
-        plan = NavPlan.from_path(path)
+        print('path=',path)
+        self.plan = NavPlan.from_path(path)
+        self.robot.loop.create_task(self.execute_plan())
+
+    async def execute_plan(self):
+        for step in self.plan.steps[1:]:
+            if not self.running: return
+            (targ_x, targ_y, targ_hdg) = step.params
+            self.robot.world.particle_filter.variance_estimate()
+            (cur_x,cur_y,cur_hdg) = self.robot.world.particle_filter.pose
+            if step.type == NavStep.HEADING:
+                turn_angle = wrap_angle(targ_hdg - cur_hdg)
+                await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
+                continue
+            # FORWARD step
+            print('cur = ', (cur_x,cur_y), ' @ ', cur_hdg*180/pi, 'deg.')
+            dx = targ_x - cur_x
+            dy = targ_y - cur_y
+            dist = sqrt(dx**2 + dy**2)
+            course = atan2(dy,dx)
+            print('targ =', (targ_x,targ_y))
+            turn_angle = wrap_angle(course - cur_hdg)
+            print('turn_angle=',turn_angle*180/pi)
+            await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
+            if not self.running: return
+            print('dist=',dist)
+            await self.robot.drive_straight(distance_mm(dist),
+                                            speed_mmps(50)).wait_for_completed()
+        print('done executing')
+        self.post_completion()

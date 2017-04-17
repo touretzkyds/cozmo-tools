@@ -40,11 +40,14 @@ class Joint():
     def __repr__(self):
         if self.type == 'fixed':
             qval = 'fixed'
-        else:
+        elif isinstance(self.q, (int,float)):
             qval = "q=%.2f deg." % (self.q*180/math.pi)
+        else:
+            qval = ("q=%s" % repr(self.q))
         return "<Joint '%s' %s>" % (self.name, qval)
 
     def this_joint_to_this_link(self):
+        "The link moves by q in the joint's reference frame."
         return self.apply_q()
 
     def this_link_to_this_joint(self):
@@ -60,7 +63,7 @@ class Joint():
         return transform.identity()
 
     def world_joint(self):
-        return transform.translate(self.q[0],self.q[1]).transform.aboutZ(self.q[2])
+        return transform.translate(self.q[0],self.q[1]).dot(transform.aboutZ(self.q[2]))
 
 class Kinematics():
     def __init__(self,joint_list,robot):
@@ -80,25 +83,31 @@ class Kinematics():
         Tinv = transform.identity()
         j = joint
         while j is not self.base and j.parent is not None:
-            Tinv = j.parent.this_link_to_this_joint().dot(j.this_joint_to_parent_link.dot(Tinv))
+            Tinv = j.parent.this_link_to_this_joint().dot(
+                j.this_joint_to_parent_link.dot(Tinv)
+                )
             j = j.parent
         if j:
             return Tinv
         else:
             raise Exception('Joint %s has no path to base frame' % joint)
 
-    def link_to_base(self,joint):
-        return self.joint_to_base(joint).dot(joint.this_link_to_this_joint())
-
     def base_to_joint(self,joint):
         return np.linalg.inv(self.joint_to_base(joint))
 
     def joint_to_joint(self,joint1,joint2):
-        if isinstance(joint1, str):
-            joint1 = self.joints[joint1]
-        if isinstance(joint2, str):
-            joint2 = self.joints[joint2]
         return self.base_to_joint(joint2).dot(self.joint_to_base(joint1))
+
+    def link_to_base(self,joint):
+        if isinstance(joint,str):
+            joint = self.joints[joint]
+        return self.joint_to_base(joint).dot(joint.this_link_to_this_joint())
+
+    def base_to_link(self,joint):
+        return np.linalg.inv(self.link_to_base(joint))
+
+    def link_to_link(self,joint1,joint2):
+        return self.base_to_link(joint2).dot(self.link_to_base(joint1))
 
     def get_pose(self):
         for j in self.joints.values():

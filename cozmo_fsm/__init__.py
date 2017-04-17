@@ -11,3 +11,5 @@ from .speech import *
 from .worldmap import WorldMap
 from .worldmap_viewer import WorldMapViewer
 from .pilot import *
+from . import wall_defs
+from . import custom_objs

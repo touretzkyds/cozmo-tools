@@ -1,4 +1,4 @@
-from math import pi, sin, cos, inf, atan2
+from math import pi, sin, cos, inf, atan2, nan, isnan
 import numpy as np
 import random
 import time
@@ -6,7 +6,10 @@ import time
 import cozmo_fsm.transform
 from .transform import wrap_angle
 from .rrt_shapes import *
-from .worldmap import Wall, wall_marker_dict, LightCubeObst
+from .worldmap import Wall, wall_marker_dict, LightCubeObst, CustomCubeObst
+
+# *** TODO: Collision checking needs to use opposite headings
+# for treeB nodes because robot is asymmetric.
 
 #---------------- RRTNode ----------------
 
@@ -30,14 +33,21 @@ class GoalCollides(Exception): pass
 class MaxIterations(Exception): pass
 
 class RRT():
+<<<<<<< HEAD
     def __init__(self, robot, max_iter=1000, step_size=10, arc_radius=40,
+=======
+    def __init__(self, robot, max_iter=1000, step_size=10,
+>>>>>>> master
                  xy_tolsq=16, q_tol=5/180*pi,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
+<<<<<<< HEAD
         self.arc_radius = arc_radius
+=======
+>>>>>>> master
         self.xy_tolsq = xy_tolsq
         self.q_tol = q_tol
         self.robot_parts = self.make_robot_parts(robot)
@@ -85,9 +95,19 @@ class RRT():
     def interpolate(self, node, target):
         dx = target.x - node.x
         dy = target.y - node.y
-        if (dx*dx + dy*dy) < self.tolsq:
-            return (self.REACHED, RRTNode(parent=node, x=target.x, y=target.y))
+        distsq = dx*dx + dy*dy
         q = atan2(dy,dx)
+        dq = wrap_angle(q - node.q)
+        if abs(dq) >= self.q_tol:
+            # Must be able to turn to the new heading without colliding
+            turn_dir = +1 if dq >= 0 else -1
+            q_inc = turn_dir * self.q_tol
+            while abs(q_inc - dq) > self.q_tol:
+                if self.collides(RRTNode(x=node.x, y=node.y, q=node.q+q_inc)):
+                    return (self.COLLISION, None)
+                q_inc += turn_dir * self.q_tol
+        if distsq < self.xy_tolsq:
+            return (self.REACHED, RRTNode(parent=node, x=target.x, y=target.y,q=q))
         xstep = self.step_size * cos(q)
         ystep = self.step_size * sin(q)
         new_node = RRTNode(parent=node, x=node.x+xstep, y=node.y+ystep, q=q)
@@ -118,7 +138,7 @@ class RRT():
 
     def plan_path(self, start, goal, max_turn=pi, arc_radius=0):
         if self.auto_obstacles:
-            self.obstacles = self.generate_obstacles()
+            self.generate_obstacles()
         self.start = start
         self.goal = goal
         if self.collides(start):
@@ -155,6 +175,7 @@ class RRT():
         pathA.reverse()
         # treeB was built backwards from the goal, so headings
         # need to be reversed
+        goal_q = treeB[0].q
         nodeB = treeB[-1]
         pathB = []
         prev_heading = wrap_angle(nodeB.q + pi)
@@ -163,7 +184,43 @@ class RRT():
             (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
             pathB.append(nodeB)
         self.path = pathA + pathB
+        self.smooth_path()
+        if not isnan(goal_q):
+            # Last node turns to desired final heading
+            last = self.path[-1]
+            goal = RRTNode(parent=None, x=last.x, y=last.y, q=goal_q)
+            self.path.append(goal)
         return (treeA, treeB, self.path)
+
+    def smooth_path(self):
+        """Smooth a path by picking random subsequences and replacing
+        them with a direct link if there is no collision."""
+        smoothed_path = self.path
+        for _ in range(0,len(smoothed_path)):
+            i = random.randrange(0,len(smoothed_path)-1)
+            j = random.randrange(i+1, len(smoothed_path))
+            dx = smoothed_path[j].x - smoothed_path[i].x
+            dy = smoothed_path[j].y - smoothed_path[i].y
+            theta = atan2(dy,dx)
+            dist = sqrt(dx**2 + dy**2)
+            cur_x = smoothed_path[i].x
+            cur_y = smoothed_path[i].y
+            step_x = self.step_size * cos(theta)
+            step_y = self.step_size * sin(theta)
+            collision = False
+            traveled = 0
+            while traveled < dist:
+                traveled += self.step_size
+                cur_x += step_x
+                cur_y += step_y
+                if self.collides(RRTNode(None, cur_x, cur_y, theta)):
+                    collision = True
+                    break
+            if not collision:
+                smoothed_path[j].parent = smoothed_path[i]
+                smoothed_path[j].theta = theta
+                smoothed_path = smoothed_path[:i+1] + smoothed_path[j:]
+        self.path = smoothed_path
 
     def make_robot_parts(self,robot):
         result = []
@@ -176,15 +233,15 @@ class RRT():
 
     def generate_obstacles(self):
         self.robot.world.world_map.generate_map()
-        result = []
-        for obj in self.robot.world.world_map.objects:
+        obstacles = []
+        for obj in self.robot.world.world_map.objects.values():
             if isinstance(obj, Wall):
-                result = result + self.generate_wall_obstacle(obj)
-            elif isinstance(obj, LightCubeObst):
-                result.append(self.generate_cube_obstacle(obj))
-        return result
+                obstacles = obstacles + self.generate_wall_obstacles(obj)
+            elif isinstance(obj, (LightCubeObst,CustomCubeObst)):
+                obstacles.append(self.generate_cube_obstacle(obj))
+        self.obstacles = obstacles
 
-    def generate_wall_obstacle(self,wall):
+    def generate_wall_obstacles(self,wall):
         wall_spec = wall_marker_dict[wall.id]
         half_length = wall.length / 2
         widths = []

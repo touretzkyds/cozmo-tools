@@ -1,4 +1,5 @@
 import time
+import functools
 import numpy
 import cv2
 
@@ -15,6 +16,7 @@ from .path_viewer import PathViewer
 from .worldmap_viewer import WorldMapViewer
 from .speech import SpeechListener, Thesaurus
 from . import opengl
+from . import custom_objs
 
 class StateMachineProgram(StateNode):
     def __init__(self,
@@ -37,6 +39,9 @@ class StateMachineProgram(StateNode):
         super().__init__()
         self.name = self.__class__.__name__.lower()
 
+        self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
+        time.sleep(0.5)  # need time for custom objects to be transmitted
+        
         self.kine_class = kine_class
         self.windowName = None
         self.cam_viewer = cam_viewer
@@ -56,19 +61,19 @@ class StateMachineProgram(StateNode):
         self.thesaurus = thesaurus
 
     def start(self):
+<<<<<<< HEAD
         #self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
+=======
+        # Create a particle filter
+        if not isinstance(self.particle_filter,ParticleFilter):
+            self.particle_filter = SLAMParticleFilter(self.robot)
+        pf = self.particle_filter
+        pf.primed = False  # haven't processed a camera image yet
+        self.robot.world.particle_filter = pf
+>>>>>>> master
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
         self.set_polling_interval(0.050)  # for kine and motion model update
-        # Create a particle filter
-        if self.particle_filter:
-            if self.particle_filter is True:
-                self.particle_filter = SLAMParticleFilter(self.robot)
-            pf = self.particle_filter
-            pf.primed = False  # haven't processed a camera image yet
-            self.robot.world.particle_filter = pf
-        else:
-            self.robot.world.particle_filter = None
         # World map and path planner
         self.robot.world.world_map = \
                 self.world_map or WorldMap(self.robot)
@@ -77,6 +82,11 @@ class StateMachineProgram(StateNode):
         # Launch viewers
         opengl.init()
         opengl.launch_event_loop()
+<<<<<<< HEAD
+=======
+        if self.world_viewer:
+            world_viewer.viewer(self.robot)
+>>>>>>> master
 
         if self.cam_viewer:
             self.windowName = self.name
@@ -102,6 +112,7 @@ class StateMachineProgram(StateNode):
             self.path_viewer.start()
         self.robot.world.path_viewer = self.path_viewer
 
+<<<<<<< HEAD
         if self.worldmap_viewer:
             if self.worldmap_viewer is True:
                 self.worldmap_viewer = WorldMapViewer(self.robot)
@@ -111,19 +122,23 @@ class StateMachineProgram(StateNode):
         # Request camera image and object streams
 
         # Request camera image stream
+=======
+        # Request camera image and object streams
+>>>>>>> master
         self.robot.camera.image_stream_enabled = True
         self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                            self.process_image)
+        self.robot.world.add_event_handler(
+            cozmo.objects.EvtObjectObserved,
+            self.robot.world.world_map.handle_object_observed)
 
         # Start speech recognition if requested
         if self.speech:
             self.speech_listener = SpeechListener(self.robot,self.thesaurus,debug=self.speech_debug)
             self.speech_listener.start()
 
-        # Call parent's start() to launch the state machine, which
-        # may create additional windows.  Then launch GLUT main loop.
+        # Call parent's start() to launch the state machine.
         super().start()
-        opengl.launch_main_loop()
 
     def stop(self):
         super().stop()

@@ -43,7 +43,7 @@ class CozmoKinematics(Kinematics):
         # x axis points right, y points down, z points forward
         camera_frame = Joint('camera', parent=camera_dummy, d=15., theta=-pi/2)
 
-        joints = [base_frame, cor_frame,
+        joints = [base_frame, world_frame, cor_frame,
                   front_axle_frame, back_axle_frame,
                   shoulder_frame, lift_attach_frame,
                   head_frame, camera_dummy, camera_frame]

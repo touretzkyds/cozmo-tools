@@ -9,8 +9,7 @@ from cozmo_fsm import *
 
 class CV_GoodFeatures(StateMachineProgram):
     def __init__(self):
-        super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
-                         annotate_cube = False)
+        super().__init__(aruco=False, cam_viewer=True, annotate_cube = False)
 
     def start(self):
         cv2.namedWindow('features')
