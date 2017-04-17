@@ -9,10 +9,7 @@ class NavStep():
     FORWARD = "forward"
     BACKWARD = "backward"
     HEADING = "heading"
-<<<<<<< HEAD
     ARC = "arc"
-=======
->>>>>>> master
 
     def __init__(self, type, params):
         self.type = type

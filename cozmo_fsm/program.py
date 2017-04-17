@@ -60,17 +60,19 @@ class StateMachineProgram(StateNode):
         self.speech_debug = speech_debug
         self.thesaurus = thesaurus
 
+    async def daco(self):
+        await self.robot.world.delete_all_custom_objects()
+
     def start(self):
-<<<<<<< HEAD
-        #self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
-=======
+        self.robot.loop.create_task(self.daco())
+
         # Create a particle filter
         if not isinstance(self.particle_filter,ParticleFilter):
             self.particle_filter = SLAMParticleFilter(self.robot)
         pf = self.particle_filter
         pf.primed = False  # haven't processed a camera image yet
         self.robot.world.particle_filter = pf
->>>>>>> master
+
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
         self.set_polling_interval(0.050)  # for kine and motion model update
@@ -82,11 +84,6 @@ class StateMachineProgram(StateNode):
         # Launch viewers
         opengl.init()
         opengl.launch_event_loop()
-<<<<<<< HEAD
-=======
-        if self.world_viewer:
-            world_viewer.viewer(self.robot)
->>>>>>> master
 
         if self.cam_viewer:
             self.windowName = self.name
@@ -112,7 +109,6 @@ class StateMachineProgram(StateNode):
             self.path_viewer.start()
         self.robot.world.path_viewer = self.path_viewer
 
-<<<<<<< HEAD
         if self.worldmap_viewer:
             if self.worldmap_viewer is True:
                 self.worldmap_viewer = WorldMapViewer(self.robot)
@@ -120,11 +116,6 @@ class StateMachineProgram(StateNode):
         self.robot.world.worldmap_viewer = self.worldmap_viewer
 
         # Request camera image and object streams
-
-        # Request camera image stream
-=======
-        # Request camera image and object streams
->>>>>>> master
         self.robot.camera.image_stream_enabled = True
         self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                            self.process_image)

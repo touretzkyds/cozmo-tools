@@ -33,21 +33,14 @@ class GoalCollides(Exception): pass
 class MaxIterations(Exception): pass
 
 class RRT():
-<<<<<<< HEAD
     def __init__(self, robot, max_iter=1000, step_size=10, arc_radius=40,
-=======
-    def __init__(self, robot, max_iter=1000, step_size=10,
->>>>>>> master
                  xy_tolsq=16, q_tol=5/180*pi,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
-<<<<<<< HEAD
         self.arc_radius = arc_radius
-=======
->>>>>>> master
         self.xy_tolsq = xy_tolsq
         self.q_tol = q_tol
         self.robot_parts = self.make_robot_parts(robot)
