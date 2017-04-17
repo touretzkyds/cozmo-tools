@@ -49,9 +49,9 @@ class WorldMap():
             markers.append((id,spec))
             seen_markers[wall_id] = markers
         # Delete any pre-existing versions of these walls
-        for obj in self.objects.copy():
-            if isinstance(obj,Wall) and obj.id in seen_markers:
-                self.objects.remove(obj)
+        #for obj in self.objects.copy():
+        #    if isinstance(obj,Wall) and obj.id in seen_markers:
+        #        self.objects.remove(obj)
         # Now infer the walls from the markers
         for (id,markers) in seen_markers.items():
             self.objects.append(self.infer_wall(id,markers))

@@ -4,6 +4,8 @@ from .rrt import *
 class NavStep():
     FORWARD = "forward"
     BACKWARD = "backward"
+    HEADING = "heading"
+    ARC = "arc"
 
     def __init__(self, type, params):
         self.type = type

@@ -11,14 +11,16 @@ from .worldmap import Wall, wall_marker_dict, LightCubeObst
 #---------------- RRTNode ----------------
 
 class RRTNode():
-    def __init__(self, parent=None, x=0, y=0, q=0):
+    def __init__(self, parent=None, x=0, y=0, q=0, radius=0):
         self.parent = parent
         self.x = x
         self.y = y
         self.q = q
+        self.radius = radius
 
     def __repr__(self):
-        return '<RRTNode (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
+        rad = "" if self.radius == 0 else (" rad. %d" % self.radius)
+        return '<RRTNode (%.1f,%.1f)@%d deg%s>' % (self.x, self.y, self.q/pi*180, rad)
 
 
 #---------------- RRT Path Planner ----------------
@@ -28,13 +30,16 @@ class GoalCollides(Exception): pass
 class MaxIterations(Exception): pass
 
 class RRT():
-    def __init__(self, robot, max_iter=1000, step_size=5, tolsq=16,
+    def __init__(self, robot, max_iter=1000, step_size=10, arc_radius=40,
+                 xy_tolsq=16, q_tol=5/180*pi,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
-        self.tolsq = tolsq
+        self.arc_radius = arc_radius
+        self.xy_tolsq = xy_tolsq
+        self.q_tol = q_tol
         self.robot_parts = self.make_robot_parts(robot)
         self.bounds = bounds
         self.obstacles = obstacles
@@ -74,7 +79,7 @@ class RRT():
         status, new_node = self.interpolate(nearest, target)
         if status is not self.COLLISION:
             tree.append(new_node)
-        time.sleep(0.01)
+        time.sleep(0.01)   # *** FOR ANIMATION PURPOSES
         return (status, new_node)
 
     def interpolate(self, node, target):
@@ -108,7 +113,10 @@ class RRT():
                     return True
         return False        
 
-    def plan_path(self, start, goal):
+    def plan_push_chip(self, start, goal, max_turn=20*pi/180, arc_radius=40.):
+        return plan_path(self, start, goal, max_turn, arc_radius)
+
+    def plan_path(self, start, goal, max_turn=pi, arc_radius=0):
         if self.auto_obstacles:
             self.obstacles = self.generate_obstacles()
         self.start = start

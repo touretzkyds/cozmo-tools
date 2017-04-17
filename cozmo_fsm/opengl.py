@@ -19,7 +19,7 @@ def init():
     if not INIT_DONE:
         INIT_DONE = True
         glutInit()
-        glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
 
         # Default to drawing outlines of shapes
         glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)

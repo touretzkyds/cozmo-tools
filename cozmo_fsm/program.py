@@ -4,8 +4,6 @@ import cv2
 
 import cozmo
 
-import world_viewer
-
 from .base import StateNode
 from .aruco import *
 from .particle import *
@@ -14,13 +12,13 @@ from .particle_viewer import ParticleViewer
 from .worldmap import WorldMap
 from .rrt import RRT
 from .path_viewer import PathViewer
+from .worldmap_viewer import WorldMapViewer
 from .speech import SpeechListener, Thesaurus
 from . import opengl
 
 class StateMachineProgram(StateNode):
     def __init__(self,
                  kine_class=CozmoKinematics,
-                 world_viewer=False,
                  cam_viewer=True,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
@@ -29,6 +27,7 @@ class StateMachineProgram(StateNode):
                  arucolibname=cv2.aruco.DICT_4X4_250,
                  particle_filter = True,
                  world_map = None,
+                 worldmap_viewer=False,
                  rrt = None,
                  path_viewer = False,
                  speech = False,
@@ -40,7 +39,6 @@ class StateMachineProgram(StateNode):
 
         self.kine_class = kine_class
         self.windowName = None
-        self.world_viewer = world_viewer
         self.cam_viewer = cam_viewer
         self.particle_viewer = particle_viewer
         self.particle_viewer_scale = particle_viewer_scale
@@ -50,6 +48,7 @@ class StateMachineProgram(StateNode):
             self.robot.world.aruco = Aruco(arucolibname)
         self.particle_filter = particle_filter
         self.world_map = world_map
+        self.worldmap_viewer = worldmap_viewer
         self.rrt = rrt
         self.path_viewer = path_viewer
         self.speech = speech
@@ -57,7 +56,7 @@ class StateMachineProgram(StateNode):
         self.thesaurus = thesaurus
 
     def start(self):
-        self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
+        #self.robot.loop.create_task(self.robot.world.delete_all_custom_objects())
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
         self.set_polling_interval(0.050)  # for kine and motion model update
@@ -76,8 +75,8 @@ class StateMachineProgram(StateNode):
         self.robot.world.rrt = self.rrt or RRT(self.robot)
 
         # Launch viewers
-        if self.world_viewer:
-            world_viewer.viewer(self.robot)
+        opengl.init()
+        opengl.launch_event_loop()
 
         if self.cam_viewer:
             self.windowName = self.name
@@ -99,10 +98,17 @@ class StateMachineProgram(StateNode):
 
         if self.path_viewer:
             if self.path_viewer is True:
-                self.path_viewer = \
-                    PathViewer(self.robot.world.rrt)
+                self.path_viewer = PathViewer(self.robot.world.rrt)
             self.path_viewer.start()
         self.robot.world.path_viewer = self.path_viewer
+
+        if self.worldmap_viewer:
+            if self.worldmap_viewer is True:
+                self.worldmap_viewer = WorldMapViewer(self.robot)
+            self.worldmap_viewer.start()
+        self.robot.world.worldmap_viewer = self.worldmap_viewer
+
+        # Request camera image and object streams
 
         # Request camera image stream
         self.robot.camera.image_stream_enabled = True
@@ -173,3 +179,6 @@ class StateMachineProgram(StateNode):
         pf = self.robot.world.particle_filter
         if pf and not pf.primed:
             pf.look_for_new_landmarks()
+
+        # Finally update the world map
+        self.robot.world.world_map.generate_map()

@@ -34,12 +34,10 @@ class ParticleViewer():
         self.windowName = windowName
 
     def initialize_window(self):
-        global WINDOW
-        if WINDOW is None:
-            WINDOW = \
-                opengl.create_window(self.windowName,(self.width,self.height))
-        else:
-            glutSetWindow(WINDOW)
+        if not WINDOW:
+            opengl.CREATION_QUEUE.append(self.window_creator)
+        while not WINDOW:
+            time.sleep(0.1)
         glViewport(0,0,self.width,self.height)
         glClearColor(*self.bgcolor, 0)
 
