@@ -16,28 +16,31 @@ class Wall():
                (self.id, self.x, self.y, self.theta*180/pi, self.length)
         
 class LightCubeObst():
-    def __init__(self, id, x, y, theta):
+    light_cube_size = (44., 44., 44.)
+    def __init__(self, id, x, y, z, theta):
         self.id = id
         self.x = x
         self.y = y
+        self.z = z
         self.theta = theta
-        self.size = (44., 44., 44.)
+        self.size = self.light_cube_size
 
     def __repr__(self):
-        return '<LightCubeObst %d: (%.1f,%.1f) @ %d deg.>' % \
-               (self.id, self.x, self.y, self.theta*180/pi)
+        return '<LightCubeObst %d: (%.1f,%.1f, %.1f) @ %d deg.>' % \
+               (self.id, self.x, self.y, self.z, self.theta*180/pi)
 
 class CustomCubeObst():
-    def __init__(self, type, x, y, theta):
+    def __init__(self, type, x, y, z, theta):
         self.type = type
         self.x = x
         self.y = y
+        self.z = z
         self.theta = theta
         self.size = (50., 50., 50.)
 
     def __repr__(self):
-        return '<CustomCubeObst %s: (%.1f,%.1f) @ %d deg.>' % \
-               (self.type, self.x, self.y, self.theta*180/pi)
+        return '<CustomCubeObst %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
+               (self.type, self.x, self.y, self.z, self.theta*180/pi)
 
 #================ WorldMap ================
 
@@ -95,8 +98,9 @@ class WorldMap():
                 world_bearing = wrap_angle(rob_theta + bearing)
                 world_x = rob_x + dist * cos(world_bearing)
                 world_y = rob_y + dist * sin(world_bearing)
+                world_z = max(cube.pose.position.z, LightCubeObst.light_cube_size[2]/2)
                 world_orient = rob_theta + diff.rotation.angle_z.radians
-                self.objects[cube] = LightCubeObst(id, world_x, world_y, world_orient)
+                self.objects[cube] = LightCubeObst(id, world_x, world_y, world_z, world_orient)
             
     def update_object(self,obj):
         if isinstance(obj, CustomObject):
@@ -108,9 +112,10 @@ class WorldMap():
             world_bearing = wrap_angle(rob_theta + bearing)
             world_x = rob_x + dist * cos(world_bearing)
             world_y = rob_y + dist * sin(world_bearing)
+            world_z = obj.pose.position.z
             world_orient = rob_theta + diff.rotation.angle_z.radians
             t = obj.object_type
-            self.objects[t] = CustomCubeObst(t, world_x, world_y, world_orient)
+            self.objects[t] = CustomCubeObst(t, world_x, world_y, world_z, world_orient)
 
     
     def handle_object_observed(self, evt, **kwargs):

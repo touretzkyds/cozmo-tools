@@ -34,11 +34,9 @@ class ParticleViewer():
         self.scale = scale
         self.windowName = windowName
 
-    def initialize_window(self):
-        if not WINDOW:
-            opengl.CREATION_QUEUE.append(self.window_creator)
-        while not WINDOW:
-            time.sleep(0.1)
+    def window_creator(self):
+        global WINDOW
+        WINDOW = opengl.create_window(self.windowName, (self.width,self.height))        
         glutDisplayFunc(self.display)
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
@@ -49,9 +47,11 @@ class ParticleViewer():
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-
     def start(self): # Displays in background
-        self.initialize_window()
+        if not WINDOW:
+            opengl.CREATION_QUEUE.append(self.window_creator)
+            while not WINDOW:
+                time.sleep(0.1)
         print("Type 'h' in the particle viewer window for help.")
 
     def draw_rectangle(self, center, size=(10,10),

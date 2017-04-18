@@ -21,4 +21,3 @@ async def declare_objects(robot):
     await decl(CustomObjectTypes.CustomType05,
                CustomObjectMarkers.Diamonds5,
                50, 40, 40, True)
-

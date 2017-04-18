@@ -78,10 +78,6 @@ from event_monitor import monitor, unmonitor
 import cozmo_fsm
 from cozmo_fsm import *
 
-try:
-    import world_viewer
-except: pass
-
 # tab completion
 readline.parse_and_bind('tab: complete') 
 # history file
@@ -199,21 +195,21 @@ def show_stuff(spec):
         running_fsm = StateMachineProgram(cam_viewer=True).set_name("CamViewer").now()
     elif spec == "particle_viewer":
         if not robot.world.particle_viewer:
-            robot.world.particle_viewer = \
-                ParticleViewer(robot)
+            robot.world.particle_viewer = ParticleViewer(robot)
             robot.world.particle_viewer.start()
     elif spec == "path_viewer":
         if not robot.world.path_viewer:
-            robot.world.path_viewer = \
-                PathViewer(world.rrt)
+            robot.world.path_viewer = PathViewer(world.rrt)
             robot.world.path_viewer.start()
-    elif spec == "world_viewer":
-        world_viewer.viewer(robot)
+    elif spec == "worldmap_viewer":
+        if not robot.world.worldmap_viewer:
+            robot.world.worldmap_viewer = WorldMapViewer(robot)
+            robot.world.worldmap_viewer.start()
     else:
         print("""Invalid option. Try one of:
   show active
   show viewer
-  show world_viewer
+  show worldmap_viewer
   show particle_viewer
   show path_viewer
   """)

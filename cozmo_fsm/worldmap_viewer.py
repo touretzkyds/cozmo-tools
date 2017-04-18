@@ -14,6 +14,7 @@ from OpenGL.GLU import *
 
 from . import opengl
 from . import transform
+from . import worldmap
 
 import cozmo
 
@@ -178,10 +179,10 @@ class WorldMapViewer():
         glDisableClientState(GL_COLOR_ARRAY)
         glDisableClientState(GL_VERTEX_ARRAY)
 
-    def make_light_cube(self,cube_number):
-        lcube = self.robot.world.light_cubes[cube_number]
-        if (not lcube.pose) or not lcube.pose.is_valid: return None
-        p = lcube.pose.position.x_y_z
+    def make_light_cube(self,lcube,cube_obst):
+        global gl_lists
+        cube_number = cube_obst.id
+        p = (cube_obst.x, cube_obst.y, cube_obst.z)
         s = light_cube_size_mm
         color = (None, color_red, color_green, color_blue)[cube_number]
         valid_pose = (lcube.pose.origin_id == self.robot.pose.origin_id)
@@ -204,7 +205,7 @@ class WorldMapViewer():
         glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(cube_number)))
         glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
 
     def make_custom_objects(self):
         custom_objects = [v for v in self.robot.world._objects.values()
@@ -235,6 +236,7 @@ class WorldMapViewer():
         return c
 
     def make_floor(self):
+        global gl_lists
         floor_size = (800, 800, 1)
         blip = floor_size[2]
         c = glGenLists(1)
@@ -256,7 +258,7 @@ class WorldMapViewer():
             glEnd()
         glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
 
     def make_charger(self):
         charger = self.robot.world.charger
@@ -292,6 +294,7 @@ class WorldMapViewer():
         return c
 
     def make_cozmo_robot(self):
+        global gl_lists
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
@@ -306,9 +309,10 @@ class WorldMapViewer():
         self.make_cube(robot_head_size_mm, highlight=self.robot.is_on_charger)
         glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
 
     def make_axes(self):
+        global gl_lists
         if not self.show_axes: return None
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
@@ -327,9 +331,10 @@ class WorldMapViewer():
         self.make_cube((w,w,len), highlight=True, color=color_blue, edges=False)
         glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
 
     def make_gazepoint(self):
+        global gl_lists
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
@@ -338,18 +343,31 @@ class WorldMapViewer():
         self.make_cube((s,s,s), highlight=True, color=(1.0, 0.9, 0.1), edges=False)
         glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
+
+    def make_objects(self):
+        for (key,obj) in self.robot.world.world_map.objects.items():
+            if isinstance(obj, worldmap.LightCubeObst):
+                self.make_light_cube(key,obj)
+            elif isinstance(obj, worldmap.CustomCubeObst):
+                pass # self.make_custom_cube(obj)
+            elif isinstance(obj, worldmap.WallObst):
+                self.make_wall(obj)
 
     def make_shapes(self):
+        global gl_lists
+        gl_lists = []
         global axes, gazepoint, cube1, cube2, cube3, charger, cozmo_robot, custom_objects, floor
         # axes
-        axes = self.make_axes()
+        self.make_axes()
         # gaze point
-        gazepoint = self.make_gazepoint()
-        # light cubes
-        cube1 = self.make_light_cube(cozmo.objects.LightCube1Id)
-        cube2 = self.make_light_cube(cozmo.objects.LightCube2Id)
-        cube3 = self.make_light_cube(cozmo.objects.LightCube3Id)
+        self.make_gazepoint()
+        # light cubes, qubes, and walls
+        self.make_objects()
+        cube1 = cube2 = cube3 = None
+        #cube1 = self.make_light_cube(cozmo.objects.LightCube1Id)
+        #cube2 = self.make_light_cube(cozmo.objects.LightCube2Id)
+        #cube3 = self.make_light_cube(cozmo.objects.LightCube3Id)
         # charger
         charger = self.make_charger()
         # cozmo robot
@@ -360,15 +378,9 @@ class WorldMapViewer():
         floor = self.make_floor()
 
     def del_shapes(self):
-        if gazepoint: glDeleteLists(gazepoint,1)
-        if axes: glDeleteLists(axes,1)
-        if cube1: glDeleteLists(cube1,1)
-        if cube2: glDeleteLists(cube2,1)
-        if cube3: glDeleteLists(cube3,1)
-        if charger: glDeleteLists(charger,1)
-        if custom_objects: glDeleteLists(custom_objects,1)
-        if floor: glDeleteLists(floor,1)
-        glDeleteLists(cozmo_robot,1)
+        global gl_lists
+        for id in gl_lists:
+            glDeleteLists(id,1)
 
     # ================ Window Setup ================
 
@@ -387,17 +399,15 @@ class WorldMapViewer():
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    def initialize_window(self):
+    def start(self): # Displays in background
         if not WINDOW:
             opengl.CREATION_QUEUE.append(self.window_creator)
-        while not WINDOW:
-            time.sleep(0.1)
-
-    def start(self): # Displays in background
-        self.initialize_window()
+            while not WINDOW:
+                time.sleep(0.1)
         print("Type 'h' in the world map window for help.")
 
     def display(self):
+        global gl_lists
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
@@ -427,15 +437,10 @@ class WorldMapViewer():
             ]
         gluLookAt(*camera_loc, *fixation_point, 0.0, 0.0, 1.0)
         self.make_shapes()
-        if axes: glCallList(axes)
-        if cube1: glCallList(cube1)
-        if cube2: glCallList(cube2)
-        if cube3: glCallList(cube3)
+        for id in gl_lists:
+            glCallList(id)
         if charger: glCallList(charger)
         if custom_objects: glCallList(custom_objects)
-        glCallList(cozmo_robot)
-        if floor: glCallList(floor)
-        if gazepoint: glCallList(gazepoint)
         glutSwapBuffers()
         self.del_shapes()
 
@@ -509,8 +514,8 @@ class WorldMapViewer():
         self.display()
 
     def reshape(self, width, height):
-        global window_width, window_height
-        window_width = width
-        window_height = height
+        self.width = width
+        self.height = height
+        self.aspect = self.width/self.height
         glViewport(0, 0, width, height)
 

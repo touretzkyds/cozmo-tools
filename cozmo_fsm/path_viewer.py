@@ -48,14 +48,12 @@ class PathViewer():
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    def initialize_window(self):
+    def start(self): # Displays in background
         if not WINDOW:
             opengl.CREATION_QUEUE.append(self.window_creator)
-        while not WINDOW:
-            time.sleep(0.1)
-
-    def start(self): # Displays in background
-        self.initialize_window()
+            while not WINDOW:
+                time.sleep(0.1)
+        print("Type 'h' in the path viewer window for help.")
 
     def clear(self):
         global the_items
