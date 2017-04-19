@@ -5,6 +5,7 @@ OpenGL world viewer for cozmo_fsm world map.
 from math import sin, cos, atan2, pi, radians
 import time
 import array
+import numpy as np
 
 from OpenGL.GLUT import *
 from OpenGL.GL import *
@@ -186,8 +187,9 @@ class WorldMapViewer():
         glNewList(c, GL_COMPILE)
         glPushMatrix()
         glTranslatef(*pos)
-        t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3).flatten()
-        rotmat = array.array('f',t).tobytes()
+        # Transpose the matrix for sending to OpenCV
+        t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3).transpose()
+        rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
         s = light_cube_size_mm
         if lcube.pose.is_comparable(self.robot.pose):
@@ -213,8 +215,9 @@ class WorldMapViewer():
         orient = obst.theta
         glPushMatrix()
         glTranslatef(*pos)
-        t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).flatten()
-        rotmat = array.array('f',t).tobytes()
+        # Transpose the matrix for sending to OpenCV
+        t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).transpose()
+        rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
         comparable = True # obj.pose.origin_id == 0 or obj.pose.is_comparable(self.robot.pose)
         obj_color = color_orange
@@ -226,6 +229,40 @@ class WorldMapViewer():
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
+
+    def make_wall(self,wall_obst):
+        global gl_lists
+        wall_spec = worldmap.wall_marker_dict[wall_obst.id]
+        half_length = wall_obst.length / 2
+        half_height = wall_obst.height / 2
+        widths = []
+        last_x = -half_length
+        edges = [ [0, -half_length, half_height, 1.] ]
+        for (center,width) in wall_spec.doorways:
+            left_edge = center - width/2 - half_length
+            edges.append([0., left_edge, half_height, 1.])
+            widths.append(left_edge - last_x)
+            right_edge = center + width/2 - half_length
+            edges.append([0., right_edge, half_height, 1.])
+            last_x = right_edge
+        edges.append([0., half_length, half_height, 1.])
+        widths.append(half_length-last_x)
+        edges = np.array(edges).T
+        edges = transform.aboutZ(wall_obst.theta).dot(edges)
+        edges = transform.translate(wall_obst.x,wall_obst.y).dot(edges)
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        for i in range(0,len(widths)):
+            center = edges[:,2*i:2*i+2].mean(1).reshape(4,1)
+            dimensions=(4.0, widths[i],wall_obst.height)
+            glPushMatrix()
+            glTranslatef(*center.flatten()[0:3])
+            glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
+            self.make_cube(size=dimensions, color=color_red)
+            glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
 
     def make_floor(self):
         global gl_lists
@@ -338,7 +375,8 @@ class WorldMapViewer():
         gl_lists.append(c)
 
     def make_objects(self):
-        for (key,obj) in self.robot.world.world_map.objects.items():
+        items = tuple(self.robot.world.world_map.objects.items())
+        for (key,obj) in items:
             if isinstance(obj, worldmap.LightCubeObst):
                 self.make_light_cube(key,obj)
             elif isinstance(obj, worldmap.CustomCubeObst):

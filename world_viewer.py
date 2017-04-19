@@ -274,7 +274,8 @@ def make_custom_objects():
         obj_size = (obj.x_size_mm, obj.y_size_mm, obj.z_size_mm)
         glPushMatrix()
         glTranslatef(*p)
-        glRotatef(obj.pose.rotation.angle_z.degrees, 0, 0, 1)
+        rotmat = array.array('f',quat2rot(*obj.pose.rotation.q0_q1_q2_q3)).tobytes()
+        glMultMatrixf(rotmat)
         comparable = obj.pose.origin_id == 0 or obj.pose.is_comparable(robot.pose)
         if isinstance(obj, cozmo.objects.FixedCustomObject):
             obj_color = color_yellow
