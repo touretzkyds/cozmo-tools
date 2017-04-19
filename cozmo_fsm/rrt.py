@@ -6,7 +6,7 @@ import time
 import cozmo_fsm.transform
 from .transform import wrap_angle
 from .rrt_shapes import *
-from .worldmap import Wall, wall_marker_dict, LightCubeObst, CustomCubeObst
+from .worldmap import WallObst, wall_marker_dict, LightCubeObst, CustomCubeObst
 
 # *** TODO: Collision checking needs to use opposite headings
 # for treeB nodes because robot is asymmetric.
@@ -228,7 +228,7 @@ class RRT():
         self.robot.world.world_map.generate_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
-            if isinstance(obj, Wall):
+            if isinstance(obj, WallObst):
                 obstacles = obstacles + self.generate_wall_obstacles(obj)
             elif isinstance(obj, (LightCubeObst,CustomCubeObst)):
                 obstacles.append(self.generate_cube_obstacle(obj))

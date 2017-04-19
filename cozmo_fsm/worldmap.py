@@ -3,16 +3,18 @@ from cozmo.objects import CustomObject
 
 from .transform import wrap_angle
 
-class Wall():
-    def __init__(self, id=0, x=0, y=0, theta=0, length=100):
+class WallObst():
+    def __init__(self, id=0, x=0, y=0, theta=0, length=100, height=150):
         self.id = id
         self.x = x
         self.y = y
+        self.z = height/2
         self.theta = theta
         self.length = length
+        self.height = height
 
     def __repr__(self):
-        return '<Wall %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
+        return '<WallObst %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
                (self.id, self.x, self.y, self.theta*180/pi, self.length)
         
 class LightCubeObst():
@@ -45,6 +47,8 @@ class CustomCubeObst():
 #================ WorldMap ================
 
 class WorldMap():
+    vision_z_fudge = 10  # Cozmo underestimates object z coord by about this much
+
     def __init__(self,robot):
         self.robot = robot
         self.objects = dict()
@@ -66,7 +70,7 @@ class WorldMap():
             seen_markers[wall_id] = markers
         # Delete any pre-existing versions of these walls
         #for obj in self.objects.copy():
-        #    if isinstance(obj,Wall) and obj.id in seen_markers:
+        #    if isinstance(obj,WallObst) and obj.id in seen_markers:
         #        self.objects.remove(obj)
         # Now infer the walls from the markers
         for (id,markers) in seen_markers.items():
@@ -84,8 +88,8 @@ class WorldMap():
             wall_orient = m_orient # simple for now
             wall_x = m_x + dist*cos(wall_orient-pi/2)
             wall_y = m_y + dist*sin(wall_orient-pi/2)
-            return Wall(id=wall_spec.id, x=wall_x, y=wall_y, theta=wall_orient,
-                        length=wall_spec.length)
+            return WallObst(id=wall_spec.id, x=wall_x, y=wall_y, theta=wall_orient,
+                            length=wall_spec.length)
         
     def add_cubes(self):
         for (id,cube) in self.robot.world.light_cubes.items():
@@ -98,8 +102,8 @@ class WorldMap():
                 world_bearing = wrap_angle(rob_theta + bearing)
                 world_x = rob_x + dist * cos(world_bearing)
                 world_y = rob_y + dist * sin(world_bearing)
-                world_z = max(cube.pose.position.z, LightCubeObst.light_cube_size[2]/2)
-                world_orient = rob_theta + diff.rotation.angle_z.radians
+                world_z = cube.pose.position.z + self.vision_z_fudge
+                world_orient = wrap_angle(rob_theta + diff.rotation.angle_z.radians)
                 self.objects[cube] = LightCubeObst(id, world_x, world_y, world_z, world_orient)
             
     def update_object(self,obj):
@@ -112,17 +116,15 @@ class WorldMap():
             world_bearing = wrap_angle(rob_theta + bearing)
             world_x = rob_x + dist * cos(world_bearing)
             world_y = rob_y + dist * sin(world_bearing)
-            world_z = obj.pose.position.z
+            world_z = obj.pose.position.z + self.vision_z_fudge
             world_orient = rob_theta + diff.rotation.angle_z.radians
-            t = obj.object_type
-            self.objects[t] = CustomCubeObst(t, world_x, world_y, world_z, world_orient)
+            self.objects[obj] = CustomCubeObst(obj, world_x, world_y, world_z, world_orient)
 
-    
     def handle_object_observed(self, evt, **kwargs):
         if isinstance(evt.obj, CustomObject):
             self.update_object(evt.obj)
 
-#================ Actual Walls ================
+#================ Wall Specification  ================
 
 wall_marker_dict = dict()
 

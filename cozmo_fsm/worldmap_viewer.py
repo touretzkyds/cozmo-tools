@@ -4,8 +4,6 @@ OpenGL world viewer for cozmo_fsm world map.
 
 from math import sin, cos, atan2, pi, radians
 import time
-import sys
-import threading
 import array
 
 from OpenGL.GLUT import *
@@ -110,7 +108,6 @@ axis_length = 100
 axis_width = 1
 print_camera = False
 
-
 initial_fixation_point = [100, -25, 0]
 initial_camera_rotation = [0, 40, 270]
 initial_camera_distance = 500
@@ -127,9 +124,9 @@ class WorldMapViewer():
         self.robot = robot
         self.width = width
         self.height = height
-        self.bgcolor = bgcolor
         self.aspect = self.width/self.height
         self.windowName = windowName
+        self.bgcolor = bgcolor
         self.translation = [0., 0.]  # Translation in mm
         self.scale = 1
         self.show_axes = True
@@ -182,17 +179,17 @@ class WorldMapViewer():
     def make_light_cube(self,lcube,cube_obst):
         global gl_lists
         cube_number = cube_obst.id
-        p = (cube_obst.x, cube_obst.y, cube_obst.z)
-        s = light_cube_size_mm
+        pos = (cube_obst.x, cube_obst.y, cube_obst.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
         valid_pose = (lcube.pose.origin_id == self.robot.pose.origin_id)
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
-        glTranslatef(*p)
+        glTranslatef(*pos)
         t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3).flatten()
         rotmat = array.array('f',t).tobytes()
         glMultMatrixf(rotmat)
+        s = light_cube_size_mm
         if lcube.pose.is_comparable(self.robot.pose):
             # make solid cube and highlight if visible
             self.make_cube((s,s,s), highlight=lcube.is_visible, color=color)
@@ -207,33 +204,28 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
-    def make_custom_objects(self):
-        custom_objects = [v for v in self.robot.world._objects.values()
-                         if isinstance(v, (cozmo.objects.CustomObject,
-                                           cozmo.objects.FixedCustomObject))]
-        if not custom_objects: return None
+    def make_custom_cube(self,custom_obj,obst):
+        global gl_lists
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
-        for obj in custom_objects:
-            p = obj.pose.position.x_y_z
-            obj_size = (obj.x_size_mm, obj.y_size_mm, obj.z_size_mm)
-            glPushMatrix()
-            glTranslatef(*p)
-            glRotatef(obj.pose.rotation.angle_z.degrees, 0, 0, 1)
-            comparable = obj.pose.origin_id == 0 or obj.pose.is_comparable(self.robot.pose)
-            if isinstance(obj, cozmo.objects.FixedCustomObject):
-                obj_color = color_yellow
-                highlight = True
-            else:
-                obj_color = color_orange
-                highlight = obj.is_visible
-            if comparable:
-                self.make_cube(obj_size, highlight=highlight, color=obj_color)
-            else:
-                self.make_cube(obj_size, body=False, highlight=False, color=obj_color)
-            glPopMatrix()
+        pos = (obst.x, obst.y, obst.z)
+        size = obst.size
+        orient = obst.theta
+        glPushMatrix()
+        glTranslatef(*pos)
+        t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).flatten()
+        rotmat = array.array('f',t).tobytes()
+        glMultMatrixf(rotmat)
+        comparable = True # obj.pose.origin_id == 0 or obj.pose.is_comparable(self.robot.pose)
+        obj_color = color_orange
+        highlight = True # obj.is_visible
+        if comparable:
+            self.make_cube(size, highlight=highlight, color=obj_color)
+        else:
+            self.make_cube(size, body=False, highlight=False, color=obj_color)
+        glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
 
     def make_floor(self):
         global gl_lists
@@ -350,7 +342,7 @@ class WorldMapViewer():
             if isinstance(obj, worldmap.LightCubeObst):
                 self.make_light_cube(key,obj)
             elif isinstance(obj, worldmap.CustomCubeObst):
-                pass # self.make_custom_cube(obj)
+                self.make_custom_cube(key,obj)
             elif isinstance(obj, worldmap.WallObst):
                 self.make_wall(obj)
 
@@ -364,7 +356,7 @@ class WorldMapViewer():
         self.make_gazepoint()
         # light cubes, qubes, and walls
         self.make_objects()
-        cube1 = cube2 = cube3 = None
+        #cube1 = cube2 = cube3 = None
         #cube1 = self.make_light_cube(cozmo.objects.LightCube1Id)
         #cube2 = self.make_light_cube(cozmo.objects.LightCube2Id)
         #cube3 = self.make_light_cube(cozmo.objects.LightCube3Id)
@@ -372,8 +364,6 @@ class WorldMapViewer():
         charger = self.make_charger()
         # cozmo robot
         cozmo_robot = self.make_cozmo_robot()
-        # custom objects
-        custom_objects = self.make_custom_objects()
         # floor
         floor = self.make_floor()
 
@@ -440,7 +430,6 @@ class WorldMapViewer():
         for id in gl_lists:
             glCallList(id)
         if charger: glCallList(charger)
-        if custom_objects: glCallList(custom_objects)
         glutSwapBuffers()
         self.del_shapes()
 
