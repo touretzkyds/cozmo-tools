@@ -53,11 +53,11 @@ class WorldMap():
         self.robot = robot
         self.objects = dict()
         
-    def generate_map(self):
-        self.generate_walls()
+    def update_map(self):
+        self.generate_walls_from_markers()
         self.add_cubes()
 
-    def generate_walls(self):
+    def generate_walls_from_markers(self):
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
         seen_markers = dict()
         # Distribute markers to wall ids
@@ -68,10 +68,6 @@ class WorldMap():
             markers = seen_markers.get(wall_id, list())
             markers.append((id,spec))
             seen_markers[wall_id] = markers
-        # Delete any pre-existing versions of these walls
-        #for obj in self.objects.copy():
-        #    if isinstance(obj,WallObst) and obj.id in seen_markers:
-        #        self.objects.remove(obj)
         # Now infer the walls from the markers
         for (id,markers) in seen_markers.items():
             self.objects[id] = self.infer_wall(id,markers)

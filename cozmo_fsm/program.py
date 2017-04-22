@@ -187,4 +187,4 @@ class StateMachineProgram(StateNode):
             pf.look_for_new_landmarks()
 
         # Finally update the world map
-        self.robot.world.world_map.generate_map()
+        self.robot.world.world_map.update_map()

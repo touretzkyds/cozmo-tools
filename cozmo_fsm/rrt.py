@@ -21,6 +21,9 @@ class RRTNode():
         self.q = q
         self.radius = radius
 
+    def copy(self):
+        return RRTNode(self.parent, self.x, self.y, self.q, self.radius)
+
     def __repr__(self):
         rad = "" if self.radius == 0 else (" rad. %d" % self.radius)
         return '<RRTNode (%.1f,%.1f)@%d deg%s>' % (self.x, self.y, self.q/pi*180, rad)
@@ -91,6 +94,8 @@ class RRT():
         distsq = dx*dx + dy*dy
         q = atan2(dy,dx)
         dq = wrap_angle(q - node.q)
+        if abs(dq) > self.max_turn:
+            return self.arc_interpolate(node,target,dq)
         if abs(dq) >= self.q_tol:
             # Must be able to turn to the new heading without colliding
             turn_dir = +1 if dq >= 0 else -1
@@ -104,6 +109,26 @@ class RRT():
         xstep = self.step_size * cos(q)
         ystep = self.step_size * sin(q)
         new_node = RRTNode(parent=node, x=node.x+xstep, y=node.y+ystep, q=q)
+        if self.collides(new_node):
+            return (self.COLLISION, None)
+        else:
+            return (self.INTERPOLATE, new_node)
+
+    def arc_interpolate(self,node,target,turn_angle):
+        if turn_angle > 0:
+            theta = node.q + pi/2
+            rad = self.arc_radius
+        else:
+            theta = node.q - pi/2
+            rad = -self.arc_radius
+        # center of arc
+        cx = node.x + self.arc_radius * cos(theta)
+        cy = node.y + self.arc_radius * sin(theta)
+        # destination if we turn through turn_angle
+        dq = node.q + turn_angle
+        dx = cx + self.arc_radius*cos(dq)
+        dy = cy + self.arc_radius*sin(dq)
+        new_node = RRTNode(parent=node, x=dx, y=dy, q=dq, radius=rad)
         if self.collides(new_node):
             return (self.COLLISION, None)
         else:
@@ -126,10 +151,12 @@ class RRT():
                     return True
         return False        
 
-    def plan_push_chip(self, start, goal, max_turn=20*pi/180, arc_radius=40.):
-        return plan_path(self, start, goal, max_turn, arc_radius)
+    def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
+        return self.plan_path(start, goal, max_turn, arc_radius)
 
     def plan_path(self, start, goal, max_turn=pi, arc_radius=0):
+        self.max_turn = max_turn
+        self.arc_radius = arc_radius
         if self.auto_obstacles:
             self.generate_obstacles()
         self.start = start
@@ -161,10 +188,10 @@ class RRT():
 
     def get_path(self, treeA, treeB):
         nodeA = treeA[-1]
-        pathA = [nodeA]
+        pathA = [nodeA.copy()]
         while nodeA.parent is not None:
             nodeA = nodeA.parent
-            pathA.append(nodeA)
+            pathA.append(nodeA.copy())
         pathA.reverse()
         # treeB was built backwards from the goal, so headings
         # need to be reversed
@@ -175,9 +202,9 @@ class RRT():
         while nodeB.parent is not None:
             nodeB = nodeB.parent
             (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
-            pathB.append(nodeB)
+            pathB.append(nodeB.copy())
         self.path = pathA + pathB
-        self.smooth_path()
+        #self.smooth_path()
         if not isnan(goal_q):
             # Last node turns to desired final heading
             last = self.path[-1]
@@ -194,24 +221,24 @@ class RRT():
             j = random.randrange(i+1, len(smoothed_path))
             dx = smoothed_path[j].x - smoothed_path[i].x
             dy = smoothed_path[j].y - smoothed_path[i].y
-            theta = atan2(dy,dx)
+            q = atan2(dy,dx)
             dist = sqrt(dx**2 + dy**2)
             cur_x = smoothed_path[i].x
             cur_y = smoothed_path[i].y
-            step_x = self.step_size * cos(theta)
-            step_y = self.step_size * sin(theta)
+            step_x = self.step_size * cos(q)
+            step_y = self.step_size * sin(q)
             collision = False
             traveled = 0
             while traveled < dist:
                 traveled += self.step_size
                 cur_x += step_x
                 cur_y += step_y
-                if self.collides(RRTNode(None, cur_x, cur_y, theta)):
+                if self.collides(RRTNode(None, cur_x, cur_y, q)):
                     collision = True
                     break
             if not collision:
                 smoothed_path[j].parent = smoothed_path[i]
-                smoothed_path[j].theta = theta
+                smoothed_path[j].q = q
                 smoothed_path = smoothed_path[:i+1] + smoothed_path[j:]
         self.path = smoothed_path
 
@@ -225,7 +252,7 @@ class RRT():
         return result
 
     def generate_obstacles(self):
-        self.robot.world.world_map.generate_map()
+        self.robot.world.world_map.update_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
             if isinstance(obj, WallObst):

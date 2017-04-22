@@ -87,7 +87,7 @@ class DefaultMotionModel(MotionModel):
         dy = new_xyz[1] - old_xyz[1]
         dist = sqrt(dx*dx + dy*dy)
         # If we didn't move much, ignore the motion
-        if False and dist < 1 and abs(turn_angle) < 0.05:
+        if dist < 1 and abs(turn_angle) < 0.05:
             return
         self.old_pose = new_pose
         # Did we drive forward, or was it backward?
@@ -356,6 +356,7 @@ class ParticleFilter():
         self.sensor_model = sensor_model
         self.particle_factory = particle_factory
         self.particles = [particle_factory() for i in range(num_particles)]
+        self.best_particle = self.particles[0]
         self.min_log_weight = -300  # prevent floating point underflow in exp()
         self.initializer.initialize(self.particles)
         self.exp_weights = np.empty(self.num_particles)
@@ -379,8 +380,11 @@ class ParticleFilter():
         cx = 0.0; cy = 0.0
         hsin = 0.0; hcos = 0.0
         weight_sum = 0.0
+        best_particle = self.particles[0]
         for p in self.particles:
             p.weight = exp(p.log_weight)
+            if p.weight > best_particle.weight:
+                best_particle = p
             cx += p.weight * p.x
             cy += p.weight * p.y
             hsin += sin(p.theta) * p.weight
@@ -391,6 +395,7 @@ class ParticleFilter():
         cx /= weight_sum
         cy /= weight_sum
         self.pose = (cx, cy, atan2(hsin,hcos))
+        self.best_particle = best_particle
         return self.pose
 
     def variance_estimate(self):
@@ -597,7 +602,7 @@ class SLAMSensorModel(SensorModel):
         (dist,turn_angle) = self.compute_robot_motion()
         # Unless forced, only evaluate if the robot moved enough
         # for evaluation to be worthwhile.
-        if (not force) and (dist < 5) and abs(turn_angle) < math.radians(5):
+        if (not force) and (dist < 1) and abs(turn_angle) < math.radians(1):
             return evaluated
         if not just_looking:
             self.last_evaluate_pose = self.robot.pose
@@ -732,4 +737,4 @@ class SLAMParticleFilter(ParticleFilter):
     def look_for_new_landmarks(self):
         """Calls evaluate() to find landmarks and add them to the maps."""
         self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
-        self.sensor_model.landmarks = self.particles[0].landmarks
+        self.sensor_model.landmarks = self.best_particle.landmarks
