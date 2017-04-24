@@ -32,10 +32,20 @@ class NavPlan():
             steps[-1].type = NavStep.HEADING
         return NavPlan(steps)
 
-class PilotToPose(StateNode):
+class PilotBase(StateNode):
+    def __init__(self):
+        super().__init__()
+
+    def planner(self):
+        raise ValueError('No planner specified')
+
+class PilotToPose(PilotBase):
     def __init__(self,pose):
         super().__init__()
         self.target_pose = pose
+
+    def planner(self,start_node,goal_node):
+        return self.robot.world.rrt.plan_path(start_node,goal_node)
 
     def start(self,event=None):
         super().start(event)
@@ -46,8 +56,7 @@ class PilotToPose(StateNode):
                             q=tpose.rotation.angle_z.radians)
 
         try:
-            (treeA, treeB, path) = \
-                    self.robot.world.rrt.plan_path(start_node,goal_node)
+            (treeA, treeB, path) = self.planner(start_node, goal_node)                    
         except StartCollides:
             print('Start collides!')
             self.post_failure()
@@ -63,7 +72,7 @@ class PilotToPose(StateNode):
 
         print(len(treeA)+len(treeB),'nodes')
         if self.robot.world.path_viewer:
-            self.robot.world.path_viewer.add_tree(path, (1,1,0,0.5))
+            self.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
         # construct nav plan
         print('path=',path)
@@ -86,9 +95,8 @@ class PilotToPose(StateNode):
             dy = targ_y - cur_y
             dist = sqrt(dx**2 + dy**2)
             course = atan2(dy,dx)
-            print('targ =', (targ_x,targ_y))
             turn_angle = wrap_angle(course - cur_hdg)
-            print('turn_angle=',turn_angle*180/pi)
+            print('targ =', (targ_x,targ_y), 'turn_angle=',turn_angle*180/pi)
             await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
             if not self.running: return
             print('dist=',dist)
@@ -96,3 +104,7 @@ class PilotToPose(StateNode):
                                             speed_mmps(50)).wait_for_completed()
         print('done executing')
         self.post_completion()
+
+class PilotPushToPose(PilotToPose):
+    def planner(self,start_node,goal_node):
+        return self.robot.world.rrt.plan_push_chip(start_node,goal_node)

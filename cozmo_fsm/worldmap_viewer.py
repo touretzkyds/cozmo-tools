@@ -216,7 +216,10 @@ class WorldMapViewer():
         glPushMatrix()
         glTranslatef(*pos)
         # Transpose the matrix for sending to OpenCV
-        t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).transpose()
+        if isinstance(custom_obj, cozmo.objects.CustomObject):
+            t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).transpose()
+        else:
+            t = transform.identity()
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
         comparable = True # obj.pose.origin_id == 0 or obj.pose.is_comparable(self.robot.pose)
