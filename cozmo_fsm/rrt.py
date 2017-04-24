@@ -219,6 +219,7 @@ class RRT():
         them with a direct link if there is no collision."""
         smoothed_path = self.path
         for _ in range(0,len(smoothed_path)):
+            # *** WARNING: CAN'T SNIP AN ARC NODE OR ITS PARENT
             i = random.randrange(0,len(smoothed_path)-1)
             cur_x = smoothed_path[i].x
             cur_y = smoothed_path[i].y
