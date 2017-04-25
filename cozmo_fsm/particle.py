@@ -87,7 +87,7 @@ class DefaultMotionModel(MotionModel):
         dy = new_xyz[1] - old_xyz[1]
         dist = sqrt(dx*dx + dy*dy)
         # If we didn't move much, ignore the motion
-        if dist < 1 and abs(turn_angle) < 0.05:
+        if dist < 5 and abs(turn_angle) < 0.05:
             return
         self.old_pose = new_pose
         # Did we drive forward, or was it backward?

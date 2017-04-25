@@ -267,8 +267,8 @@ class DriveArc(DriveWheels):
                 speed = - speed
 
             self.angle = angle
-            self.l_wheel_speed = speed * (1 + wheelbase / radius)
-            self.r_wheel_speed = speed * (1 - wheelbase / radius)
+            self.l_wheel_speed = speed * (1 - wheelbase / radius)
+            self.r_wheel_speed = speed * (1 + wheelbase / radius)
 
         else:  # radius is 0
             if angspeed is None:
@@ -281,10 +281,10 @@ class DriveArc(DriveWheels):
             self.r_wheel_speed = s
 
     def ang2dist(self, angle, radius):
-        return (angle / 360) * 2 * pi * radius
+        return (angle / 360) * 2 * pi * abs(radius)
 
     def dist2ang(self, distance, radius):
-        return (distance / (2 * pi * radius)) * 360
+        return (distance / abs(2 * pi * radius)) * 360
 
     def start(self,event=None):
         if self.running: return

@@ -25,7 +25,7 @@ class RRTNode():
         return RRTNode(self.parent, self.x, self.y, self.q, self.radius)
 
     def __repr__(self):
-        rad = "" if self.radius == 0 else (" rad. %d" % self.radius)
+        rad = "" if self.radius == 0 else (" rad=%d" % self.radius)
         return '<RRTNode (%.1f,%.1f)@%d deg%s>' % (self.x, self.y, self.q/pi*180, rad)
 
 
@@ -219,18 +219,20 @@ class RRT():
         them with a direct link if there is no collision."""
         smoothed_path = self.path
         for _ in range(0,len(smoothed_path)):
-            # *** WARNING: CAN'T SNIP AN ARC NODE OR ITS PARENT
-            i = random.randrange(0,len(smoothed_path)-1)
+            L = len(smoothed_path)
+            i = random.randrange(0,L-1)
             cur_x = smoothed_path[i].x
             cur_y = smoothed_path[i].y
             cur_q = smoothed_path[i].q
-            j = random.randrange(i+1, len(smoothed_path))
+            j = random.randrange(i+1, L)
+            if j < L-1 and smoothed_path[j+1].radius != 0:
+                continue  # j is parent node of an arc segment: don't touch
             dx = smoothed_path[j].x - cur_x
             dy = smoothed_path[j].y - cur_y
             new_q = atan2(dy,dx)
             dist = sqrt(dx**2 + dy**2)
             turn_angle = wrap_angle(new_q - cur_q)
-            if abs(turn_angle) <= self.max_angle:
+            if abs(turn_angle) <= self.max_turn:
                 smoothed_path = self.try_linear_smooth(smoothed_path,i,j,cur_x,cur_y,new_q,dist)
             else:
                 smoothed_path = self.try_arc_smooth(smoothed_path,i,j,cur_x,cur_y,cur_q,turn_angle)
@@ -249,6 +251,7 @@ class RRT():
         # no collision, so snip out nodes i+1 ... j-1
         smoothed_path[j].parent = smoothed_path[i]
         smoothed_path[j].q = new_q
+        smoothed_path[j].radius = 0
         smoothed_path = smoothed_path[:i+1] + smoothed_path[j:]
         return smoothed_path
 
@@ -260,35 +263,41 @@ class RRT():
             )
         dest_x = smoothed_path[j].x
         dest_y = smoothed_path[j].y
-        dx = dest_x - center[0,0]
-        dy = dest_y - center[1,0]
+        dx = center[0,0] - dest_x 
+        dy = center[1,0] - dest_y
         center_dist = sqrt(dx*dx + dy*dy)
+        if center_dist < self.arc_radius:  # can't turn this tight: punt
+            return smoothed_path
         # find tangent points on arc: outer tangent formula from Wikipedia with r=0
         gamma = atan2(dy, dx)
         beta = asin(self.arc_radius / center_dist)
-        alpha = gamma - beta
-        tang_x1 = center[0,0] + self.arc_radius * cos(pi/2 - alpha)
-        tang_y1 = center[1,0] + self.arc_radius * sin(pi/2 - alpha)
+        alpha1 = gamma + beta
+        tang_x1 = center[0,0] + self.arc_radius * cos(alpha1 + pi/2)
+        tang_y1 = center[1,0] + self.arc_radius * sin(alpha1 + pi/2)
         tang_q1 = (atan2(tang_y1-center[1,0], tang_x1-center[0,0]) + dir*pi/2)
         turn1 = tang_q1 - cur_q
         if dir == +1 and turn1 < 0:
             turn1 += 2*pi
         elif dir == -1 and turn1 > 0:
             turn1 += -2*pi
-        tang_x2 = center[0,0] + self.arc_radius * cos(pi/2 + alpha)
-        tang_y2 = center[1,0] + self.arc_radius * sin(pi/2 + alpha)
+        alpha2 = gamma - beta
+        tang_x2 = center[0,0] + self.arc_radius * cos(alpha2 - pi/2)
+        tang_y2 = center[1,0] + self.arc_radius * sin(alpha2 - pi/2)
         tang_q2 = (atan2(tang_y2-center[1,0], tang_x2-center[0,0]) + dir*pi/2)
         turn2 = tang_q2 - cur_q
         if dir == +1 and turn2 < 0:
             turn2 += 2*pi
         elif dir == -1 and turn2 > 0:
             turn2 += -2*pi
-        print('alpha=',alpha*180/pi,'  beta=',beta*180/pi,'  gamma=',gamma*180/pi)
+        """
+        print('alpha1=%.1f alpha2=%.1f beta=%.1f gamma=%.1f' %
+              (alpha1*180/pi, alpha2*180/pi, beta*180/pi, gamma*180/pi))
         print('dir=%d tang1=(%.1f,%.1f) tang_q1=%.1f turn1=%.1f' %
               (dir,tang_x1,tang_y1,tang_q1*180/pi,turn1*180/pi))
         print('dir=%d tang2=(%.1f,%.1f) tang_q2=%.1f turn2=%.1f' %
               (dir,tang_x2,tang_y2,tang_q2*180/pi,turn2*180/pi))
         transform.tprint(center)
+        """
         # correct tangent point has shortest turn
         if abs(turn1) < abs(turn2):
             (tang_x,tang_y,tang_q,turn) = (tang_x1,tang_y1,tang_q1,turn1)
@@ -302,7 +311,6 @@ class RRT():
             if self.collides(RRTNode(None, cur_x, cur_y, cur_q+q_traveled)):
                 return smoothed_path
             q_traveled += dir * self.q_tol
-        print('no collision.  q_traveled =',q_traveled*180/pi)
         # Now interpolate from the tangent point to the target
         cur_x = tang_x
         cur_y = tang_y
@@ -321,11 +329,11 @@ class RRT():
                 return smoothed_path
         # no collision, so snip out nodes i+1 ... j-1 and insert a turn node
         ni = smoothed_path[i]
-        turn_node = RRTNode(ni, tang_x, tang_y, tang_q, radius=self.arc_radius)
+        turn_node = RRTNode(ni, tang_x, tang_y, tang_q,
+                            radius = dir*self.arc_radius)
         smoothed_path[j].parent = turn_node
         smoothed_path[j].q = new_q
         smoothed_path = smoothed_path[:i+1] + [turn_node] + smoothed_path[j:]
-        print(smoothed_path)
         return smoothed_path        
 
     def make_robot_parts(self,robot):

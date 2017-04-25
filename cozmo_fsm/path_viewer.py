@@ -134,6 +134,8 @@ class PathViewer():
 
     def draw_node(self,node,color):
         self.draw_rectangle((node.x,node.y), color=color)
+        if node.radius != 0:
+            color = (1,1,0)
         if node.parent:
             self.draw_line((node.x,node.y), (node.parent.x,node.parent.y), color=color)
 
