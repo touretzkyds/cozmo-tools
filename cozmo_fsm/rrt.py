@@ -25,8 +25,14 @@ class RRTNode():
         return RRTNode(self.parent, self.x, self.y, self.q, self.radius)
 
     def __repr__(self):
-        rad = "" if self.radius == 0 else (" rad=%d" % self.radius)
-        return '<RRTNode (%.1f,%.1f)@%d deg%s>' % (self.x, self.y, self.q/pi*180, rad)
+        if isnan(self.q):
+            return '<RRTNode (%.1f,%.1f)>' % (self.x, self.y)
+        elif not self.parent:
+            return '<RRTNode (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
+        elif self.radius == 0:
+            return '<RRTNode line to (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
+        else:
+            return '<RRTNode arc to (%.1f,%.1f)@%d deg, rad=%d>' % (self.x, self.y, self.q/pi*180,self.radius)
 
 
 #---------------- RRT Path Planner ----------------
@@ -85,7 +91,7 @@ class RRT():
         status, new_node = self.interpolate(nearest, target)
         if status is not self.COLLISION:
             tree.append(new_node)
-        time.sleep(0.01)   # *** FOR ANIMATION PURPOSES
+        #time.sleep(0.01)   # *** FOR ANIMATION PURPOSES
         return (status, new_node)
 
     def interpolate(self, node, target):
@@ -150,7 +156,7 @@ class RRT():
         for part in self.parts_to_node(node):
             for obstacle in self.obstacles:
                 if part.collides(obstacle):
-                    return True
+                    return obstacle
         return False        
 
     def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
@@ -163,10 +169,12 @@ class RRT():
             self.generate_obstacles()
         self.start = start
         self.goal = goal
-        if self.collides(start):
-            raise StartCollides()
-        if self.collides(goal):
-            raise GoalCollides()
+        collider = self.collides(start)
+        if collider:
+            raise StartCollides(start,collider)
+        collider = self.collides(goal)
+        if collider:
+            raise GoalCollides(goal,collider)
         treeA = [start]
         treeB = [goal]
         self.treeA = treeA
@@ -220,11 +228,12 @@ class RRT():
         smoothed_path = self.path
         for _ in range(0,len(smoothed_path)):
             L = len(smoothed_path)
-            i = random.randrange(0,L-1)
+            if L == 2: break
+            i = random.randrange(0,L-2)
             cur_x = smoothed_path[i].x
             cur_y = smoothed_path[i].y
             cur_q = smoothed_path[i].q
-            j = random.randrange(i+1, L)
+            j = random.randrange(i+2, L)
             if j < L-1 and smoothed_path[j+1].radius != 0:
                 continue  # j is parent node of an arc segment: don't touch
             dx = smoothed_path[j].x - cur_x
@@ -233,9 +242,10 @@ class RRT():
             dist = sqrt(dx**2 + dy**2)
             turn_angle = wrap_angle(new_q - cur_q)
             if abs(turn_angle) <= self.max_turn:
-                smoothed_path = self.try_linear_smooth(smoothed_path,i,j,cur_x,cur_y,new_q,dist)
+                result = self.try_linear_smooth(smoothed_path,i,j,cur_x,cur_y,new_q,dist)
             else:
-                smoothed_path = self.try_arc_smooth(smoothed_path,i,j,cur_x,cur_y,cur_q,turn_angle)
+                result = self.try_arc_smooth(smoothed_path,i,j,cur_x,cur_y,cur_q)
+            smoothed_path = result or smoothed_path
         self.path = smoothed_path
 
     def try_linear_smooth(self,smoothed_path,i,j,cur_x,cur_y,new_q,dist):
@@ -247,28 +257,77 @@ class RRT():
             cur_x += step_x
             cur_y += step_y
             if self.collides(RRTNode(None, cur_x, cur_y, new_q)):
-                return smoothed_path
+                return None
+        # Since we're arriving at node j via a different heading than
+        # before, see if we need to add an arc to get us to node k=j+1
+        node_i = smoothed_path[i]
+        end_spec = self.calculate_end(smoothed_path, node_i, new_q, j)
+        if end_spec is None:
+            return None
         # no collision, so snip out nodes i+1 ... j-1
-        smoothed_path[j].parent = smoothed_path[i]
-        smoothed_path[j].q = new_q
-        smoothed_path[j].radius = 0
-        smoothed_path = smoothed_path[:i+1] + smoothed_path[j:]
+        print('linear: stitching','%d:'%i,smoothed_path[i],'to %d:'%j,smoothed_path[j])
+        if not end_spec:
+            smoothed_path[j].parent = smoothed_path[i]
+            smoothed_path[j].q = new_q
+            smoothed_path[j].radius = 0
+            smoothed_path = smoothed_path[:i+1] + smoothed_path[j:]
+        else:
+            (next_node,turn_node) = end_spec
+            smoothed_path[j+1].parent = turn_node
+            smoothed_path = smoothed_path[:i+1] + \
+                            [next_node, turn_node] + \
+                            smoothed_path[j+1:]
         return smoothed_path
 
-    def try_arc_smooth(self,smoothed_path,i,j,cur_x,cur_y,cur_q,direct_turn_angle):
+    def try_arc_smooth(self,smoothed_path,i,j,cur_x,cur_y,cur_q):
+        if j == i+2 and smoothed_path[i+1].radius != 0:
+            return None  # would be replacing an arc node with itself
+        arc_spec = self.calculate_arc(smoothed_path[i], smoothed_path[j])
+        if arc_spec is None:
+            return None
+        (tang_x, tang_y, tang_q, radius) = arc_spec
+        ni = smoothed_path[i]
+        turn_node1 = RRTNode(ni, tang_x, tang_y, tang_q, radius=radius)
+        # Since we're arriving at node j via a different heading than
+        # before, see if we need to add an arc at the end to allow us
+        # to smoothly proceed to node k=j+1
+        end_spec = self.calculate_end(smoothed_path, turn_node1, tang_q, j)
+        if end_spec is None:
+            return None
+        # no collision, so snip out nodes i+1 ... j-1 and insert new node(s)
+        print('arc: stitching','%d:'%i,smoothed_path[i],'to %d:'%j,smoothed_path[j])
+        if not end_spec:
+            smoothed_path[j].parent = turn_node1
+            smoothed_path[j].q = tang_q
+            smoothed_path[j].radius = 0
+            smoothed_path = smoothed_path[:i+1] + [turn_node1] + smoothed_path[j:]
+        else:
+            (next_node, turn_node2) = end_spec
+            smoothed_path[j+1].parent = turn_node2
+            smoothed_path = smoothed_path[:i+1] + \
+                            [turn_node1, next_node, turn_node2] + \
+                            smoothed_path[j+1:]
+        return smoothed_path        
+
+    def calculate_arc(self, node_i, node_j):
+        # Compute arc node parameters to get us on a heading toward node_j.
+        cur_x = node_i.x
+        cur_y = node_i.y
+        cur_q = node_i.q
+        dest_x = node_j.x
+        dest_y = node_j.y
+        direct_turn_angle = atan2(dest_y-cur_y, dest_x-cur_x)
         # find center of arc we'll be moving along
         dir = +1 if direct_turn_angle >=0 else -1
         center = transform.translate(cur_x,cur_y).dot(
             transform.aboutZ(cur_q+dir*pi/2).dot(transform.point(self.arc_radius))
             )
-        dest_x = smoothed_path[j].x
-        dest_y = smoothed_path[j].y
         dx = center[0,0] - dest_x 
         dy = center[1,0] - dest_y
         center_dist = sqrt(dx*dx + dy*dy)
-        if center_dist < self.arc_radius:  # can't turn this tight: punt
-            return smoothed_path
-        # find tangent points on arc: outer tangent formula from Wikipedia with r=0
+        if center_dist < self.arc_radius:  # turn would be too wide: punt
+            return None
+        # tangent points on arc: outer tangent formula from Wikipedia with r=0
         gamma = atan2(dy, dx)
         beta = asin(self.arc_radius / center_dist)
         alpha1 = gamma + beta
@@ -276,42 +335,29 @@ class RRT():
         tang_y1 = center[1,0] + self.arc_radius * sin(alpha1 + pi/2)
         tang_q1 = (atan2(tang_y1-center[1,0], tang_x1-center[0,0]) + dir*pi/2)
         turn1 = tang_q1 - cur_q
-        if dir == +1 and turn1 < 0:
-            turn1 += 2*pi
-        elif dir == -1 and turn1 > 0:
-            turn1 += -2*pi
+        if dir * turn1 < 0:
+            turn1 += dir * 2 * pi
         alpha2 = gamma - beta
         tang_x2 = center[0,0] + self.arc_radius * cos(alpha2 - pi/2)
         tang_y2 = center[1,0] + self.arc_radius * sin(alpha2 - pi/2)
         tang_q2 = (atan2(tang_y2-center[1,0], tang_x2-center[0,0]) + dir*pi/2)
         turn2 = tang_q2 - cur_q
-        if dir == +1 and turn2 < 0:
-            turn2 += 2*pi
-        elif dir == -1 and turn2 > 0:
-            turn2 += -2*pi
-        """
-        print('alpha1=%.1f alpha2=%.1f beta=%.1f gamma=%.1f' %
-              (alpha1*180/pi, alpha2*180/pi, beta*180/pi, gamma*180/pi))
-        print('dir=%d tang1=(%.1f,%.1f) tang_q1=%.1f turn1=%.1f' %
-              (dir,tang_x1,tang_y1,tang_q1*180/pi,turn1*180/pi))
-        print('dir=%d tang2=(%.1f,%.1f) tang_q2=%.1f turn2=%.1f' %
-              (dir,tang_x2,tang_y2,tang_q2*180/pi,turn2*180/pi))
-        transform.tprint(center)
-        """
-        # correct tangent point has shortest turn
+        if dir * turn2 < 0:
+            turn2 += dir * 2 * pi
+        # Correct tangent point has shortest turn.
         if abs(turn1) < abs(turn2):
             (tang_x,tang_y,tang_q,turn) = (tang_x1,tang_y1,tang_q1,turn1)
         else:
             (tang_x,tang_y,tang_q,turn) = (tang_x2,tang_y2,tang_q2,turn2)
-        # interpolate along the arc and check for collision
+        # Interpolate along the arc and check for collision.
         q_traveled = 0
         while abs(q_traveled) < abs(turn):
             cur_x = center[0,0] + self.arc_radius * cos(cur_q + q_traveled)
             cur_y = center[0,0] + self.arc_radius * sin(cur_q + q_traveled)
             if self.collides(RRTNode(None, cur_x, cur_y, cur_q+q_traveled)):
-                return smoothed_path
+                return None
             q_traveled += dir * self.q_tol
-        # Now interpolate from the tangent point to the target
+        # Now interpolate from the tangent point to the target.
         cur_x = tang_x
         cur_y = tang_y
         dx = dest_x - cur_x
@@ -326,15 +372,30 @@ class RRT():
             cur_x += step_x
             cur_y += step_y
             if self.collides(RRTNode(None, cur_x, cur_y, new_q)):
-                return smoothed_path
-        # no collision, so snip out nodes i+1 ... j-1 and insert a turn node
-        ni = smoothed_path[i]
-        turn_node = RRTNode(ni, tang_x, tang_y, tang_q,
-                            radius = dir*self.arc_radius)
-        smoothed_path[j].parent = turn_node
-        smoothed_path[j].q = new_q
-        smoothed_path = smoothed_path[:i+1] + [turn_node] + smoothed_path[j:]
-        return smoothed_path        
+                return None
+        # No collision, so arc is good.
+        return (tang_x, tang_y, tang_q, dir*self.arc_radius)
+
+    def calculate_end(self, smoothed_path, parent, new_q, j):
+        if  j == len(smoothed_path)-1:
+            return False
+        node_j = smoothed_path[j]
+        node_k = smoothed_path[j+1]
+        next_turn = wrap_angle(node_k.q - new_q)
+        if abs(next_turn) <= self.max_turn:
+            return False
+        dist = sqrt((node_k.x-node_j.x)**2 + (node_k.y-node_j.y)**2)
+        if dist < self.arc_radius:
+            return None
+        next_x = node_j.x - self.arc_radius * cos(new_q)
+        next_y = node_j.y - self.arc_radius * sin(new_q)
+        next_node = RRTNode(parent, next_x, next_y, new_q)
+        arc_spec = self.calculate_arc(next_node, node_k)
+        if arc_spec is None:
+            return None
+        (tang_x, tang_y, tang_q, radius) = arc_spec
+        turn_node = RRTNode(next_node, tang_x, tang_y, tang_q, radius=radius)
+        return (next_node, turn_node)
 
     def make_robot_parts(self,robot):
         result = []

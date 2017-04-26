@@ -5,6 +5,12 @@ from cozmo_fsm import transform
 from .transform import tprint
 from .rrt_shapes import *
 
+# ================ Constants ================
+
+wheelbase = 45 # millimetersxs
+
+# ================================================================
+
 class CozmoKinematics(Kinematics):
     def __init__(self,robot):
         base_frame = Joint('base',

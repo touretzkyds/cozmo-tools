@@ -373,7 +373,7 @@ class ParticleFilter():
         if self.sensor_model.evaluate(self.particles):  # true if log_weights changed
             var = self.update_weights()
             if var > 0:
-                print('resample')
+                # print('resample')
                 self.resample()
 
     def pose_estimate(self):

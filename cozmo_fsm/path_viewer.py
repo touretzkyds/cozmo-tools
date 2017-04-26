@@ -15,6 +15,8 @@ WINDOW = None
 
 from . import opengl
 from .rrt_shapes import *
+from . import transform
+from .transform import wrap_angle
 
 the_rrt = None
 the_items = []  # each item is a tuple (tree,color)
@@ -134,10 +136,29 @@ class PathViewer():
 
     def draw_node(self,node,color):
         self.draw_rectangle((node.x,node.y), color=color)
-        if node.radius != 0:
-            color = (1,1,0)
         if node.parent:
-            self.draw_line((node.x,node.y), (node.parent.x,node.parent.y), color=color)
+            if node.radius == 0:
+                self.draw_line((node.x,node.y), (node.parent.x,node.parent.y), color=color)
+            else:
+                color = (1, 1, 0.5)
+                init_x = node.parent.x
+                init_y = node.parent.y
+                init_q = node.parent.q
+                targ_q = node.q
+                radius = node.radius
+                dir = +1 if radius > 0 else -1
+                r = abs(radius)
+                center = transform.translate(init_x,init_y).dot(
+                    transform.aboutZ(init_q+dir*pi/2).dot(transform.point(r)))
+                theta = wrap_angle(init_q - dir*pi/2)
+                targ_theta = wrap_angle(targ_q - dir*pi/2)
+                ang_step = 0.05 # radians
+                while abs(theta - targ_theta) > ang_step:
+                    theta = wrap_angle(theta + dir * ang_step)
+                    cur_x = center[0,0] + r*cos(theta)
+                    cur_y = center[1,0] + r*sin(theta)
+                    self.draw_line((init_x,init_y), (cur_x,cur_y), color=color)
+                    (init_x,init_y) = (cur_x,cur_y)
 
     def draw_tree(self,tree,color):
         for node in tree:

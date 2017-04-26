@@ -8,6 +8,7 @@ from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 
 from .base import *
 from .events import *
+from .cozmo_kin import wheelbase
 
 #________________ Ordinary Nodes ________________
 
@@ -248,7 +249,6 @@ class DriveArc(DriveWheels):
 
     def calculate_wheel_speeds(self, radius=0, angle=None, distance=None,
                                speed=None, angspeed=None):
-        wheelbase = 45    # robot's wheelbase in mm
         if radius != 0:
             if angle is not None:
                 pass
