@@ -6,7 +6,7 @@ import time
 import cozmo_fsm.transform
 from .transform import wrap_angle
 from .rrt_shapes import *
-from .worldmap import WallObst, wall_marker_dict, LightCubeObst, CustomCubeObst
+from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, ChipObj
 
 # *** TODO: Collision checking needs to use opposite headings
 # for treeB nodes because robot is asymmetric.
@@ -103,7 +103,6 @@ class RRT():
         if abs(dq) > self.max_turn:
             dq = self.max_turn if dq > 0 else -self.max_turn
             q = wrap_angle(node.q + dq)
-            #return self.arc_interpolate(node,target,dq)
         if abs(dq) >= self.q_tol:
             # Must be able to turn to the new heading without colliding
             turn_dir = +1 if dq >= 0 else -1
@@ -117,26 +116,6 @@ class RRT():
         xstep = self.step_size * cos(q)
         ystep = self.step_size * sin(q)
         new_node = RRTNode(parent=node, x=node.x+xstep, y=node.y+ystep, q=q)
-        if self.collides(new_node):
-            return (self.COLLISION, None)
-        else:
-            return (self.INTERPOLATE, new_node)
-
-    def arc_interpolate(self,node,target,turn_angle):
-        if turn_angle > 0:
-            theta = node.q + pi/2
-            rad = self.arc_radius
-        else:
-            theta = node.q - pi/2
-            rad = -self.arc_radius
-        # center of arc
-        cx = node.x + self.arc_radius * cos(theta)
-        cy = node.y + self.arc_radius * sin(theta)
-        # destination if we turn through turn_angle
-        dq = node.q + turn_angle
-        dx = cx + self.arc_radius*cos(dq)
-        dy = cy + self.arc_radius*sin(dq)
-        new_node = RRTNode(parent=node, x=dx, y=dy, q=dq, radius=rad)
         if self.collides(new_node):
             return (self.COLLISION, None)
         else:
@@ -213,6 +192,7 @@ class RRT():
             nodeB = nodeB.parent
             (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
             pathB.append(nodeB.copy())
+        (pathA,pathB) = self.join_paths(pathA,pathB)
         self.path = pathA + pathB
         self.smooth_path()
         if not isnan(goal_q):
@@ -221,6 +201,13 @@ class RRT():
             goal = RRTNode(parent=None, x=last.x, y=last.y, q=goal_q)
             self.path.append(goal)
         return (treeA, treeB, self.path)
+
+    def join_paths(self,pathA,pathB):
+        turn_angle = wrap_angle(pathB[0].q - pathA[-1].q)
+        if abs(turn_angle) <= self.max_turn:
+            return (pathA,pathB)
+        print('*** JOIN PATHS: ', turn_angle*180/pi)
+        return (pathA,pathB)
 
     def smooth_path(self):
         """Smooth a path by picking random subsequences and replacing
@@ -316,14 +303,13 @@ class RRT():
         cur_q = node_i.q
         dest_x = node_j.x
         dest_y = node_j.y
-        direct_turn_angle = atan2(dest_y-cur_y, dest_x-cur_x)
+        direct_turn_angle = wrap_angle(atan2(dest_y-cur_y, dest_x-cur_x) - cur_q)
         # find center of arc we'll be moving along
         dir = +1 if direct_turn_angle >=0 else -1
-        center = transform.translate(cur_x,cur_y).dot(
-            transform.aboutZ(cur_q+dir*pi/2).dot(transform.point(self.arc_radius))
-            )
-        dx = center[0,0] - dest_x 
-        dy = center[1,0] - dest_y
+        cx = cur_x + self.arc_radius * cos(cur_q + dir*pi/2)
+        cy = cur_y + self.arc_radius * sin(cur_q + dir*pi/2)
+        dx = cx - dest_x 
+        dy = cy - dest_y
         center_dist = sqrt(dx*dx + dy*dy)
         if center_dist < self.arc_radius:  # turn would be too wide: punt
             return None
@@ -331,16 +317,16 @@ class RRT():
         gamma = atan2(dy, dx)
         beta = asin(self.arc_radius / center_dist)
         alpha1 = gamma + beta
-        tang_x1 = center[0,0] + self.arc_radius * cos(alpha1 + pi/2)
-        tang_y1 = center[1,0] + self.arc_radius * sin(alpha1 + pi/2)
-        tang_q1 = (atan2(tang_y1-center[1,0], tang_x1-center[0,0]) + dir*pi/2)
+        tang_x1 = cx + self.arc_radius * cos(alpha1 + pi/2)
+        tang_y1 = cy + self.arc_radius * sin(alpha1 + pi/2)
+        tang_q1 = (atan2(tang_y1-cy, tang_x1-cx) + dir*pi/2)
         turn1 = tang_q1 - cur_q
         if dir * turn1 < 0:
             turn1 += dir * 2 * pi
         alpha2 = gamma - beta
-        tang_x2 = center[0,0] + self.arc_radius * cos(alpha2 - pi/2)
-        tang_y2 = center[1,0] + self.arc_radius * sin(alpha2 - pi/2)
-        tang_q2 = (atan2(tang_y2-center[1,0], tang_x2-center[0,0]) + dir*pi/2)
+        tang_x2 = cx + self.arc_radius * cos(alpha2 - pi/2)
+        tang_y2 = cy + self.arc_radius * sin(alpha2 - pi/2)
+        tang_q2 = (atan2(tang_y2-cy, tang_x2-cx) + dir*pi/2)
         turn2 = tang_q2 - cur_q
         if dir * turn2 < 0:
             turn2 += dir * 2 * pi
@@ -352,8 +338,8 @@ class RRT():
         # Interpolate along the arc and check for collision.
         q_traveled = 0
         while abs(q_traveled) < abs(turn):
-            cur_x = center[0,0] + self.arc_radius * cos(cur_q + q_traveled)
-            cur_y = center[0,0] + self.arc_radius * sin(cur_q + q_traveled)
+            cur_x = cx + self.arc_radius * cos(cur_q + q_traveled)
+            cur_y = cy + self.arc_radius * sin(cur_q + q_traveled)
             if self.collides(RRTNode(None, cur_x, cur_y, cur_q+q_traveled)):
                 return None
             q_traveled += dir * self.q_tol
@@ -377,6 +363,8 @@ class RRT():
         return (tang_x, tang_y, tang_q, dir*self.arc_radius)
 
     def calculate_end(self, smoothed_path, parent, new_q, j):
+        # Return False if arc not needed, None if arc not possible,
+        # or pair of new nodes if arc is required.
         if  j == len(smoothed_path)-1:
             return False
         node_j = smoothed_path[j]
@@ -397,23 +385,19 @@ class RRT():
         turn_node = RRTNode(next_node, tang_x, tang_y, tang_q, radius=radius)
         return (next_node, turn_node)
 
-    def make_robot_parts(self,robot):
-        result = []
-        for joint in robot.kine.joints.values():
-            if joint.collision_model:
-                tmat = robot.kine.link_to_base(joint)
-                robot_obst = joint.collision_model.instantiate(tmat)
-                result.append(robot_obst)
-        return result
+    #---------------- Obstacle Representation ----------------
 
     def generate_obstacles(self):
         self.robot.world.world_map.update_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
-            if isinstance(obj, WallObst):
+            if not obj.obstacle: continue
+            if isinstance(obj, WallObj):
                 obstacles = obstacles + self.generate_wall_obstacles(obj)
-            elif isinstance(obj, (LightCubeObst,CustomCubeObst)):
+            elif isinstance(obj, (LightCubeObj,CustomCubeObj)):
                 obstacles.append(self.generate_cube_obstacle(obj))
+            elif isinstance(obj, ChipObj):
+                obstacles.append(self.generate_chip_obstacle(obj))
         self.obstacles = obstacles
 
     def generate_wall_obstacles(self,wall):
@@ -449,4 +433,18 @@ class RRT():
                       dimensions=obj.size[0:2],
                       orient=obj.theta)
         return r
-    
+
+    def generate_chip_obstacle(self,obj):
+        r = Circle(center=transform.point(obj.x,obj.y),
+                   radius=obj.radius)
+        return r
+
+    def make_robot_parts(self,robot):
+        result = []
+        for joint in robot.kine.joints.values():
+            if joint.collision_model:
+                tmat = robot.kine.link_to_base(joint)
+                robot_obst = joint.collision_model.instantiate(tmat)
+                result.append(robot_obst)
+        return result
+

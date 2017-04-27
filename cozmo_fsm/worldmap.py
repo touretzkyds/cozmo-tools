@@ -3,46 +3,58 @@ from cozmo.objects import CustomObject
 
 from .transform import wrap_angle
 
-class WallObst():
-    def __init__(self, id=0, x=0, y=0, theta=0, length=100, height=150):
+class WorldObject():
+    def __init__(self, id=0, x=0, y=0, z=0):
         self.id = id
         self.x = x
         self.y = y
+        self.z = z
+        self.obstacle = True
+
+class WallObj(WorldObject):
+    def __init__(self, id=0, x=0, y=0, theta=0, length=100, height=150):
+        super().__init__(id,x,y)
         self.z = height/2
         self.theta = theta
         self.length = length
         self.height = height
 
     def __repr__(self):
-        return '<WallObst %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
+        return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
                (self.id, self.x, self.y, self.theta*180/pi, self.length)
         
-class LightCubeObst():
+class LightCubeObj(WorldObject):
     light_cube_size = (44., 44., 44.)
     def __init__(self, id, x, y, z, theta):
-        self.id = id
-        self.x = x
-        self.y = y
-        self.z = z
+        super().__init__(id,x,y,z)
         self.theta = theta
         self.size = self.light_cube_size
 
     def __repr__(self):
-        return '<LightCubeObst %d: (%.1f,%.1f, %.1f) @ %d deg.>' % \
+        return '<LightCubeObj %d: (%.1f,%.1f, %.1f) @ %d deg.>' % \
                (self.id, self.x, self.y, self.z, self.theta*180/pi)
 
-class CustomCubeObst():
-    def __init__(self, type, x, y, z, theta):
+class CustomCubeObj(WorldObject):
+    def __init__(self, id, x, y, z, theta):
+        # id is a CustomObjecType
+        super().__init__(id,x,y,z)
         self.type = type
-        self.x = x
-        self.y = y
-        self.z = z
         self.theta = theta
         self.size = (50., 50., 50.)
 
     def __repr__(self):
-        return '<CustomCubeObst %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
+        return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
                (self.type, self.x, self.y, self.z, self.theta*180/pi)
+
+class ChipObj(WorldObject):
+    def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
+        super().__init__(id,x,y)
+        self.radius = radius
+        self.thickness = thickness
+
+    def __repr__(self):
+        return '<ChipObj (%.1f,%.1f) radius %.1f>' % \
+               (self.x, self.y, self.radius)
 
 #================ WorldMap ================
 
@@ -84,7 +96,7 @@ class WorldMap():
             wall_orient = m_orient # simple for now
             wall_x = m_x + dist*cos(wall_orient-pi/2)
             wall_y = m_y + dist*sin(wall_orient-pi/2)
-            return WallObst(id=wall_spec.id, x=wall_x, y=wall_y, theta=wall_orient,
+            return WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=wall_orient,
                             length=wall_spec.length)
         
     def add_cubes(self):
@@ -100,7 +112,7 @@ class WorldMap():
                 world_y = rob_y + dist * sin(world_bearing)
                 world_z = cube.pose.position.z + self.vision_z_fudge
                 world_orient = wrap_angle(rob_theta + diff.rotation.angle_z.radians)
-                self.objects[cube] = LightCubeObst(id, world_x, world_y, world_z, world_orient)
+                self.objects[cube] = LightCubeObj(id, world_x, world_y, world_z, world_orient)
             
     def update_object(self,obj):
         if isinstance(obj, CustomObject):
@@ -114,7 +126,7 @@ class WorldMap():
             world_y = rob_y + dist * sin(world_bearing)
             world_z = obj.pose.position.z + self.vision_z_fudge
             world_orient = rob_theta + diff.rotation.angle_z.radians
-            self.objects[obj] = CustomCubeObst(obj, world_x, world_y, world_z, world_orient)
+            self.objects[obj] = CustomCubeObj(obj, world_x, world_y, world_z, world_orient)
 
     def handle_object_observed(self, evt, **kwargs):
         if isinstance(evt.obj, CustomObject):

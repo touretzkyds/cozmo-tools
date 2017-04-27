@@ -233,6 +233,21 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
+    def make_chip(self,chip):
+        global gl_lists
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        pos = (chip.x, chip.y, chip.thickness/2)
+        glTranslatef(*pos)
+        self.make_cube((chip.radius,chip.radius,chip.thickness), highlight=True,
+                       color=(0,0.8,0))
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+        
+
+
     def make_wall(self,wall_obst):
         global gl_lists
         wall_spec = worldmap.wall_marker_dict[wall_obst.id]
@@ -269,7 +284,7 @@ class WorldMapViewer():
 
     def make_floor(self):
         global gl_lists
-        floor_size = (800, 800, 1)
+        floor_size = (2000, 2000, 1)
         blip = floor_size[2]
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
@@ -297,6 +312,7 @@ class WorldMapViewer():
         if (not charger.pose) or not charger.pose.is_valid: return None
         comparable = charger.pose.is_comparable(self.robot.pose)
         highlight = charger.is_visible or (self.robot.is_on_charger and comparable)
+        global gl_lists
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
@@ -323,7 +339,7 @@ class WorldMapViewer():
                            highlight=True, color=color_white)
         glPopMatrix()
         glEndList()
-        return c
+        gl_lists.append(c)
 
     def make_cozmo_robot(self):
         global gl_lists
@@ -380,32 +396,23 @@ class WorldMapViewer():
     def make_objects(self):
         items = tuple(self.robot.world.world_map.objects.items())
         for (key,obj) in items:
-            if isinstance(obj, worldmap.LightCubeObst):
+            if isinstance(obj, worldmap.LightCubeObj):
                 self.make_light_cube(key,obj)
-            elif isinstance(obj, worldmap.CustomCubeObst):
+            elif isinstance(obj, worldmap.CustomCubeObj):
                 self.make_custom_cube(key,obj)
-            elif isinstance(obj, worldmap.WallObst):
+            elif isinstance(obj, worldmap.WallObj):
                 self.make_wall(obj)
+            elif isinstance(obj, worldmap.ChipObj):
+                self.make_chip(obj)
 
     def make_shapes(self):
         global gl_lists
         gl_lists = []
-        global axes, gazepoint, cube1, cube2, cube3, charger, cozmo_robot, custom_objects, floor
-        # axes
         self.make_axes()
-        # gaze point
         self.make_gazepoint()
-        # light cubes, qubes, and walls
-        self.make_objects()
-        #cube1 = cube2 = cube3 = None
-        #cube1 = self.make_light_cube(cozmo.objects.LightCube1Id)
-        #cube2 = self.make_light_cube(cozmo.objects.LightCube2Id)
-        #cube3 = self.make_light_cube(cozmo.objects.LightCube3Id)
-        # charger
+        self.make_objects()  # walls, light cubes, custom cubes, and chips
         charger = self.make_charger()
-        # cozmo robot
         cozmo_robot = self.make_cozmo_robot()
-        # floor
         floor = self.make_floor()
 
     def del_shapes(self):
@@ -470,7 +477,6 @@ class WorldMapViewer():
         self.make_shapes()
         for id in gl_lists:
             glCallList(id)
-        if charger: glCallList(charger)
         glutSwapBuffers()
         self.del_shapes()
 
