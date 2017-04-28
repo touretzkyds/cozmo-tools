@@ -43,7 +43,7 @@ class MaxIterations(Exception): pass
 
 class RRT():
     def __init__(self, robot, max_iter=1000, step_size=10, arc_radius=40,
-                 xy_tolsq=90, q_tol=5/180*pi,
+                 xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
         self.robot = robot

@@ -10,6 +10,7 @@ import cozmo
 
 from .transform import wrap_angle
 from .aruco import ArucoMarker
+from .cozmo_kin import center_of_rotation_offset
 
 class Particle():
     def __init__(self):
@@ -69,7 +70,7 @@ class MotionModel():
         self.robot = robot
 
 class DefaultMotionModel(MotionModel):
-    def __init__(self, robot, sigma_trans=0.1, sigma_rot=0.1):
+    def __init__(self, robot, sigma_trans=0.1, sigma_rot=0.01):
         super().__init__(robot)
         self.sigma_trans = sigma_trans
         self.sigma_rot = sigma_rot
@@ -85,10 +86,8 @@ class DefaultMotionModel(MotionModel):
         turn_angle = wrap_angle(new_hdg - old_hdg)
         dx = new_xyz[0] - old_xyz[0]
         dy = new_xyz[1] - old_xyz[1]
-        dist = sqrt(dx*dx + dy*dy)
-        # If we didn't move much, ignore the motion
-        if dist < 5 and abs(turn_angle) < 0.05:
-            return
+        cor = center_of_rotation_offset
+        dist = max(0, sqrt(dx*dx + dy*dy) + cor * abs(turn_angle))
         self.old_pose = new_pose
         # Did we drive forward, or was it backward?
         fwd_xy = (old_xyz[0] + dist * cos(old_hdg+turn_angle/2),
@@ -101,12 +100,19 @@ class DefaultMotionModel(MotionModel):
         rev_dy = rev_xy[1] - new_xyz[1]
         if (fwd_dx*fwd_dx + fwd_dy*fwd_dy) >  (rev_dx*rev_dx + rev_dy*rev_dy):
             dist = - dist
+        rot_var = 0 if abs(turn_angle) < 0.001 else self.sigma_rot
         for p in particles:
             pdist = dist * (1 + random.gauss(0, self.sigma_trans))
-            pturn = turn_angle * (1 + random.gauss(0, self.sigma_rot))
+            pturn = random.gauss(turn_angle, rot_var)
+            # Correct for the center of rotation being behind the base frame
+            xc = -cor * cos(p.theta)
+            yc = -cor * sin(p.theta)
+            xcor = xc * cos(turn_angle) + yc * -sin(turn_angle) - xc
+            ycor = xc * sin(turn_angle) + yc *  cos(turn_angle) - yc
+            # Make half the turn, translate, then complete the turn
             p.theta = wrap_angle(p.theta + pturn/2)
-            p.x = p.x + cos(p.theta)*pdist
-            p.y = p.y + sin(p.theta)*pdist
+            p.x = p.x + cos(p.theta)*pdist + xcor
+            p.y = p.y + sin(p.theta)*pdist + ycor
             p.theta = wrap_angle(p.theta + pturn/2)
 
 #================ Sensor Model ================
@@ -670,7 +676,7 @@ class SLAMSensorModel(SensorModel):
                 error_x = map_lm_x - predicted_lm_x
                 error_y = map_lm_y - predicted_lm_y
                 error1_sq = error_x**2 + error_y**2
-                error2_sq = (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
+                error2_sq = 0 # *** (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
                 p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
                 # Update landmark in this particle's map
                 p.update_landmark(id, sensor_dist, sensor_bearing, sensor_orient,

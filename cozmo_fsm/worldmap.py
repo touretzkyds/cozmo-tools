@@ -121,9 +121,8 @@ class WorldMap():
             dist = sqrt(dx*dx + dy*dy)
             bearing = atan2(dy,dx)
             (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
-            world_bearing = wrap_angle(rob_theta + bearing)
-            world_x = rob_x + dist * cos(world_bearing)
-            world_y = rob_y + dist * sin(world_bearing)
+            world_x = rob_x + dist * cos(bearing)
+            world_y = rob_y + dist * sin(bearing)
             world_z = obj.pose.position.z + self.vision_z_fudge
             world_orient = rob_theta + diff.rotation.angle_z.radians
             self.objects[obj] = CustomCubeObj(obj, world_x, world_y, world_z, world_orient)

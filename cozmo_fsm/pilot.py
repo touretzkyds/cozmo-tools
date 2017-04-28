@@ -211,4 +211,5 @@ class PilotPushToPose(PilotToPose):
         self.max_turn = 20*(pi/180)
 
     def planner(self,start_node,goal_node):
+        self.robot.world.rrt.step_size=20
         return self.robot.world.rrt.plan_push_chip(start_node,goal_node)

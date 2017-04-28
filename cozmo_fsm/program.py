@@ -75,7 +75,7 @@ class StateMachineProgram(StateNode):
 
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
-        self.set_polling_interval(0.050)  # for kine and motion model update
+        self.set_polling_interval(0.025)  # for kine and motion model update
         # World map and path planner
         self.robot.world.world_map = \
                 self.world_map or WorldMap(self.robot)

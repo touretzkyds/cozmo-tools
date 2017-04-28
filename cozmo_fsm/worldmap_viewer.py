@@ -346,10 +346,11 @@ class WorldMapViewer():
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
-        p = self.robot.pose.position.x_y_z
+        cur_pose = self.robot.world.particle_filter.pose
+        p = (cur_pose[0], cur_pose[1], self.robot.pose.position.z)
         glTranslatef(*p)
         glTranslatef(*robot_body_offset_mm)
-        glRotatef(self.robot.pose.rotation.angle_z.degrees, 0, 0, 1)
+        glRotatef(cur_pose[2]*180/pi, 0, 0, 1)
         self.make_cube(robot_body_size_mm, highlight=self.robot.is_on_charger)
         h = robot_head_offset_mm
         glTranslatef(*h)

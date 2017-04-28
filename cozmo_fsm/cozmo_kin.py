@@ -7,7 +7,8 @@ from .rrt_shapes import *
 
 # ================ Constants ================
 
-wheelbase = 45 # millimetersxs
+wheelbase = 45 # millimeters
+center_of_rotation_offset = -19 # millimeters
 
 # ================================================================
 
@@ -18,7 +19,7 @@ class CozmoKinematics(Kinematics):
                                                      dimensions=(95,60)))
 
         # cor is center of rotation
-        cor_frame = Joint('cor', parent=base_frame, r=-20.)
+        cor_frame = Joint('cor', parent=base_frame, r=-19.)
 
         world_frame = Joint('world', parent=base_frame, type='world', getter=self.get_world)
 
