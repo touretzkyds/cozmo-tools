@@ -91,7 +91,6 @@ dispatch_table = {                                                    \
   cozmo.behavior.EvtBehaviorStopped    : monitor_generic,             \
   cozmo.anim.EvtAnimationsLoaded       : monitor_generic,             \
   cozmo.anim.EvtAnimationCompleted     : monitor_EvtActionCompleted,  \
-  cozmo.objects.EvtObjectAvailable     : monitor_generic,             \
   cozmo.objects.EvtObjectAppeared      : monitor_generic,             \
   cozmo.objects.EvtObjectDisappeared   : monitor_generic,             \
   cozmo.objects.EvtObjectObserved      : monitor_generic,             \
