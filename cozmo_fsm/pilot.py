@@ -29,13 +29,22 @@ class NavPlan():
     @staticmethod
     def from_path(path):
         steps = []
+        last_node = path[0]
         for node in path:
             if node.radius == 0:
+                dist = sqrt((node.x-last_node.x)**2 + (node.y-last_node.y)**2)
+                max_step = 50 # mm
+                for d in range(max_step,math.ceil(dist),max_step):
+                    steps.append(NavStep(NavStep.FORWARD,
+                                         (last_node.x + d*cos(node.q),
+                                          last_node.y + d*sin(node.q),
+                                          node.q)))
                 steps.append(NavStep(NavStep.FORWARD,
                                      (node.x, node.y, node.q)))
             else:
                 steps.append(NavStep(NavStep.ARC,
                                      (node.x, node.y, node.q, node.radius)))
+            last_node = node
         if path[-2].x == path[-1].x and path[-2].y == path[-1].y:
             steps[-1].type = NavStep.HEADING
         return NavPlan(steps)

@@ -373,7 +373,7 @@ class RRT():
         if abs(next_turn) <= self.max_turn:
             return False
         dist = sqrt((node_k.x-node_j.x)**2 + (node_k.y-node_j.y)**2)
-        if dist < self.arc_radius:
+        if False and dist < self.arc_radius:
             return None
         next_x = node_j.x - self.arc_radius * cos(new_q)
         next_y = node_j.y - self.arc_radius * sin(new_q)
