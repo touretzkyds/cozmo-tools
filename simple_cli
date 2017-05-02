@@ -36,8 +36,8 @@ Available commands:
     show active
         Shows active state nodes and transitions.
 
-    show camviewer
-        Displays an OpenCV camera image viewer.
+    show cam_viewer | path_viewer | worldmap_viewer
+        Displays OpenCV viewer of the specified type.
 
     !cmd
         Runs 'cmd' in a shell and prints the result.
@@ -230,7 +230,7 @@ def do_shell_command(cmd):
 def run(sdk_conn):
     global robot
     robot = sdk_conn.wait_for_robot()
-    if len(sys.argv) > 1 and sys.argv[1] == "VIEWER":
+    if "TK_VIEWER" in sys.argv:
         time.sleep(1.5) # allow time for Tk to set up the viewer window
     try:
         robot.erouter = cozmo_fsm.evbase.EventRouter()
@@ -325,31 +325,42 @@ def cli_loop(robot):
             traceback.print_exc()
             print()
 
+VERBOSE = False  # True if we want all the log messages
+
 def suppress_filter(log_record):
+    if VERBOSE:
+        return True
     if log_record.levelno == logging.ERROR and \
        log_record.msg.startswith("Received a custom object type:"):
         return False
     if log_record.msg.startswith("Defined: ") and \
        len(log_record.args) > 0 and \
-       isinstance(log_record.args[0], cozmo.objects.CustomObject):
+           isinstance(log_record.args[0], cozmo.objects.CustomObject):
+        return False
+    if log_record.msg.startswith("Invalidating pose for") or \
+       log_record.msg.startswith("Robot delocalized") or \
+       log_record.msg.startswith("Object connected") or \
+       log_record.msg.startswith("Object disconnected"):
         return False
     return True
 
 logging_is_setup = False
 
 def start_connection():
-    global logging_is_setup
+    global logging_is_setup, VERBOSE
     if not logging_is_setup:
         cozmo.setup_basic_logging()
         logging_is_setup = True
+    if "VERBOSE" in sys.argv:
+        VERBOSE = True
     cozmo.logger.addFilter(suppress_filter)
     cozmo.robot.Robot.drive_off_charger_on_connect = False
     try:
         if len(sys.argv) >= 2:
-            if sys.argv[1] == "VIEWER":
+            if sys.argv[1] == "TK_VIEWER":
                 cozmo.connect_with_tkviewer(run)
             else:
-                print("\nUnrecognized argument '%s'. Use VIEWER instead.\n" % sys.argv[1])
+                print("\nUnrecognized argument '%s'. Use TK_VIEWER instead.\n" % sys.argv[1])
                 cozmo.connect(run)
         else:
             cozmo.connect(run)
