@@ -309,7 +309,7 @@ class WorldMapViewer():
 
     def make_charger(self):
         charger = self.robot.world.charger
-        if (not charger.pose) or not charger.pose.is_valid: return None
+        if (not charger) or (not charger.pose) or not charger.pose.is_valid: return None
         comparable = charger.pose.is_comparable(self.robot.pose)
         highlight = charger.is_visible or (self.robot.is_on_charger and comparable)
         global gl_lists
