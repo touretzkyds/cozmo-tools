@@ -340,6 +340,7 @@ def suppress_filter(log_record):
     if log_record.msg.startswith("Invalidating pose for") or \
        log_record.msg.startswith("Robot delocalized") or \
        log_record.msg.startswith("Object connected") or \
+       log_record.msg.startswith("ObjectConnectionState event") or \
        log_record.msg.startswith("Object disconnected"):
         return False
     return True
