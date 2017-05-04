@@ -155,18 +155,20 @@ class RRT():
         self.goal = goal
         self.target_heading = goal.q
         if isnan(self.target_heading):
-            self.offset_goal = goal
+            offset_goal = goal
         else:
             offset_x = goal.x + center_of_rotation_offset * cos(goal.q)
             offset_y = goal.y + center_of_rotation_offset * sin(goal.q)
             offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
-            self.offset_goal = offset_goal
+        self.offset_goal = offset_goal
+
         collider = self.collides(start)
         if collider:
             raise StartCollides(start,collider)
         collider = self.collides(offset_goal)
         if collider:
             raise GoalCollides(goal,collider)
+
         treeA = [start]
         treeB = [offset_goal]
         self.treeA = treeA
