@@ -1,11 +1,12 @@
 import math
 import time
+import sys
 import asyncio
 
 from .base import *
 from .rrt import *
 from .nodes import DriveArc
-from .cozmo_kin import wheelbase
+from .cozmo_kin import wheelbase, center_of_rotation_offset
 
 from cozmo.util import distance_mm, speed_mmps
 
@@ -20,7 +21,8 @@ class NavStep():
         self.params = params
 
     def __repr__(self):
-        return '<NavStep %.1f,%.1f>' % self.params
+        return '<NavStep %s %.1f,%.1f @ %d deg.>' % \
+               (self.type, *self.params[0:2], round(self.params[2]*180/pi))
 
 class NavPlan():
     def __init__(self, steps=[]):
@@ -31,7 +33,7 @@ class NavPlan():
         steps = []
         last_node = path[0]
         for node in path:
-            if node.radius == 0:
+            if (not node.radius) or (node.radius == 0):
                 dist = sqrt((node.x-last_node.x)**2 + (node.y-last_node.y)**2)
                 max_step = 50 # mm
                 for d in range(max_step,math.ceil(dist),max_step):
@@ -45,7 +47,7 @@ class NavPlan():
                 steps.append(NavStep(NavStep.ARC,
                                      (node.x, node.y, node.q, node.radius)))
             last_node = node
-        if path[-2].x == path[-1].x and path[-2].y == path[-1].y:
+        if path[-1].radius == 0:
             steps[-1].type = NavStep.HEADING
         return NavPlan(steps)
 
@@ -162,8 +164,10 @@ class PilotToPose(PilotBase):
             self.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
         # Construct and execute nav plan
-        [print(x) for x in path]
+        #[print(x) for x in path]
         self.plan = NavPlan.from_path(path)
+        #print('Navigation Plan:')
+        #[print(y) for y in self.plan.steps]
         self.robot.loop.create_task(self.execute_plan())
 
     async def execute_plan(self):
@@ -174,7 +178,33 @@ class PilotToPose(PilotBase):
             (cur_x,cur_y,cur_hdg) = self.robot.world.particle_filter.pose
             if step.type == NavStep.HEADING:
                 (targ_x, targ_y, targ_hdg) = step.params
+                # Equation of the line y=ax+c through the target pose
+                a = min(1000, max(-1000, math.tan(targ_hdg)))
+                c = targ_y - a * targ_x
+                # Equation of the line y=bx+d through the present pose
+                b = min(1000, max(-1000, math.tan(cur_hdg)))
+                d = cur_y - b * cur_x
+                # Intersection point
+                int_x = (d-c) / (a-b) if abs(a-b) > 1e-5 else math.nan
+                int_y = a * int_x + c
+                dx = int_x - cur_x
+                dy = int_y - cur_y
+                dist = sqrt(dx*dx + dy*dy)
+                if abs(wrap_angle(atan2(dy,dx) - cur_hdg)) > pi/2:
+                    dist = - dist
+                dist += -center_of_rotation_offset
+                print('PRE-TURN: cur=(%.1f,%.1f) @ %.1f deg.,  int=(%.1f, %.1f)  dist=%.1f' %
+                      (cur_x, cur_y, cur_hdg*180/pi, int_x, int_y, dist))
+                if abs(dist) < 2:
+                    print('  ** SKIPPED **')
+                else:
+                    await self.robot.drive_straight(distance_mm(dist),
+                                                    speed_mmps(50)).wait_for_completed()
+                (cur_x,cur_y,cur_hdg) = self.robot.world.particle_filter.pose
                 turn_angle = wrap_angle(targ_hdg - cur_hdg)
+                print('TURN: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f) @ %.1f deg, turn_angle=%.1f deg.' %
+                      (cur_x, cur_y, cur_hdg*180/pi,
+                       targ_x, targ_y, targ_hdg*180/pi, turn_angle*180/pi))
                 await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
                 continue
             elif step.type == NavStep.FORWARD:
@@ -183,14 +213,17 @@ class PilotToPose(PilotBase):
                 dy = targ_y - cur_y
                 course = atan2(dy,dx)
                 turn_angle = wrap_angle(course - cur_hdg)
-                print('FORWARD: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f) @ %.1f deg, turn_angle=%.1f deg.' %
+                #print('FORWARD: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f) @ %.1f deg, turn_angle=%.1f deg.' %
+                print('FWD: cur=(%.1f,%.1f)@%.1f\N{degree sign} targ=(%.1f,%.1f)@%.1f\N{degree sign} turn=%.1f\N{degree sign}' %
                       (cur_x,cur_y,cur_hdg*180/pi,
-                       targ_x,targ_y,targ_hdg*180/pi,turn_angle*180/pi))
+                       targ_x,targ_y,targ_hdg*180/pi,turn_angle*180/pi),
+                      end='')
+                sys.stdout.flush()
                 if abs(turn_angle) > self.max_turn:
                     turn_angle = self.max_turn if turn_angle > 0 else -self.max_turn
                     print('  ** TURN ANGLE SET TO', turn_angle*180/pi)
                 # *** HACK: skip node if it requires unreasonable turn
-                if abs(turn_angle) < 2*pi/180 or wrap_angle(course-targ_hdg) > pi/2:
+                if abs(turn_angle) < 2*pi/180 or abs(wrap_angle(course-targ_hdg)) > pi/2:
                     print('  ** SKIPPED TURN **')
                 else:
                     await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
@@ -199,6 +232,7 @@ class PilotToPose(PilotBase):
                 dx = targ_x - cur_x
                 dy = targ_y - cur_y
                 dist = sqrt(dx**2 + dy**2)
+                print(' dist=%.1f' % dist)
                 await self.robot.drive_straight(distance_mm(dist),
                                                 speed_mmps(50)).wait_for_completed()
             elif step.type == NavStep.ARC:

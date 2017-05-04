@@ -5,7 +5,9 @@ import time
 
 import cozmo_fsm.transform
 from .transform import wrap_angle
+
 from .rrt_shapes import *
+from .cozmo_kin import center_of_rotation_offset
 from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, ChipObj
 
 # *** TODO: Collision checking needs to use opposite headings
@@ -14,7 +16,7 @@ from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, Ch
 #---------------- RRTNode ----------------
 
 class RRTNode():
-    def __init__(self, parent=None, x=0, y=0, q=0, radius=0):
+    def __init__(self, parent=None, x=0, y=0, q=0, radius=None):
         self.parent = parent
         self.x = x
         self.y = y
@@ -28,11 +30,14 @@ class RRTNode():
         if isnan(self.q):
             return '<RRTNode (%.1f,%.1f)>' % (self.x, self.y)
         elif not self.parent:
-            return '<RRTNode (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
-        elif self.radius == 0:
-            return '<RRTNode line to (%.1f,%.1f)@%d deg>' % (self.x, self.y, self.q/pi*180)
+            return '<RRTNode (%.1f,%.1f)@%d deg>' % \
+                   (self.x, self.y, round(self.q/pi*180))
+        elif self.radius is None:
+            return '<RRTNode line to (%.1f,%.1f)@%d deg>' % \
+                   (self.x, self.y, round(self.q/pi*180))
         else:
-            return '<RRTNode arc to (%.1f,%.1f)@%d deg, rad=%d>' % (self.x, self.y, self.q/pi*180,self.radius)
+            return '<RRTNode arc to (%.1f,%.1f)@%d deg, rad=%d>' % \
+                   (self.x, self.y, round(self.q/pi*180), self.radius)
 
 
 #---------------- RRT Path Planner ----------------
@@ -141,21 +146,29 @@ class RRT():
     def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
         return self.plan_path(start, goal, max_turn, arc_radius)
 
-    def plan_path(self, start, goal, max_turn=pi, arc_radius=0):
+    def plan_path(self, start, goal, max_turn=pi, arc_radius=40):
         self.max_turn = max_turn
         self.arc_radius = arc_radius
         if self.auto_obstacles:
             self.generate_obstacles()
         self.start = start
         self.goal = goal
+        self.target_heading = goal.q
+        if isnan(self.target_heading):
+            self.offset_goal = goal
+        else:
+            offset_x = goal.x + center_of_rotation_offset * cos(goal.q)
+            offset_y = goal.y + center_of_rotation_offset * sin(goal.q)
+            offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
+            self.offset_goal = offset_goal
         collider = self.collides(start)
         if collider:
             raise StartCollides(start,collider)
-        collider = self.collides(goal)
+        collider = self.collides(offset_goal)
         if collider:
             raise GoalCollides(goal,collider)
         treeA = [start]
-        treeB = [goal]
+        treeB = [offset_goal]
         self.treeA = treeA
         self.treeB = treeB
         swapped = False
@@ -184,7 +197,6 @@ class RRT():
         pathA.reverse()
         # treeB was built backwards from the goal, so headings
         # need to be reversed
-        goal_q = treeB[0].q
         nodeB = treeB[-1]
         pathB = []
         prev_heading = wrap_angle(nodeB.q + pi)
@@ -195,10 +207,12 @@ class RRT():
         (pathA,pathB) = self.join_paths(pathA,pathB)
         self.path = pathA + pathB
         self.smooth_path()
-        if not isnan(goal_q):
-            # Last node turns to desired final heading
+        target_q = self.target_heading
+        if not isnan(target_q):
+            # Last nodes turn to desired final heading
             last = self.path[-1]
-            goal = RRTNode(parent=None, x=last.x, y=last.y, q=goal_q)
+            goal = RRTNode(parent=last, x=self.goal.x, y=self.goal.y,
+                           q=target_q, radius=0)
             self.path.append(goal)
         return (treeA, treeB, self.path)
 
@@ -221,7 +235,7 @@ class RRT():
             cur_y = smoothed_path[i].y
             cur_q = smoothed_path[i].q
             j = random.randrange(i+2, L)
-            if j < L-1 and smoothed_path[j+1].radius != 0:
+            if j < L-1 and smoothed_path[j+1].radius != None:
                 continue  # j is parent node of an arc segment: don't touch
             dx = smoothed_path[j].x - cur_x
             dy = smoothed_path[j].y - cur_y
@@ -252,11 +266,11 @@ class RRT():
         if end_spec is None:
             return None
         # no collision, so snip out nodes i+1 ... j-1
-        print('linear: stitching','%d:'%i,smoothed_path[i],'to %d:'%j,smoothed_path[j])
+        # print('linear: stitching','%d:'%i,smoothed_path[i],'to %d:'%j,smoothed_path[j])
         if not end_spec:
             smoothed_path[j].parent = smoothed_path[i]
             smoothed_path[j].q = new_q
-            smoothed_path[j].radius = 0
+            smoothed_path[j].radius = None
             smoothed_path = smoothed_path[:i+1] + smoothed_path[j:]
         else:
             (next_node,turn_node) = end_spec
@@ -267,7 +281,7 @@ class RRT():
         return smoothed_path
 
     def try_arc_smooth(self,smoothed_path,i,j,cur_x,cur_y,cur_q):
-        if j == i+2 and smoothed_path[i+1].radius != 0:
+        if j == i+2 and smoothed_path[i+1].radius != None:
             return None  # would be replacing an arc node with itself
         arc_spec = self.calculate_arc(smoothed_path[i], smoothed_path[j])
         if arc_spec is None:
@@ -282,11 +296,11 @@ class RRT():
         if end_spec is None:
             return None
         # no collision, so snip out nodes i+1 ... j-1 and insert new node(s)
-        print('arc: stitching','%d:'%i,smoothed_path[i],'to %d:'%j,smoothed_path[j])
+        # print('arc: stitching','%d:'%i,smoothed_path[i],'to %d:'%j,smoothed_path[j])
         if not end_spec:
             smoothed_path[j].parent = turn_node1
             smoothed_path[j].q = tang_q
-            smoothed_path[j].radius = 0
+            smoothed_path[j].radius = None
             smoothed_path = smoothed_path[:i+1] + [turn_node1] + smoothed_path[j:]
         else:
             (next_node, turn_node2) = end_spec

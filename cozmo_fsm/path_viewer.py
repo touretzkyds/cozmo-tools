@@ -137,7 +137,7 @@ class PathViewer():
     def draw_node(self,node,color):
         self.draw_rectangle((node.x,node.y), color=color)
         if node.parent:
-            if node.radius == 0:
+            if node.radius is None or node.radius == 0:
                 self.draw_line((node.x,node.y), (node.parent.x,node.parent.y), color=color)
             else:
                 color = (1, 1, 0.5)
@@ -146,7 +146,7 @@ class PathViewer():
                 init_q = node.parent.q
                 targ_q = node.q
                 radius = node.radius
-                dir = +1 if radius > 0 else -1
+                dir = +1 if radius >= 0 else -1
                 r = abs(radius)
                 center = transform.translate(init_x,init_y).dot(
                     transform.aboutZ(init_q+dir*pi/2).dot(transform.point(r)))
