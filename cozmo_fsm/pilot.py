@@ -79,7 +79,8 @@ class PilotBase(StateNode):
         dy = cy - dest_y
         center_dist = sqrt(dx*dx + dy*dy)
         if center_dist < self.arc_radius:  # turn would be too wide: punt
-            print('*** TURN TOO WIDE ***, center_dist =',center_dist)
+            if self.verbose:
+                print('*** TURN TOO WIDE ***, center_dist =',center_dist)
             center_dist = self.arc_radius
         # tangent points on arc: outer tangent formula from Wikipedia with r=0
         gamma = atan2(dy, dx)
@@ -127,7 +128,8 @@ class PilotBase(StateNode):
         self.handle.cancel()
         self.handle = None
         self.robot.stop_all_motors()
-        print('drive_arc angle=',angle,'deg.,  traveled=',traveled,'deg.')
+        if self.verbose:
+            print('drive_arc angle=',angle,'deg.,  traveled=',traveled,'deg.')
         
 class PilotToPose(PilotBase):
     def __init__(self, pose, verbose=False):
@@ -160,7 +162,8 @@ class PilotToPose(PilotBase):
             self.post_failure()
             return
 
-        print(len(treeA)+len(treeB),'nodes')
+        if self.verbose:
+            print(len(treeA)+len(treeB),'nodes')
         if self.robot.world.path_viewer:
             self.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
