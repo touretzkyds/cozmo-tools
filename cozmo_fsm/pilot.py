@@ -52,8 +52,9 @@ class NavPlan():
         return NavPlan(steps)
 
 class PilotBase(StateNode):
-    def __init__(self):
+    def __init__(self, verbose=False):
         super().__init__()
+        self.verbose = verbose
         self.handle = None
         self.arc_radius = 40
         self.max_turn = pi
@@ -129,8 +130,8 @@ class PilotBase(StateNode):
         print('drive_arc angle=',angle,'deg.,  traveled=',traveled,'deg.')
         
 class PilotToPose(PilotBase):
-    def __init__(self,pose):
-        super().__init__()
+    def __init__(self, pose, verbose=False):
+        super().__init__(verbose)
         self.target_pose = pose
 
     def planner(self,start_node,goal_node):
@@ -164,10 +165,12 @@ class PilotToPose(PilotBase):
             self.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
         # Construct and execute nav plan
-        #[print(x) for x in path]
+        if self.verbose:
+            [print(x) for x in path]
         self.plan = NavPlan.from_path(path)
-        #print('Navigation Plan:')
-        #[print(y) for y in self.plan.steps]
+        if self.verbose:
+            print('Navigation Plan:')
+            [print(y) for y in self.plan.steps]
         self.robot.loop.create_task(self.execute_plan())
 
     async def execute_plan(self):
@@ -193,18 +196,21 @@ class PilotToPose(PilotBase):
                 if abs(wrap_angle(atan2(dy,dx) - cur_hdg)) > pi/2:
                     dist = - dist
                 dist += -center_of_rotation_offset
-                print('PRE-TURN: cur=(%.1f,%.1f) @ %.1f deg.,  int=(%.1f, %.1f)  dist=%.1f' %
-                      (cur_x, cur_y, cur_hdg*180/pi, int_x, int_y, dist))
+                if self.verbose:
+                    print('PRE-TURN: cur=(%.1f,%.1f) @ %.1f deg.,  int=(%.1f, %.1f)  dist=%.1f' %
+                          (cur_x, cur_y, cur_hdg*180/pi, int_x, int_y, dist))
                 if abs(dist) < 2:
-                    print('  ** SKIPPED **')
+                    if self.verbose:
+                        print('  ** SKIPPED **')
                 else:
                     await self.robot.drive_straight(distance_mm(dist),
                                                     speed_mmps(50)).wait_for_completed()
                 (cur_x,cur_y,cur_hdg) = self.robot.world.particle_filter.pose
                 turn_angle = wrap_angle(targ_hdg - cur_hdg)
-                print('TURN: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f) @ %.1f deg, turn_angle=%.1f deg.' %
-                      (cur_x, cur_y, cur_hdg*180/pi,
-                       targ_x, targ_y, targ_hdg*180/pi, turn_angle*180/pi))
+                if self.verbose:
+                    print('TURN: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f) @ %.1f deg, turn_angle=%.1f deg.' %
+                          (cur_x, cur_y, cur_hdg*180/pi,
+                           targ_x, targ_y, targ_hdg*180/pi, turn_angle*180/pi))
                 await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
                 continue
             elif step.type == NavStep.FORWARD:
@@ -213,18 +219,20 @@ class PilotToPose(PilotBase):
                 dy = targ_y - cur_y
                 course = atan2(dy,dx)
                 turn_angle = wrap_angle(course - cur_hdg)
-                #print('FORWARD: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f) @ %.1f deg, turn_angle=%.1f deg.' %
-                print('FWD: cur=(%.1f,%.1f)@%.1f\N{degree sign} targ=(%.1f,%.1f)@%.1f\N{degree sign} turn=%.1f\N{degree sign}' %
-                      (cur_x,cur_y,cur_hdg*180/pi,
-                       targ_x,targ_y,targ_hdg*180/pi,turn_angle*180/pi),
-                      end='')
-                sys.stdout.flush()
+                if self.verbose:
+                    print('FWD: cur=(%.1f,%.1f)@%.1f\N{degree sign} targ=(%.1f,%.1f)@%.1f\N{degree sign} turn=%.1f\N{degree sign}' %
+                          (cur_x,cur_y,cur_hdg*180/pi,
+                           targ_x,targ_y,targ_hdg*180/pi,turn_angle*180/pi),
+                          end='')
+                    sys.stdout.flush()
                 if abs(turn_angle) > self.max_turn:
                     turn_angle = self.max_turn if turn_angle > 0 else -self.max_turn
-                    print('  ** TURN ANGLE SET TO', turn_angle*180/pi)
+                    if self.verbose:
+                        print('  ** TURN ANGLE SET TO', turn_angle*180/pi)
                 # *** HACK: skip node if it requires unreasonable turn
                 if abs(turn_angle) < 2*pi/180 or abs(wrap_angle(course-targ_hdg)) > pi/2:
-                    print('  ** SKIPPED TURN **')
+                    if self.verbose:
+                        print('  ** SKIPPED TURN **')
                 else:
                     await self.robot.turn_in_place(cozmo.util.radians(turn_angle)).wait_for_completed()
                 if not self.running: return
@@ -232,20 +240,24 @@ class PilotToPose(PilotBase):
                 dx = targ_x - cur_x
                 dy = targ_y - cur_y
                 dist = sqrt(dx**2 + dy**2)
-                print(' dist=%.1f' % dist)
+                if self.verbose:
+                    print(' dist=%.1f' % dist)
                 await self.robot.drive_straight(distance_mm(dist),
                                                 speed_mmps(50)).wait_for_completed()
             elif step.type == NavStep.ARC:
                 (targ_x, targ_y, targ_hdg, radius) = step.params
-                print('ARC: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f), targ_hdg=%.1f deg., radius=%.1f' %
-                      (cur_x,cur_y,cur_hdg*180/pi,targ_x,targ_y,targ_hdg*180/pi,radius))
+                if self.verbose:
+                    print('ARC: cur=(%.1f,%.1f) @ %.1f deg.,  targ=(%.1f,%.1f), targ_hdg=%.1f deg., radius=%.1f' %
+                          (cur_x,cur_y,cur_hdg*180/pi,targ_x,targ_y,targ_hdg*180/pi,radius))
                 (actual_radius, actual_angle) = \
                                 self.calculate_arc(cur_x, cur_y, cur_hdg, targ_x, targ_y)
-                print(' ** actual_radius =', actual_radius, '  actual_angle=', actual_angle*180/pi)
+                if self.verbose:
+                    print(' ** actual_radius =', actual_radius, '  actual_angle=', actual_angle*180/pi)
                 await self.drive_arc(actual_radius, math.degrees(abs(actual_angle)))
             else:
                 raise ValueError('Invalid NavStep',step)
-        print('done executing')
+        if self.verbose:
+            print('done executing')
         self.post_completion()
 
 class PilotPushToPose(PilotToPose):
