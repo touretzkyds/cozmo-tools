@@ -214,8 +214,8 @@ class WorldMapViewer():
         size = obst.size
         orient = obst.theta
         glPushMatrix()
-        glTranslatef(*pos)
-        # Transpose the matrix for sending to OpenCV
+        glTranslatef(pos[0], pos[1], max(pos[2],5))
+        # Transpose the pose rotation matrix for sending to OpenCV
         if isinstance(custom_obj, cozmo.objects.CustomObject):
             t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).transpose()
         else:

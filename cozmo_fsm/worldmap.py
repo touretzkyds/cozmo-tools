@@ -35,12 +35,17 @@ class LightCubeObj(WorldObject):
                (self.id, self.x, self.y, self.z, self.theta*180/pi)
 
 class CustomCubeObj(WorldObject):
-    def __init__(self, id, x, y, z, theta):
+    def __init__(self, id, x, y, z, theta, size=None):
         # id is a CustomObjecType
         super().__init__(id,x,y,z)
         self.type = type
         self.theta = theta
-        self.size = (50., 50., 50.)
+        if (size is None) and isinstance(id, CustomObject):
+            self.size = (id.x_size_mm, id.y_size_mm, id.z_size_mm)
+        elif size:
+            self.size = size
+        else:
+            self.size = (50., 50., 50.)
 
     def __repr__(self):
         return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \

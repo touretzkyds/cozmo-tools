@@ -2,6 +2,22 @@ import cozmo
 from cozmo.objects import CustomObject, CustomObjectMarkers, CustomObjectTypes
 
 async def declare_objects(robot):
+
+    """
+    await robot.world.define_custom_box(
+        CustomObjectTypes.CustomType00,
+        CustomObjectMarkers.Hexagons4,     # front
+        CustomObjectMarkers.Triangles5,    # back
+        CustomObjectMarkers.Circles2,      # top
+        CustomObjectMarkers.Diamonds3,     # bottom
+        CustomObjectMarkers.Circles4,      # left
+        CustomObjectMarkers.Diamonds5,     # right
+        50, 20, 1,   # depth, width, height
+        40, 40,      # marker width and height
+        True)        # is_unique
+    return
+    """
+
     decl = robot.world.define_custom_cube
     await decl(CustomObjectTypes.CustomType00,
                CustomObjectMarkers.Circles2,
