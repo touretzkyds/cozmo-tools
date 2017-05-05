@@ -12,12 +12,15 @@ class WorldObject():
         self.obstacle = True
 
 class WallObj(WorldObject):
-    def __init__(self, id=0, x=0, y=0, theta=0, length=100, height=150):
+    def __init__(self, id=0, x=0, y=0, theta=0, length=100, height=150,
+                 door_width=75, door_height=105):
         super().__init__(id,x,y)
         self.z = height/2
         self.theta = theta
         self.length = length
         self.height = height
+        self.door_width = door_width
+        self.door_height = door_height
 
     def __repr__(self):
         return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
@@ -102,7 +105,8 @@ class WorldMap():
             wall_x = m_x + dist*cos(wall_orient-pi/2)
             wall_y = m_y + dist*sin(wall_orient-pi/2)
             return WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=wall_orient,
-                            length=wall_spec.length)
+                           length=wall_spec.length, height=wall_spec.height,
+                           door_height=wall_spec.door_height)
         
     def add_cubes(self):
         for (id,cube) in self.robot.world.light_cubes.items():
@@ -141,8 +145,12 @@ class WorldMap():
 wall_marker_dict = dict()
 
 class WallSpec():
-    def __init__(self, length=100, markers={}, doorways=[]):
+    def __init__(self, length=100, height=210, door_width=75, door_height=105,
+                 markers={}, doorways=[]):
         self.length = length
+        self.height = height
+        self.door_width = door_width
+        self.door_height = door_height
         self.markers = markers
         self.doorways = doorways
         ids = list(markers.keys())

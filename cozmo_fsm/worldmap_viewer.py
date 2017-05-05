@@ -233,37 +233,73 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
+    def make_cylinder(self,radius=10,height=25, highlight=True, color=None):
+        if color is None:
+            color = (1,1,1)
+        if len(color) == 3:
+            color = (*color, 1)
+        if not highlight:
+            s = 0.5
+            color = (color*s, color*s, color*s, color[3])
+        glColor4f(*color)
+        quadric = gluNewQuadric()
+        gluQuadricOrientation(quadric, GLU_OUTSIDE)
+        gluCylinder(quadric, radius, radius, height, 30, 20)
+        glTranslatef(0, 0, height)
+        gluDisk(quadric, 0, radius, 30, 1)
+
+        # Draw the outline circles
+        if highlight:
+            color = (1, 1, 1, 1)
+        else:
+            color = (0, 0, 0, 1)
+
+        r = radius + 0.1
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        glColor4f(*color)
+        glBegin(GL_LINE_LOOP)
+        num_slices = 36
+        for i in range(num_slices):
+            theta = i * (360/num_slices) * (pi/180)
+            glVertex3f(r * cos(theta), r*sin(theta), 0.)
+        glEnd()
+        glTranslatef(0, 0, -height)
+        glBegin(GL_LINE_LOOP)
+        for i in range(num_slices):
+            theta = i * (360/num_slices) * (pi/180)
+            glVertex3f(r * cos(theta), r*sin(theta), 0.)
+        glEnd()
+            
+
     def make_chip(self,chip):
         global gl_lists
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
-        pos = (chip.x, chip.y, chip.thickness/2)
-        glTranslatef(*pos)
-        self.make_cube((chip.radius,chip.radius,chip.thickness), highlight=True,
-                       color=(0,0.8,0))
+        glTranslatef(chip.x, chip.y, chip.z)
+        self.make_cylinder(chip.radius, chip.thickness,
+                           color=(0,0.8,0), highlight=True)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
-        
-
 
     def make_wall(self,wall_obst):
         global gl_lists
         wall_spec = worldmap.wall_marker_dict[wall_obst.id]
         half_length = wall_obst.length / 2
         half_height = wall_obst.height / 2
+        door_height = wall_obst.door_height
         widths = []
         last_x = -half_length
-        edges = [ [0, -half_length, half_height, 1.] ]
+        edges = [ [0, -half_length, door_height/2, 1.] ]
         for (center,width) in wall_spec.doorways:
             left_edge = center - width/2 - half_length
-            edges.append([0., left_edge, half_height, 1.])
+            edges.append([0., left_edge, door_height/2, 1.])
             widths.append(left_edge - last_x)
             right_edge = center + width/2 - half_length
-            edges.append([0., right_edge, half_height, 1.])
+            edges.append([0., right_edge, door_height/2, 1.])
             last_x = right_edge
-        edges.append([0., half_length, half_height, 1.])
+        edges.append([0., half_length, door_height/2, 1.])
         widths.append(half_length-last_x)
         edges = np.array(edges).T
         edges = transform.aboutZ(wall_obst.theta).dot(edges)
@@ -271,16 +307,24 @@ class WorldMapViewer():
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         for i in range(0,len(widths)):
-            center = edges[:,2*i:2*i+2].mean(1).reshape(4,1)
-            dimensions=(4.0, widths[i],wall_obst.height)
+            center = edges[:, 2*i : 2*i+2].mean(1).reshape(4,1)
+            dimensions=(4.0, widths[i], wall_obst.door_height)
             glPushMatrix()
             glTranslatef(*center.flatten()[0:3])
             glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
             self.make_cube(size=dimensions, color=color_red)
             glPopMatrix()
+        # Make the transom
+        glPushMatrix()
+        transom_height = wall_obst.height - wall_obst.door_height
+        z = wall_obst.door_height + transom_height/2
+        glTranslatef(wall_obst.x, wall_obst.y, z)
+        glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
+        self.make_cube(size=(4.0, wall_obst.length, transom_height),
+                       edges=False, color=color_red)
+        glPopMatrix()
         glEndList()
         gl_lists.append(c)
-
 
     def make_floor(self):
         global gl_lists
