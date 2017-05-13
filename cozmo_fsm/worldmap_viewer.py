@@ -99,6 +99,11 @@ robot_body_size_mm =   ( 70, 56,   30)
 robot_body_offset_mm = (-30,  0,   15)
 robot_head_size_mm =   ( 36, 39.4, 36)
 robot_head_offset_mm = ( 20,  0,   36)
+lift_size_mm =         ( 10, 50,   30)
+lift_arm_spacing_mm = 52
+lift_arm_len_mm =     66
+lift_arm_diam_mm =    10
+
 
 charger_bed_size_mm =  (104, 98, 10 )
 charger_back_size_mm = (  5, 90, 35 )
@@ -385,21 +390,67 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
+    @staticmethod
+    def tran_to_tuple(tran):
+        return (tran[0][0], tran[1][0], tran[2][0])
+
     def make_cozmo_robot(self):
         global gl_lists
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
+
+        # Draw the body
         cur_pose = self.robot.world.particle_filter.pose
         p = (cur_pose[0], cur_pose[1], self.robot.pose.position.z)
         glTranslatef(*p)
         glTranslatef(*robot_body_offset_mm)
         glRotatef(cur_pose[2]*180/pi, 0, 0, 1)
         self.make_cube(robot_body_size_mm, highlight=self.robot.is_on_charger)
-        h = robot_head_offset_mm
-        glTranslatef(*h)
+
+        # Draw the head
+        glPushMatrix()
+        glTranslatef(*robot_head_offset_mm)
         glRotatef(-self.robot.head_angle.degrees, 0, 1, 0)
         self.make_cube(robot_head_size_mm, highlight=self.robot.is_on_charger)
+        glPopMatrix()
+
+        # Draw the lift
+        glTranslatef(-robot_body_offset_mm[0], -robot_body_offset_mm[1], -robot_body_offset_mm[2])
+        glPushMatrix()
+        self.robot.kine.get_pose()
+        lift_tran = self.robot.kine.joint_to_base('lift_attach')
+        lift_pt = transform.point(0, 0, 0)
+        lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
+        glTranslatef(*lift_point)
+        self.make_cube(lift_size_mm, highlight=self.robot.is_on_charger)
+        glPopMatrix()
+
+        # Draw the lift arms
+        glPushMatrix()
+        lift_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
+
+        shoulder_tran = self.robot.kine.joint_to_base('shoulder')
+        shoulder_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        shoulder_point = self.tran_to_tuple(shoulder_tran.dot(shoulder_pt));
+
+        arm_point = ((shoulder_point[0] + lift_point[0]) / 2,
+                     (shoulder_point[1] + lift_point[1]) / 2,
+                     (shoulder_point[2] + lift_point[2]) / 2)
+
+        arm_angle = atan2(lift_point[2] - shoulder_point[2],
+                          lift_point[0] - shoulder_point[0])
+
+        glTranslatef(*arm_point)
+        glRotatef(-(180 * arm_angle / pi), 0, 1, 0)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm),
+                       highlight=self.robot.is_on_charger)
+        glTranslatef(0, lift_arm_spacing_mm, 0)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm),
+                       highlight=self.robot.is_on_charger)
+        glPopMatrix()
+
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
