@@ -61,6 +61,7 @@ class StateMachineProgram(StateNode):
         self.thesaurus = thesaurus
 
     async def daco(self):
+        await self.robot.world.undefine_all_custom_marker_objects()
         await self.robot.world.delete_all_custom_objects()
 
     def start(self):
