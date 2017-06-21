@@ -1,6 +1,6 @@
 try:
     import speech_recognition as sr
-except: paass      
+except: pass      
 
 from threading import Thread
 
