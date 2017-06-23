@@ -34,7 +34,7 @@ class LightCubeObj(WorldObject):
         self.size = self.light_cube_size
 
     def __repr__(self):
-        return '<LightCubeObj %d: (%.1f,%.1f, %.1f) @ %d deg.>' % \
+        return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
                (self.id, self.x, self.y, self.z, self.theta*180/pi)
 
 class CustomCubeObj(WorldObject):
@@ -110,17 +110,19 @@ class WorldMap():
         
     def add_cubes(self):
         for (id,cube) in self.robot.world.light_cubes.items():
-            if cube.pose and cube.pose.is_valid:
+            if cube.pose.is_comparable(self.robot.pose):
                 diff = cube.pose - self.robot.pose
                 (dx,dy,_) = diff.position.x_y_z
-                dist = sqrt(dx*dx + dy*dy)
-                bearing = atan2(dy,dx)
                 (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
-                world_bearing = wrap_angle(rob_theta + bearing)
-                world_x = rob_x + dist * cos(world_bearing)
-                world_y = rob_y + dist * sin(world_bearing)
+                orient_diff = wrap_angle(rob_theta - self.robot.pose.rotation.angle_z.radians)
+                osin = sin(orient_diff)
+                ocos = cos(orient_diff)
+                wx = dx * ocos + dy * osin
+                wy = dx * -osin + dy * ocos
+                world_x = rob_x + wx
+                world_y = rob_y + wy
                 world_z = cube.pose.position.z + self.vision_z_fudge
-                world_orient = wrap_angle(rob_theta + diff.rotation.angle_z.radians)
+                world_orient = wrap_angle(cube.pose.rotation.angle_z.radians + orient_diff)
                 self.objects[cube] = LightCubeObj(id, world_x, world_y, world_z, world_orient)
             
     def update_object(self,obj):
