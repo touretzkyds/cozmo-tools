@@ -5,6 +5,7 @@ import cv2
 
 import cozmo
 
+from .evbase import EventRouter
 from .base import StateNode
 from .aruco import *
 from .particle import *
@@ -38,6 +39,10 @@ class StateMachineProgram(StateNode):
                  ):
         super().__init__()
         self.name = self.__class__.__name__.lower()
+
+        if not hasattr(self.robot, 'erouter'):
+            self.robot.erouter = EventRouter()
+            self.robot.erouter.robot = self.robot
 
         self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
         time.sleep(0.5)  # need time for custom objects to be transmitted

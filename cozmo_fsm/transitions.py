@@ -7,7 +7,7 @@ from .nodes import Say, Iterate
 
 class NullTrans(Transition):
     """Transition fires immediately; does not require an event to trigger it."""
-    def start(self,event=None):
+    def start(self):
         if self.running: return
         super().start(event)
         # Don't fire immediately on start because the source node(s) may
@@ -22,9 +22,9 @@ class CSFEventBase(Transition):
         self.event_type = event_type
         self.count = count
 
-    def start(self,event=None):
+    def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         self.observed_sources = set()
         for source in self.sources:
             self.robot.erouter.add_listener(self, self.event_type, source)
@@ -75,9 +75,9 @@ class NextTrans(Transition):
 
 class SayDataTrans(Transition):
     """Converts a DataEvent to Say.SayDataEvent so we can speak the data."""
-    def start(self,event=None):
+    def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         for source in self.sources:
             self.robot.erouter.add_listener(self, DataEvent, source)
             self.robot.erouter.add_listener(self, Say.SayDataEvent, source)
@@ -111,9 +111,9 @@ class TapTrans(Transition):
         super().__init__()
         self.cube = cube
 
-    def start(self,event):
+    def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         self.robot.erouter.add_listener(self,TapEvent,self.cube)
 
     def handle_event(self,event):
@@ -129,9 +129,9 @@ class DataTrans(Transition):
         super().__init__()
         self.data = data
 
-    def start(self,event=None):
+    def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         for source in self.sources:
             self.robot.erouter.add_listener(self, DataEvent, source)
 
@@ -179,9 +179,9 @@ class PatternMatchTrans(Transition):
         self.pattern = pattern
         self.event_type = event_type
     
-    def start(self,event=None):
+    def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         if self.pattern is None:
             self.robot.erouter.add_wildcard_listener(self, self.event_type, None)
         else:
@@ -210,9 +210,9 @@ class HearTrans(PatternMatchTrans):
 
 class RandomTrans(Transition):
     """Picks a destination node at random."""
-    def start(self,event=None):
+    def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
         self.robot.loop.call_soon(self.fire)  # okay to use Transition.fire

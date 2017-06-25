@@ -421,7 +421,7 @@ class Say(ActionNode):
         print("Speaking: '",utterance,"'",sep='')
 
     def action_launcher(self):
-        return self.robot.say_text(self.utterance,**self.action_kwargs)
+        return self.robot.say_text(self.utterance, **self.action_kwargs)
 
 
 class Forward(ActionNode):
@@ -456,7 +456,7 @@ class Forward(ActionNode):
 
 
 class Turn(ActionNode):
-    """Turns by a specified angle. Can accapet an Angle as a DataEvent."""
+    """Turns by a specified angle. Can accept an Angle as a DataEvent."""
     def __init__(self, angle=degrees(90), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
@@ -498,7 +498,7 @@ class SetHeadAngle(ActionNode):
         return self.robot.set_head_angle(self.angle, **self.action_kwargs)
 
 class SetLiftHeight(ActionNode):
-    def __init__(self, height, abort_on_stop=True, **action_kwargs):
+    def __init__(self, height=0, abort_on_stop=True, **action_kwargs):
         self.height = height
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
@@ -579,7 +579,6 @@ class PlaceOnObject(ActionNode):
 
 
 #________________ Animations ________________
-
 
 class AnimationNode(ActionNode):
     def __init__(self, anim_name='anim_bored_01', **kwargs):

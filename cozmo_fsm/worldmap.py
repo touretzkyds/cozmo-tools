@@ -110,7 +110,7 @@ class WorldMap():
         
     def add_cubes(self):
         for (id,cube) in self.robot.world.light_cubes.items():
-            if cube.pose.is_comparable(self.robot.pose):
+            if cube.pose and cube.pose.is_comparable(self.robot.pose):
                 diff = cube.pose - self.robot.pose
                 (dx,dy,_) = diff.position.x_y_z
                 (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose

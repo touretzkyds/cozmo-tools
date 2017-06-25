@@ -44,7 +44,7 @@ class StateNode(EventListener):
         # Start transitions before children, because children
         # may post an event that we're listening for (such as completion).
         for t in self.transitions:
-            t.start(event)
+            t.start()
         if self.start_node:
             self.start_node.start()
 
@@ -150,7 +150,7 @@ class Transition(EventListener):
             self.destinations.append(node)
         return self
 
-    def start(self,event=None):
+    def start(self):
         if self.running: return
         if TRACE.trace_level >= TRACE.transition_startstop:
             print('TRACE%d:' % TRACE.transition_startstop, self, 'starting')

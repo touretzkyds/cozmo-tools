@@ -25,9 +25,9 @@ class FailureEvent(Event):
 
     def __repr__(self):
         if isinstance(self.details, cozmo.action.Action):
-            reason = details.failure_reason[0]
+            reason = self.details.failure_reason[0]
         else:
-            reason = details
+            reason = self.details
         return '<%s for %s: %s>' % (self.__class__.__name__, self.source.name, reason)
 
 
