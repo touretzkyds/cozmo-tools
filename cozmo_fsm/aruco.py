@@ -35,11 +35,11 @@ class Aruco(object):
         #added for pose estimation
         self.marker_size = marker_size #these units will be pose est units!!
         self.image_size = (320,240)
-        self.focal_len = 290
+        focal_len = robot.camera._config._focal_length
         self.camera_matrix = \
-            numpy.array([[self.focal_len, 0,               self.image_size[0]/2],
-                         [0,              -self.focal_len, self.image_size[1]/2],
-                         [0,              0,               1]]).astype(float)
+            numpy.array([[focal_len[0],   0,                  self.image_size[0]/2],
+                         [0,              -self.focal_len[1], self.image_size[1]/2],
+                         [0,              0,                  1]]).astype(float)
         self.distortion_array = numpy.array([[0,0,0,0,0]]).astype(float)
 
     def process_image(self,gray):
