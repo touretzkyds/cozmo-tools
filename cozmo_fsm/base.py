@@ -55,8 +55,16 @@ class StateNode(EventListener):
         super().stop()
         # Stop children before transitions, because a child's stop()
         # method could post an event we want to handle.
-        for c in self.children.values(): c.stop()
+        self.stop_children()
         for t in self.transitions: t.stop()
+
+    def stop_children(self):
+        if self.children == {}:
+            return
+        if TRACE.trace_level >= TRACE.statenode_startstop:
+            print('TRACE%d:' % TRACE.statenode_startstop, self, 'is stopping its children')
+        for child in self.children.values():
+            child.stop()
 
     def add_transition(self, trans):
         if not isinstance(trans, Transition):

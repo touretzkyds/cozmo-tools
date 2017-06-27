@@ -44,8 +44,10 @@ class StateMachineProgram(StateNode):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
 
+        self.robot.loop.create_task(self.daco())
+        time.sleep(0.1)
         self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
-        time.sleep(0.5)  # need time for custom objects to be transmitted
+        time.sleep(0.25)  # need time for custom objects to be transmitted
         
         self.kine_class = kine_class
         self.windowName = None
@@ -55,7 +57,7 @@ class StateMachineProgram(StateNode):
         self.annotate_cube = annotate_cube
         self.aruco = aruco
         if self.aruco:
-            self.robot.world.aruco = Aruco(arucolibname)
+            self.robot.world.aruco = Aruco(self.robot,arucolibname)
         self.particle_filter = particle_filter
         self.world_map = world_map
         self.worldmap_viewer = worldmap_viewer
@@ -70,8 +72,6 @@ class StateMachineProgram(StateNode):
         await self.robot.world.delete_all_custom_objects()
 
     def start(self):
-        self.robot.loop.create_task(self.daco())
-
         # Create a particle filter
         if not isinstance(self.particle_filter,ParticleFilter):
             self.particle_filter = SLAMParticleFilter(self.robot)

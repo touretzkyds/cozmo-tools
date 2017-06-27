@@ -9,7 +9,7 @@ class NullTrans(Transition):
     """Transition fires immediately; does not require an event to trigger it."""
     def start(self):
         if self.running: return
-        super().start(event)
+        super().start()
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
         self.robot.loop.call_soon(self.fire)
@@ -83,6 +83,7 @@ class SayDataTrans(Transition):
             self.robot.erouter.add_listener(self, Say.SayDataEvent, source)
 
     def handle_event(self,event):
+        if not self.running: return
         super().handle_event(event)
         if isinstance(event, Say.SayDataEvent):
             say_data_event = event
@@ -102,6 +103,7 @@ class TimerTrans(Transition):
         self.set_polling_interval(duration)
 
     def poll(self):
+        if not self.running: return
         self.fire()
 
 
@@ -136,6 +138,7 @@ class DataTrans(Transition):
             self.robot.erouter.add_listener(self, DataEvent, source)
 
     def handle_event(self,event):
+        if not self.running: return
         super().handle_event(event)
         if isinstance(event,DataEvent):
             if self.data is None or \
@@ -159,6 +162,7 @@ class ArucoTrans(Transition):
         self.marker_ids = marker_ids
 
     def poll(self,event=None):
+        if not self.running: return
         if self.marker_ids is None:
             if self.robot.world.aruco.seen_marker_ids != []:
                 self.fire()
@@ -188,6 +192,7 @@ class PatternMatchTrans(Transition):
             self.robot.erouter.add_listener(self, self.event_type, None)
 
     def handle_event(self,event):
+        if not self.running: return
         super().handle_event(event)
         if self.pattern is None:
             result = self.wildcard.match(event.string)

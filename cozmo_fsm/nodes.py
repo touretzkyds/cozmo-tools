@@ -91,6 +91,24 @@ class RelaxLift(StateNode):
         msg = cozmo._clad._clad_to_engine_iface.EnableLiftPower(False)
         self.robot.conn.send_msg(msg)
 
+class SetLights(StateNode):
+    def __init__(self, object, light):
+        super().__init__()
+        self.object = object
+        self.light = light
+
+    def start(self,event=None):
+        super().start(event)
+        if self.object is not self.robot:
+            self.object.set_lights(self.light)
+        else:
+            if self.light.on_color.int_color & 0x00FFFF00 == 0: # no green or blue component
+                self.robot.set_all_backpack_lights(self.light)
+            else:
+                self.robot.set_backpack_lights_off()
+                self.robot.set_center_backpack_lights(self.light)
+        self.post_completion()
+
 #________________ Coroutine Nodes ________________
 
 class CoroutineNode(StateNode):

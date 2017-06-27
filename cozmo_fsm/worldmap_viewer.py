@@ -229,7 +229,7 @@ class WorldMapViewer():
         glMultMatrixf(rotmat)
         comparable = True # obj.pose.origin_id == 0 or obj.pose.is_comparable(self.robot.pose)
         obj_color = color_orange
-        highlight = True # obj.is_visible
+        highlight = custom_obj.is_visible
         if comparable:
             self.make_cube(size, highlight=highlight, color=obj_color)
         else:
