@@ -44,7 +44,7 @@ class StateMachineProgram(StateNode):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
 
-        self.robot.loop.create_task(self.daco())
+        self.robot.world.undefine_all_custom_marker_objects()
         time.sleep(0.1)
         self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
         time.sleep(0.25)  # need time for custom objects to be transmitted
@@ -66,10 +66,6 @@ class StateMachineProgram(StateNode):
         self.speech = speech
         self.speech_debug = speech_debug
         self.thesaurus = thesaurus
-
-    async def daco(self):
-        await self.robot.world.undefine_all_custom_marker_objects()
-        await self.robot.world.delete_all_custom_objects()
 
     def start(self):
         # Create a particle filter
