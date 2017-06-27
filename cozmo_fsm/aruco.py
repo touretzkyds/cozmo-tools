@@ -23,7 +23,7 @@ class ArucoMarker(object):
 
 
 class Aruco(object):
-    def __init__(self,arucolibname, marker_size=50):
+    def __init__(self, robot, arucolibname, marker_size=50):
         self.arucolibname = arucolibname
         self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
@@ -37,9 +37,9 @@ class Aruco(object):
         self.image_size = (320,240)
         focal_len = robot.camera._config._focal_length
         self.camera_matrix = \
-            numpy.array([[focal_len[0],   0,                  self.image_size[0]/2],
-                         [0,              -self.focal_len[1], self.image_size[1]/2],
-                         [0,              0,                  1]]).astype(float)
+            numpy.array([[focal_len.x ,  0,            self.image_size[0]/2],
+                         [0,             -focal_len.y, self.image_size[1]/2],
+                         [0,             0,            1]]).astype(float)
         self.distortion_array = numpy.array([[0,0,0,0,0]]).astype(float)
 
     def process_image(self,gray):
