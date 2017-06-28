@@ -328,21 +328,22 @@ def cli_loop(robot):
 VERBOSE = False  # True if we want all the log messages
 
 def suppress_filter(log_record):
+    message = log_record.msg if isinstance(log_record.msg, str) else repr(log_record.msg)
     if VERBOSE:
         return True
     if log_record.levelno == logging.ERROR and \
-       log_record.msg.startswith("Received a custom object type:"):
+       message.startswith("Received a custom object type:"):
         return False
-    if log_record.msg.startswith("Defined: ") and \
+    if message.startswith("Defined: ") and \
        len(log_record.args) > 0 and \
            isinstance(log_record.args[0], cozmo.objects.CustomObject):
         return False
-    if log_record.msg.startswith("Invalidating pose for") or \
-       log_record.msg.startswith("Robot delocalized") or \
-       log_record.msg.startswith("ObjectPowerLevel event") or \
-       log_record.msg.startswith("ObjectConnectionState event") or \
-       log_record.msg.startswith("Object connected") or \
-       log_record.msg.startswith("Object disconnected"):
+    if message.startswith("Invalidating pose for") or \
+       message.startswith("Robot delocalized") or \
+       message.startswith("ObjectPowerLevel event") or \
+       message.startswith("ObjectConnectionState event") or \
+       message.startswith("Object connected") or \
+       message.startswith("Object disconnected"):
         return False
     return True
 
