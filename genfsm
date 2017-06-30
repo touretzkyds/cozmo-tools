@@ -24,19 +24,9 @@ you are defining. Example:
 See the cozmo_fsm/examples directory for examples of .fsm files
 and the .py files they generate.
 
+Note: install termcolor package to get messages displayed in color.
+
 Author: David S. Touretzky, Carnegie Mellon University
-=======
-
-Changelog:
-==========
-
-* 01/11/2017
-    Dave Touretzky
-        - Add colored messages using termcolor.cprint
-
-* 12/20/2016
-    Dave Touretzky
-        - Created.  Converted cozmo_fsm/examples to use this.
 """
 
 import sys, time, re
@@ -175,7 +165,7 @@ def handle_newline():
 
 def lexer (string):
     """Convert input string into a sequence of lexer tokens."""
-    r_identifier = re.compile('\w+')
+    r_identifier = re.compile('((self\.)|)\w+')
     tokens = []
     while string:
         was_in_table = False
@@ -417,6 +407,8 @@ transition_names = dict(
 
 def gen_name(base_name, name_counts=dict()):
     name = base_name.lower()
+    if name.startswith('self.'):
+        name = name[5:]
     count = name_counts.get(name,0) + 1
     name_counts[name] = count
     return name + repr(count)
@@ -571,7 +563,7 @@ def process_file():
     global line_cache, current_line, starting_line, indent_level
     line_cache = [None] # dummy line 0
     current_line = 0
-    r_setup = re.compile('^\s*\$setup\s*((\"\"\")|(\'\'\')|\{)\s*$')
+    r_setup = re.compile('^\s*\$setup\s*((\"\"\")|(\'\'\')|\{)\s*((\#.*)|)$')
     r_indent = re.compile('^\s*')
     while True:
         line = in_f.readline()
@@ -582,10 +574,11 @@ def process_file():
         if line.find('$setup') == -1:
             out_f.write(line)
             continue
-        if not r_setup.match(line):
+        setup_match = r_setup.match(line)
+        if not setup_match:
             report_line_error("Incorrect $setup syntax: '%s'" % line.strip())
             continue
-        delim = line[-2]
+        delim = setup_match.group(1)[0]
         if delim == '{':
             close_delim = '}'
             r_end = re.compile('\s*\}\s*$')
