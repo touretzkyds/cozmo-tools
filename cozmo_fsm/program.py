@@ -1,7 +1,8 @@
+import asyncio
+import inspect
 import time
 import functools
-import numpy
-import cv2
+import numpy, cv2
 
 import cozmo
 
@@ -44,8 +45,10 @@ class StateMachineProgram(StateNode):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
 
-        self.robot.world.undefine_all_custom_marker_objects()
-        time.sleep(0.1)
+        # Reset custom objects
+        cor = self.robot.world.undefine_all_custom_marker_objects()
+        if inspect.iscoroutine(cor):
+            asyncio.ensure_future(cor)
         self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
         time.sleep(0.25)  # need time for custom objects to be transmitted
         
@@ -130,7 +133,7 @@ class StateMachineProgram(StateNode):
             self.speech_listener = SpeechListener(self.robot,self.thesaurus,debug=self.speech_debug)
             self.speech_listener.start()
 
-        # Call parent's start() to launch the state machine.
+        # Call parent's start() to launch the state machine by invoking the start node.
         super().start()
 
     def stop(self):
