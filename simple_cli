@@ -358,6 +358,7 @@ def start_connection():
         VERBOSE = True
     cozmo.logger.addFilter(suppress_filter)
     cozmo.robot.Robot.drive_off_charger_on_connect = False
+    connection_error = None
     try:
         if len(sys.argv) >= 2:
             if sys.argv[1] == "TK_VIEWER":
@@ -368,7 +369,9 @@ def start_connection():
         else:
             cozmo.connect(run)
     except cozmo.ConnectionError as e:
-        sys.exit("A connection error occurred: %s" % e)
+        connection_error = e
+    if connection_error is not None:
+        sys.exit("A connection error occurred: %s" % connection_error)
 
 
 def process_interrupt():
