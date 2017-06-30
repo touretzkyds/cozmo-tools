@@ -132,9 +132,9 @@ class PilotBase(StateNode):
             print('drive_arc angle=',angle,'deg.,  traveled=',traveled,'deg.')
         
 class PilotToPose(PilotBase):
-    def __init__(self, pose, verbose=False):
+    def __init__(self, target_pose=None, verbose=False):
         super().__init__(verbose)
-        self.target_pose = pose
+        self.target_pose = target_pose
 
     def planner(self,start_node,goal_node):
         return self.robot.world.rrt.plan_path(start_node,goal_node)

@@ -21,7 +21,7 @@ class RRTNode():
         self.x = x
         self.y = y
         self.q = q
-        self.radius = radius
+        self.radius = radius  # arc radius
 
     def copy(self):
         return RRTNode(self.parent, self.x, self.y, self.q, self.radius)
