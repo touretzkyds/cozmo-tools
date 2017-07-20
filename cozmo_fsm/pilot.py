@@ -141,6 +141,9 @@ class PilotToPose(PilotBase):
 
     def start(self,event=None):
         super().start(event)
+        if self.target_pose is None:
+            self.post_failure()
+            return
         (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
         start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
         tpose = self.target_pose
