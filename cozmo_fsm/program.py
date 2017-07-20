@@ -22,18 +22,25 @@ from . import custom_objs
 
 class StateMachineProgram(StateNode):
     def __init__(self,
-                 kine_class=CozmoKinematics,
-                 cam_viewer=True,
+                 kine_class = CozmoKinematics,
+                 cam_viewer = True,
+                 force_annotation = False,   # set to True for annotation even without cam_viewer
+                 annotate_sdk = True,        # include SDK's own image annotations
+                 annotated_scale_factor = 2, # set to 1 to avoid cost of resizing images
+
+                 particle_filter = True,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
-                 annotate_cube = True,
-                 aruco=True,
-                 arucolibname=cv2.aruco.DICT_4X4_250,
-                 particle_filter = True,
+
+                 aruco = True,
+                 arucolibname = cv2.aruco.DICT_4X4_250,
+
                  world_map = None,
-                 worldmap_viewer=False,
+                 worldmap_viewer = False,
+
                  rrt = None,
                  path_viewer = False,
+
                  speech = False,
                  speech_debug = False,
                  thesaurus = Thesaurus()
@@ -53,19 +60,27 @@ class StateMachineProgram(StateNode):
         time.sleep(0.25)  # need time for custom objects to be transmitted
         
         self.kine_class = kine_class
+
         self.windowName = None
         self.cam_viewer = cam_viewer
+        self.annotate_sdk = annotate_sdk
+        self.force_annotation = force_annotation
+        self.annotated_scale_factor = annotated_scale_factor
+
+        self.particle_filter = particle_filter
         self.particle_viewer = particle_viewer
         self.particle_viewer_scale = particle_viewer_scale
-        self.annotate_cube = annotate_cube
+
         self.aruco = aruco
         if self.aruco:
             self.robot.world.aruco = Aruco(self.robot,arucolibname)
-        self.particle_filter = particle_filter
+
         self.world_map = world_map
         self.worldmap_viewer = worldmap_viewer
+
         self.rrt = rrt
         self.path_viewer = path_viewer
+
         self.speech = speech
         self.speech_debug = speech_debug
         self.thesaurus = thesaurus
@@ -156,7 +171,7 @@ class StateMachineProgram(StateNode):
         return image
 
     def process_image(self,event,**kwargs):
-        curim = numpy.array(event.image.raw_image).astype(numpy.uint8) #cozmo-raw image
+        curim = numpy.array(event.image.raw_image) #cozmo-raw image
         gray = cv2.cvtColor(curim,cv2.COLOR_BGR2GRAY)
 
         # Aruco image processing
@@ -166,27 +181,30 @@ class StateMachineProgram(StateNode):
         self.user_image(curim,gray)
         # Done with image processing
 
-        # Annotate and display image if stream enabled.
-        if self.windowName is not None:
-            scale_factor = 2
-            # Cozmo's annotations
-            self.robot.img = event.image
-            if self.annotate_cube:
-                coz_ann = event.image.annotate_image(scale=scale_factor)
-                annotated_im = numpy.array(coz_ann).astype(numpy.uint8)
+        # Annotate and display image if requested
+        if self.force_annotation or self.windowName is not None:
+            scale = self.annotated_scale_factor
+            # Apply Cozmo SDK annotations.
+            if self.annotate_sdk:
+                coz_ann = event.image.annotate_image(scale=scale)
+                annotated_im = numpy.array(coz_ann)
+            elif scale != 1:
+                shape = curim.shape
+                dsize = (scale*shape[1], scale*shape[0])
+                annotated_im = cv2.resize(curim, dsize)
             else:
-                im = numpy.array(event.image.raw_image).astype(numpy.uint8)
-                shape = im.shape
-                dsize = (2*shape[1], 2*shape[0])
-                annotated_im = cv2.resize(im, dsize)
+                annotated_im = curim
             # Aruco annotation
             if self.aruco and \
                    len(self.robot.world.aruco.seen_marker_ids) > 0:
-                annotated_im = self.robot.world.aruco.annotate(annotated_im,scale_factor)
+                annotated_im = self.robot.world.aruco.annotate(annotated_im,scale)
             # Other annotators can run here if the user supplies them.
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
-            cv2.imshow(self.windowName,annotated_im)
+            if self.windowName:
+                cv2.imshow(self.windowName, annotated_im)
+
+        # Use this heartbeat signal to look for new landmarks on startup
         pf = self.robot.world.particle_filter
         if pf and not pf.primed:
             pf.look_for_new_landmarks()
