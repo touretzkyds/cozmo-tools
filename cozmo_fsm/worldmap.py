@@ -56,7 +56,7 @@ class CustomCubeObj(WorldObject):
 
     def __repr__(self):
         return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
-               (self.type, self.x, self.y, self.z, self.theta*180/pi)
+               (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi)
 
 class ChipObj(WorldObject):
     def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
