@@ -150,6 +150,8 @@ class PilotToPose(PilotBase):
         goal_node = RRTNode(x=tpose.position.x, y=tpose.position.y,
                             q=tpose.rotation.angle_z.radians)
 
+        if self.robot.world.path_viewer:
+            self.robot.world.path_viewer.clear()
         try:
             (treeA, treeB, path) = self.planner(start_node, goal_node)                    
         except StartCollides as e:

@@ -128,11 +128,18 @@ class SensorModel():
 
     def compute_robot_motion(self):
         # How much did we move since last evaluation?
-        dx = self.robot.pose.position.x - self.last_evaluate_pose.position.x
-        dy = self.robot.pose.position.y - self.last_evaluate_pose.position.y
-        dist = sqrt(dx*dx + dy*dy)
-        turn_angle = wrap_angle(self.robot.pose.rotation.angle_z.radians -
-                                self.last_evaluate_pose.rotation.angle_z.radians)
+        if self.robot.pose.is_comparable(self.last_evaluate_pose):
+            dx = self.robot.pose.position.x - self.last_evaluate_pose.position.x
+            dy = self.robot.pose.position.y - self.last_evaluate_pose.position.y
+            dist = sqrt(dx*dx + dy*dy)
+            turn_angle = wrap_angle(self.robot.pose.rotation.angle_z.radians -
+                                    self.last_evaluate_pose.rotation.angle_z.radians)
+        else:
+            dist = 0
+            turn_angle = 0
+            print('** Robot origin_id changed from', self.last_evaluate_pose.origin_id,
+                  'to', self.robot.pose.origin_id)
+            self.last_evaluate_pose = self.robot.pose
         return (dist,turn_angle)
 
 class ArucoDistanceSensorModel(SensorModel):

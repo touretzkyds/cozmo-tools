@@ -129,9 +129,10 @@ class RRT():
     def parts_to_node(self,node):
         parts = []
         for part in self.robot_parts:
-            center = transform.point(part.center[0,0]+node.x, part.center[1,0]+node.y)
-            tmat = transform.translate(center[0,0],center[1,0]) \
-                      .dot(transform.aboutZ(part.orient))
+            tmat = transform.aboutZ(part.orient)
+            tmat = transform.translate(part.center[0,0], part.center[1,0]).dot(tmat)
+            tmat = transform.aboutZ(node.q).dot(tmat)
+            tmat = transform.translate(node.x, node.y).dot(tmat)
             this_part = part.instantiate(tmat)
             parts.append(this_part)
         return parts
