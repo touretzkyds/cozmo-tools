@@ -229,9 +229,10 @@ def lexer_build_arglist(string):
                 break
         pos += 1
     if lookstack:
-        p = min(pos, len(string))
+        cleanstr = string.strip()
+        p = min(pos, len(cleanstr)-1)
         report_line_error("Ill-formed argument list at '%s' near '%s'" %
-                          (error_fragment(ostring), string[p]))
+                          (error_fragment(ostring), cleanstr[p]))
         return Arglist(''), ''
     return Arglist(string[0:pos]), string[pos:]
 
@@ -619,7 +620,8 @@ def report_global_error(error_text):
 def error_fragment(string):
     s = string.strip()
     p = s.find('\n')
-    if p == -1: p = len(s)
+    if p == -1:
+        p = len(s)
     fragment = s[0:min(p,20)]
     if len(fragment) < p:
         fragment += "..."
