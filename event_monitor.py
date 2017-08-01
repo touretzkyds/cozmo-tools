@@ -79,25 +79,39 @@ def monitor_EvtObjectTapped(evt, *, obj, tap_count, tap_duration, tap_intensity,
     print(' count=', tap_count, \
           ' duration=', tap_duration, ' intensity=', tap_intensity, sep='')
 
+def monitor_EvtObjectMovingStarted(evt, *, obj, acceleration, **kwargs):
+    print_prefix(evt)
+    print_object(obj)
+    print(' accleration=', acceleration, sep='')
+
+def monitor_EvtObjectMovingStopped(evt, *, obj, move_duration, **kwargs):
+    print_prefix(evt)
+    print_object(obj)
+    print(' move_duration=%3.1f secs' %move_duration)
+
 def monitor_face(evt, face, **kwargs):
     print_prefix(evt)
     name = face.name if face.name is not '' else '[unknown face]'
-    print(name, ' face_id=', face.face_id, sep='')
+    expr = face.expression if face.expression is not None else 'expressionless'
+    kw = set(kwargs.keys()) if len(kwargs) > 0 else '{}'
+    print(name, ' (%s) ' % expr, ' face_id=', face.face_id, '  ', kw, sep='')
 
-dispatch_table = {                                                    \
-  cozmo.action.EvtActionStarted        : monitor_generic,             \
-  cozmo.action.EvtActionCompleted      : monitor_EvtActionCompleted,  \
-  cozmo.behavior.EvtBehaviorStarted    : monitor_generic,             \
-  cozmo.behavior.EvtBehaviorStopped    : monitor_generic,             \
-  cozmo.anim.EvtAnimationsLoaded       : monitor_generic,             \
-  cozmo.anim.EvtAnimationCompleted     : monitor_EvtActionCompleted,  \
-  cozmo.objects.EvtObjectAppeared      : monitor_generic,             \
-  cozmo.objects.EvtObjectDisappeared   : monitor_generic,             \
-  cozmo.objects.EvtObjectObserved      : monitor_generic,             \
-  cozmo.objects.EvtObjectTapped        : monitor_EvtObjectTapped,     \
-  cozmo.faces.EvtFaceAppeared          : monitor_face,                \
-  cozmo.faces.EvtFaceObserved          : monitor_face,                \
-  cozmo.faces.EvtFaceDisappeared       : monitor_face,                \
+dispatch_table = {                                                       \
+  cozmo.action.EvtActionStarted        : monitor_generic,                \
+  cozmo.action.EvtActionCompleted      : monitor_EvtActionCompleted,     \
+  cozmo.behavior.EvtBehaviorStarted    : monitor_generic,                \
+  cozmo.behavior.EvtBehaviorStopped    : monitor_generic,                \
+  cozmo.anim.EvtAnimationsLoaded       : monitor_generic,                \
+  cozmo.anim.EvtAnimationCompleted     : monitor_EvtActionCompleted,     \
+  cozmo.objects.EvtObjectAppeared      : monitor_generic,                \
+  cozmo.objects.EvtObjectDisappeared   : monitor_generic,                \
+  cozmo.objects.EvtObjectMovingStarted : monitor_EvtObjectMovingStarted, \
+  cozmo.objects.EvtObjectMovingStopped : monitor_EvtObjectMovingStopped, \
+  cozmo.objects.EvtObjectObserved      : monitor_generic,                \
+  cozmo.objects.EvtObjectTapped        : monitor_EvtObjectTapped,        \
+  cozmo.faces.EvtFaceAppeared          : monitor_face,                   \
+  cozmo.faces.EvtFaceObserved          : monitor_face,                   \
+  cozmo.faces.EvtFaceDisappeared       : monitor_face,                   \
 }
 
 excluded_events = {    # Occur too frequently to monitor by default   \
