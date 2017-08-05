@@ -5,7 +5,8 @@ import asyncio
 
 from .base import *
 from .rrt import *
-from .nodes import DriveArc
+from .nodes import ParentFails, ParentCompletes, DriveArc, DriveContinuous
+from .transitions import CompletionTrans, FailureTrans, DataTrans
 from .cozmo_kin import wheelbase, center_of_rotation_offset
 
 from cozmo.util import distance_mm, speed_mmps
@@ -131,7 +132,7 @@ class PilotBase(StateNode):
         if self.verbose:
             print('drive_arc angle=',angle,'deg.,  traveled=',traveled,'deg.')
         
-class PilotToPose(PilotBase):
+class PilotToPoseOld(PilotBase):
     def __init__(self, target_pose=None, verbose=False):
         super().__init__(verbose)
         self.target_pose = target_pose
@@ -268,6 +269,84 @@ class PilotToPose(PilotBase):
             print('done executing')
         self.post_completion()
 
+class PilotToPose(StateNode):
+    def __init__(self, target_pose=None, verbose=False):
+        super().__init__()
+        self.target_pose = target_pose
+        self.verbose = verbose
+
+    class PilotPlanner(StateNode):
+        def planner(self,start_node,goal_node):
+            return self.robot.world.rrt.plan_path(start_node,goal_node)
+
+        def start(self,event=None):
+            super().start(event)
+            if self.parent.target_pose is None:
+                self.parent.post_failure()
+                return
+            (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
+            start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
+            tpose = self.parent.target_pose
+            goal_node = RRTNode(x=tpose.position.x, y=tpose.position.y,
+                                q=tpose.rotation.angle_z.radians)
+
+            if self.robot.world.path_viewer:
+                self.robot.world.path_viewer.clear()
+            try:
+                (treeA, treeB, path) = self.planner(start_node, goal_node)                    
+            except StartCollides as e:
+                print('Start collides!',e)
+                self.post_failure()
+                return
+            except GoalCollides as e:
+                print('Goal collides!',e)
+                self.post_failure()
+                return
+            except MaxIterations:
+                print('Max iteration exceeded!')
+                self.post_failure()
+                return
+
+            if self.parent.verbose:
+                print(len(treeA)+len(treeB),'nodes')
+            if self.robot.world.path_viewer:
+                self.robot.world.path_viewer.clear()
+                self.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
+
+            # Construct and execute nav plan
+            if self.parent.verbose:
+                [print(x) for x in path]
+            cpath = []
+            for node in path:
+                cpath.append([node.x, node.y])
+            if self.parent.verbose:
+                print('cpath =', cpath)
+
+            self.post_data(cpath)
+
+    def setup(self):
+        # Build a little state machine by hand so we don't have to use genfsm
+        planner = self.PilotPlanner() .set_name(self.name+"_planner") .set_parent(self)
+        driver = DriveContinuous() .set_name(self.name+"_driver") .set_parent(self)
+        pfail = ParentFails().set_parent(self)
+        pcomp = ParentCompletes().set_parent(self)
+        # Planner fails if collision state or no path found
+        ptransF = FailureTrans().set_name(self.name+"_planfail")
+        ptransF.add_sources(planner)
+        ptransF.add_destinations(pfail)
+        # Planner sends data transition to activate driver
+        ptransD = DataTrans().set_name(self.name+"_data")
+        ptransD.add_sources(planner)
+        ptransD.add_destinations(driver)
+        # Driver will fail if robot is picked up
+        dtransF = FailureTrans().set_name(self.name+"_failure")
+        dtransF.add_sources(driver)
+        dtransF.add_destinations(pfail)
+        # Driver completes if destination reached
+        dtransC = CompletionTrans().set_name(self.name+"_completion")
+        dtransC.add_sources(driver)
+        dtransC.add_destinations(pcomp)
+
 class PilotPushToPose(PilotToPose):
     def __init__(self,pose):
         super().__init__(pose)
@@ -276,3 +355,22 @@ class PilotPushToPose(PilotToPose):
     def planner(self,start_node,goal_node):
         self.robot.world.rrt.step_size=20
         return self.robot.world.rrt.plan_push_chip(start_node,goal_node)
+
+class PilotCheckStart(StateNode):
+    "Fails if rrt planner indicates start_collides"
+
+    def start(self, event=None):
+        super().start(event)
+        (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
+        start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
+        try:
+            self.robot.world.rrt.plan_path(start_node,start_node)
+        except StartCollides as e:
+            print('Start collides!',e)
+            self.post_failure()
+            return
+        except Exception as e:
+            print('Unexpected planner exception',e)
+            self.post_failure()
+            return
+        self.post_success()

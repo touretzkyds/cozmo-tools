@@ -35,7 +35,7 @@ class PathViewer():
         self.aspect = self.width/self.height
         self.windowName = windowName
         self.translation = [0., 0.]  # Translation in mm
-        self.scale = 1
+        self.scale = 0.64
 
     def window_creator(self):
         global WINDOW
@@ -60,6 +60,10 @@ class PathViewer():
     def clear(self):
         global the_items
         the_items = []
+
+    def set_rrt(self,new_rrt):
+        global the_rrt
+        the_rrt = new_rrt
 
     def draw_rectangle(self, center, width=4, height=None,
                        angle=0, color=(1,1,1), fill=True):

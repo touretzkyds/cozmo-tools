@@ -95,11 +95,16 @@ class StateMachineProgram(StateNode):
 
         # Set up kinematics
         self.robot.kine = self.kine_class(self.robot)
-        self.set_polling_interval(0.025)  # for kine and motion model update
+        self.robot.was_picked_up = False
+        self.robot.carrying = None
+
         # World map and path planner
         self.robot.world.world_map = \
                 self.world_map or WorldMap(self.robot)
         self.robot.world.rrt = self.rrt or RRT(self.robot)
+
+        # Polling
+        self.set_polling_interval(0.025)  # for kine and motion model update
 
         # Launch viewers
         opengl.init()
@@ -126,6 +131,8 @@ class StateMachineProgram(StateNode):
         if self.path_viewer:
             if self.path_viewer is True:
                 self.path_viewer = PathViewer(self.robot.world.rrt)
+            else:
+                self.path_viewer.set_rrt(self.robot.world.rrt)
             self.path_viewer.start()
         self.robot.world.path_viewer = self.path_viewer
 
@@ -157,13 +164,27 @@ class StateMachineProgram(StateNode):
             self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage,
                                                   self.process_image)
         except: pass
-        if self.windowName is not None:
-            cv2.destroyWindow(self.windowName)
+        #if self.windowName is not None:
+        #    cv2.destroyWindow(self.windowName)
 
     def poll(self):
         self.robot.kine.get_pose()
-        if self.robot.world.particle_filter:
-            self.robot.world.particle_filter.move()
+        if self.robot.is_picked_up:
+            # robot is in the air
+            if self.robot.was_picked_up:
+                pass  # we already knew that
+            else:
+                print('** Robot was picked up!')
+                self.robot.stop_all_motors()
+        else:  # robot is on the ground
+            pf = self.robot.world.particle_filter
+            if pf:
+                if self.robot.was_picked_up:
+                    print('** Robot was put down.')
+                    pf.initializer.initialize(self.robot)
+                else:
+                    pf.move()
+        self.robot.was_picked_up = self.robot.is_picked_up
 
     def user_image(self,image,gray): pass
 

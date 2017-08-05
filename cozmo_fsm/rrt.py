@@ -163,12 +163,23 @@ class RRT():
             offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
         self.offset_goal = offset_goal
 
+        # Check if start collides
         collider = self.collides(start)
         if collider:
-            raise StartCollides(start,collider)
-        collider = self.collides(offset_goal)
+            raise StartCollides(start,collider,collider.obstacle)
+
+        # Check if goal collides
+        if not isnan(self.offset_goal.q):
+            collider = self.collides(self.offset_goal)
+        else:  # no goal orientation specified, so try them all
+            temp_goal = self.offset_goal.copy()
+            for theta in range(0,360,10):
+                temp_goal.q = theta/180*pi
+                collider = self.collides(temp_goal)
+                if not collider:
+                    break
         if collider:
-            raise GoalCollides(goal,collider)
+            raise GoalCollides(goal,collider,collider.obstacle)
 
         treeA = [start]
         treeB = [offset_goal]
@@ -442,6 +453,7 @@ class RRT():
             r = Rectangle(center=center,
                           dimensions=dimensions,
                           orient=wall.theta )
+            r.obstacle = wall
             obst.append(r)
         return obst
 
@@ -449,11 +461,13 @@ class RRT():
         r = Rectangle(center=transform.point(obj.x, obj.y),
                       dimensions=obj.size[0:2],
                       orient=obj.theta)
+        r.obstacle = obj
         return r
 
     def generate_chip_obstacle(self,obj):
         r = Circle(center=transform.point(obj.x,obj.y),
                    radius=obj.radius)
+        r.obstalce = obj
         return r
 
     def make_robot_parts(self,robot):

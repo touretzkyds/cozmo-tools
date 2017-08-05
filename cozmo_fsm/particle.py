@@ -26,15 +26,18 @@ class Particle():
 
 #================ Particle Initializers ================
 
-class ParticleInitializer(): pass
+class ParticleInitializer():
+    def __init__(self):
+        self.pf = None   # must be filled in after creation
 
 class RandomWithinRadius(ParticleInitializer):
     """ Normally distribute particles within a radius, with random heading. """
     def __init__(self,radius=200):
+        super().__init__()
         self.radius = radius
 
-    def initialize(self, particles):
-        for p in particles:
+    def initialize(self, robot):
+        for p in self.pf.particles:
             qangle = random.random()*2*pi
             r = random.gauss(0, self.radius/2) + self.radius/1.5
             p.x = r * cos(qangle)
@@ -42,25 +45,35 @@ class RandomWithinRadius(ParticleInitializer):
             p.theta = random.random()*2*pi
             p.log_weight = 0.0
             p.weight = 1.0
+        self.pf.pose = (0, 0, 0)
+        self.pf.motion_model.old_pose = robot.pose
 
 class RobotPosition(ParticleInitializer):
-    """ Initialize all particles to the robot's current position; the motion model will jitter tjem. """
+    """ Initialize all particles to the robot's current position or a constant;
+    the motion model will jitter them. """
     def __init__(self, x=None, y=None, theta=None):
+        super().__init__()
         self.x = x
         self.y = y
         self.theta = theta
         
-    def initialize(self,particles):
+    def initialize(self, robot):
         if self.x == None:
-            self.x = self.robot.pose.position.x
-            self.y = self.robot.pose.position.y
-            self.theta = self.robot.pose.rotation.angle_z.radians
-        for p in particles:
-            p.x = self.x
-            p.y = self.y
-            p.theta = self.theta
+            x = robot.pose.position.x
+            y = robot.pose.position.y
+            theta = robot.pose.rotation.angle_z.radians
+        else:
+            x = self.x
+            y = self.y
+            theta = self.theta
+        for p in self.pf.particles:
+            p.x = x
+            p.y = y
+            p.theta = theta
             p.log_weight = 0.0
             p.weight = 1.0
+        self.pf.pose = (x, y, theta)
+        self.pf.motion_model.old_pose = robot.pose
     
 
 #================ Motion Model ================
@@ -79,6 +92,9 @@ class DefaultMotionModel(MotionModel):
     def move(self, particles):
         old_pose = self.old_pose
         new_pose = self.robot.pose
+        self.old_pose = new_pose
+        if not new_pose.is_comparable(old_pose):
+            return  # can't path integrate if the robot switched reference frames
         old_xyz = old_pose.position.x_y_z
         new_xyz = new_pose.position.x_y_z
         old_hdg = old_pose.rotation.angle_z.radians
@@ -88,7 +104,6 @@ class DefaultMotionModel(MotionModel):
         dy = new_xyz[1] - old_xyz[1]
         cor = center_of_rotation_offset
         dist = max(0, sqrt(dx*dx + dy*dy) + cor * abs(turn_angle))
-        self.old_pose = new_pose
         # Did we drive forward, or was it backward?
         fwd_xy = (old_xyz[0] + dist * cos(old_hdg+turn_angle/2),
                   old_xyz[1] + dist * sin(old_hdg+turn_angle/2))
@@ -107,8 +122,10 @@ class DefaultMotionModel(MotionModel):
             # Correct for the center of rotation being behind the base frame
             xc = -cor * cos(p.theta)
             yc = -cor * sin(p.theta)
-            xcor = xc * cos(turn_angle) + yc * -sin(turn_angle) - xc
-            ycor = xc * sin(turn_angle) + yc *  cos(turn_angle) - yc
+            cost = cos(turn_angle)
+            sint = sin(turn_angle)
+            xcor = xc * cost + yc * -sint - xc
+            ycor = xc * sint + yc *  cost - yc
             # Make half the turn, translate, then complete the turn
             p.theta = wrap_angle(p.theta + pturn/2)
             p.x = p.x + cos(p.theta)*pdist + xcor
@@ -359,6 +376,7 @@ class ParticleFilter():
         self.robot = robot
         self.num_particles = num_particles
         self.initializer = initializer
+        self.initializer.pf = self
         if motion_model == "default":
             motion_model = DefaultMotionModel(robot)
         if sensor_model == "default":
@@ -371,7 +389,7 @@ class ParticleFilter():
         self.particles = [particle_factory() for i in range(num_particles)]
         self.best_particle = self.particles[0]
         self.min_log_weight = -300  # prevent floating point underflow in exp()
-        self.initializer.initialize(self.particles)
+        self.initializer.initialize(robot)
         self.exp_weights = np.empty(self.num_particles)
         self.new_indices = np.empty(self.num_particles, dtype=np.int)
         self.new_x = np.empty(self.num_particles)
@@ -719,6 +737,7 @@ class SLAMParticleFilter(ParticleFilter):
         if 'initializer' not in kwargs:
             kwargs['initializer'] = RobotPosition(0,0,0)
         super().__init__(robot, **kwargs)
+        self.initializer.pf = self
         self.new_landmarks = [None] * self.num_particles
 
     def clear_landmarks(self):

@@ -136,20 +136,17 @@ class WorldMap():
         self.update_coords(world_obj, sdk_obj)
 
     def update_coords(self, world_obj, sdk_obj):
-            diff = sdk_obj.pose - self.robot.pose
-            (dx,dy,_) = diff.position.x_y_z
-            (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
-            orient_diff = wrap_angle(rob_theta - self.robot.pose.rotation.angle_z.radians)
-            osin = sin(orient_diff)
-            ocos = cos(orient_diff)
-            wx = dx * ocos + dy * osin
-            wy = dx * -osin + dy * ocos
-            world_obj.x = rob_x + wx
-            world_obj.y = rob_y + wy
-            world_obj.z = sdk_obj.pose.position.z + self.vision_z_fudge
-            world_obj.theta = wrap_angle(sdk_obj.pose.rotation.angle_z.radians + orient_diff)
-            world_obj.is_visible = sdk_obj.is_visible
-            
+        dx = sdk_obj.pose.position.x - self.robot.pose.position.x
+        dy = sdk_obj.pose.position.y - self.robot.pose.position.y
+        alpha = atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians
+        r = sqrt(dx*dx + dy*dy)
+        (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
+        world_obj.x = rob_x + r * cos(alpha + rob_theta)
+        world_obj.y = rob_y + r * sin(alpha + rob_theta)
+        orient_diff = wrap_angle(rob_theta - self.robot.pose.rotation.angle_z.radians)
+        world_obj.theta = wrap_angle(sdk_obj.pose.rotation.angle_z.radians + orient_diff)
+        world_obj.is_visible = sdk_obj.is_visible
+
     def handle_object_observed(self, evt, **kwargs):
         if isinstance(evt.obj, LightCube):
             self.update_cube(evt.obj)

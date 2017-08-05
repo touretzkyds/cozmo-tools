@@ -1,7 +1,10 @@
 import time
+import asyncio
 import inspect
 import random
-from math import sqrt, sin, asin
+import numpy as np
+import math
+from math import pi
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
@@ -109,6 +112,138 @@ class SetLights(StateNode):
                 self.robot.set_center_backpack_lights(self.light)
         self.post_completion()
 
+class DriveContinuous(StateNode):
+    def __init__(self,path=[]):
+        self.path = path
+        self.polling_interval = 0.05
+        super().__init__()
+
+    def start(self,event=None):
+        if isinstance(event, DataEvent) and isinstance(event.data,(list,tuple)):
+            self.path = event.data
+        if len(self.path) == 0:
+            raise ValueError('Node %s has a null path' % repr(self))
+        self.path_index = 0
+        self.cur = self.path[self.path_index]
+        self.last_dist = -1
+        self.reached_dist = False
+        self.mode = None
+        self.pause_counter = 0
+        super().start(event)
+
+    def stop(self):
+        self.robot.stop_all_motors()
+        super().stop()
+
+    def poll(self):
+        # Quit if the robot is picked up.
+        if self.robot.is_picked_up:
+            print('** Robot was picked up.')
+            self.robot.stop_all_motors()
+            self.post_failure()
+            return
+        # See where we are, and if we've passed the current waypoint.
+        x = self.robot.world.particle_filter.pose[0]
+        y = self.robot.world.particle_filter.pose[1]
+        q = self.robot.world.particle_filter.pose[2]
+        dist = math.sqrt((self.cur[0]-x)**2 + (self.cur[1]-y)**2)
+        if self.pause_counter > 0:
+            self.pause_counter -= 1
+            print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
+                  (x, y, q*180/pi, dist))
+            return
+        if not self.reached_dist:
+            self.reached_dist = \
+                (dist - self.last_dist) > 0.1 and \
+                ( (self.mode == 'x' and np.sign(x-self.cur[0]) == np.sign(self.cur[0]-self.prev[0])) or
+                  (self.mode == 'y' and np.sign(y-self.cur[1]) == np.sign(self.cur[1]-self.prev[1])) )
+        reached_waypoint = self.reached_dist and abs(q - self.target_q) < 5*pi/180
+        self.last_dist = dist
+
+        # Advance to next waypoint
+        if self.path_index == 0 or reached_waypoint:
+            self.path_index += 1
+            print('DriveContinuous: path index advanced to',self.path_index)
+            if self.path_index == len(self.path):
+                print('DriveContinous: path complete.  Stopping.')
+                self.robot.stop_all_motors()
+                self.post_completion()
+                return
+            elif self.path_index > len(self.path):
+                # uncaught completion event
+                self.stop()
+                return
+            self.prev = self.cur
+            self.cur = self.path[self.path_index]
+            self.last_dist = math.inf
+            self.reached_dist = False
+            self.target_q = math.atan2(self.cur[1]-self.prev[1], self.cur[0]-self.prev[0])
+
+            # Heading determines whether we're solving y=f(x) or x=f(y)
+            if abs(self.target_q) < pi/4 or abs(abs(self.target_q)-pi) < pi/4:
+                self.mode = 'x'
+                self.m = (self.cur[1]-self.prev[1]) / (self.cur[0]-self.prev[0])
+                self.b = self.cur[1] - self.m * (self.cur[0]-self.prev[0])
+            else:
+                self.mode = 'y'
+                self.m = (self.cur[0]-self.prev[0]) / (self.cur[1]-self.prev[1])
+                self.b = self.cur[0] - self.m * (self.cur[1]-self.prev[1])
+            if self.path_index > 1:
+                # come to a full stop before trying to change direction
+                self.robot.stop_all_motors()
+                self.pause_counter = 5
+                return
+        elif self.reached_dist:
+            if self.mode != 'q':
+                self.robot.stop_all_motors()
+                self.robot.pause_counter = 5
+                self.mode = 'q'  # We're there; now fix our heading
+                return
+
+        # Calculate error and correction based on present x/y/q position
+        q_error = q - self.target_q
+        if self.mode == 'x':      # y = f(x)
+            target_y = self.m * (x-self.prev[0]) + self.b
+            d_error = (y - target_y) * np.sign(pi/2 - abs(self.target_q))
+            correcting_q = - 0.8*q_error - 0.25*math.atan2(d_error,25)
+        elif self.mode == 'y':    # x = f(y)
+            target_x = self.m * (y-self.prev[1]) + self.b
+            d_error = (x - target_x) * np.sign(pi/2 - abs(self.target_q-pi/2))
+            correcting_q = - 0.8*q_error - 0.25*math.atan2(-d_error,25)
+        elif self.mode == 'q':
+            d_error = math.sqrt((x-self.cur[0])**2 + (y-self.cur[1])**2)
+            correcting_q = - 0.8*q_error
+        else:
+            raise ValueError("Bad mode value '%s'" % repr(self.mode))
+
+        # Calculate wheel speeds based on correction value
+        if self.mode == 'q' or abs(q_error*180/pi) >= 10:
+            # For large heading error, turn in place
+            speed = 0
+            qscale = 50
+            correcting_q = - 1.0 * np.sign(q_error) * max(abs(q_error), 25*pi/180)
+            flag = "<>"
+        elif abs(q_error*180/pi) > 5 and abs(d_error) < 100:
+            # For moderate heading error where  distance error isn't huge,
+            # slow down and turn more slowly
+            speed = 20
+            qscale = 75
+            flag = "**"
+        else:
+            # We're doing pretty well; go fast and make minor corrections
+            speed = 100
+            qscale = 150
+            flag = "  "
+        speedinc = qscale * correcting_q
+        lspeed = speed - speedinc
+        rspeed = speed + speedinc
+        """
+        print('%s x: %5.1f  y: %5.1f  q:%6.1f     derr: %5.1f  qerr:%6.1f  corq: %5.1f  inc: %5.1f  dist: %5.1f' %
+              (self.mode+flag, x, y, q*180/pi, d_error, q_error*180/pi,
+               correcting_q*180/pi, speedinc, dist))
+               """
+        asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
+
 #________________ Coroutine Nodes ________________
 
 class CoroutineNode(StateNode):
@@ -194,10 +329,33 @@ class DriveForward(DriveWheels):
         p0 = self.start_position
         p1 = self.robot.pose.position
         diff = (p1.x - p0.x, p1.y - p0.y)
-        dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
+        dist = math.sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
             self.poll_handle.cancel()
             self.stop_wheels()
+            self.post_completion()
+
+class SmallTurn(CoroutineNode):
+    """Estimates how many polling cycles to run the wheels; doesn't use odometry."""
+    def __init__(self, angle=5):
+        self.angle = angle
+        self.polling_interval = 0.025
+        super().__init__()
+
+    def start(self,event=None):
+        # constants were determined empirically for speed 50
+        self.counter = round((abs(self.angle) + 5) / 1.25)
+        super().start(event)
+
+    def coroutine_launcher(self):
+        speed = 50 if self.angle < 0 else -50
+        return self.robot.drive_wheels(speed,-speed,500,500)
+
+    def poll(self):
+        self.counter -= 1
+        if self.counter <= 0:
+            self.poll_handle.cancel()
+            self.robot.stop_all_motors()
             self.post_completion()
 
 class DriveTurn(DriveWheels):
@@ -206,22 +364,27 @@ class DriveTurn(DriveWheels):
             angle = angle.degrees
         if isinstance(speed, cozmo.util.Speed):
             speed = speed.speed_mmps
-        if angle < 0:
-            speed = -speed
+        if speed <= 0:
+            raise ValueError('speed parameter must be positive')
         self.angle = angle
         self.speed = speed
         self.kwargs = kwargs
-        super().__init__(-speed,speed,**self.kwargs)
-        # Call parent init before setting polling interval.
         self.polling_interval = 0.05
+        super().__init__(0,0,**self.kwargs)
 
     def start(self,event=None):
         if self.running: return
         if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
             self.angle = event.data.degrees
-        super().start(event)
+        if self.angle > 0:
+            self.l_wheel_speed = -self.speed
+            self.r_wheel_speed = self.speed
+        else:
+            self.l_wheel_speed = self.speed
+            self.r_wheel_speed = -self.speed
         self.last_heading = self.robot.pose.rotation.angle_z.degrees
         self.traveled = 0
+        super().start(event)
 
     def poll(self):
         """See how far we've traveled"""
@@ -530,7 +693,7 @@ class SetLiftHeight(ActionNode):
 class SetLiftAngle(SetLiftHeight):
     def __init__(self, angle, abort_on_stop=True, **action_kwargs):
         def get_theta(height):
-            return asin((height-45)/66)
+            return math.asin((height-45)/66)
         if isinstance(angle, cozmo.util.Angle):
             angle = angle.radians
         min_theta = get_theta(cozmo.robot.MIN_LIFT_HEIGHT_MM)

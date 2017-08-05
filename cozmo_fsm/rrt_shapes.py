@@ -6,6 +6,7 @@ class Shape():
     def __init__(self):
         self.center = transform.point()
         self.rotmat = transform.identity()
+        self.obstacle = None
     
     def __repr__(self):
         return "<%s >" % (self.__class__.__name__)

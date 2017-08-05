@@ -202,4 +202,3 @@ class Transition(EventListener):
             dest.start(event)
 
     default_value_delay = 0.1  # delay before wildcard match will fire
-
