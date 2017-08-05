@@ -129,9 +129,12 @@ class DriveContinuous(StateNode):
         self.reached_dist = False
         self.mode = None
         self.pause_counter = 0
+        self.handle = None
         super().start(event)
 
     def stop(self):
+        if self.handle:
+            self.handle.cancel()
         self.robot.stop_all_motors()
         super().stop()
 
@@ -242,7 +245,18 @@ class DriveContinuous(StateNode):
               (self.mode+flag, x, y, q*180/pi, d_error, q_error*180/pi,
                correcting_q*180/pi, speedinc, dist))
                """
-        asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
+        self.handle = asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
+
+class Print(StateNode):
+    def __init__(self,text=""):
+        super().__init__()
+        self.text = text
+
+    def start(self,event=None):
+        super().start(event)
+        print(text)
+        self.post_completion()
+
 
 #________________ Coroutine Nodes ________________
 

@@ -326,24 +326,25 @@ class PilotToPose(StateNode):
 
     def setup(self):
         # Build a little state machine by hand so we don't have to use genfsm
-        planner = self.PilotPlanner() .set_name(self.name+"_planner") .set_parent(self)
-        driver = DriveContinuous() .set_name(self.name+"_driver") .set_parent(self)
+        my_name = '_PilotToPose'
+        planner = self.PilotPlanner() .set_name(my_name+"_planner") .set_parent(self)
+        driver = DriveContinuous() .set_name(my_name+"_driver") .set_parent(self)
         pfail = ParentFails().set_parent(self)
         pcomp = ParentCompletes().set_parent(self)
         # Planner fails if collision state or no path found
-        ptransF = FailureTrans().set_name(self.name+"_planfail")
+        ptransF = FailureTrans().set_name(my_name+"_planfail")
         ptransF.add_sources(planner)
         ptransF.add_destinations(pfail)
         # Planner sends data transition to activate driver
-        ptransD = DataTrans().set_name(self.name+"_data")
+        ptransD = DataTrans().set_name(my_name+"_data")
         ptransD.add_sources(planner)
         ptransD.add_destinations(driver)
         # Driver will fail if robot is picked up
-        dtransF = FailureTrans().set_name(self.name+"_failure")
+        dtransF = FailureTrans().set_name(my_name+"_failure")
         dtransF.add_sources(driver)
         dtransF.add_destinations(pfail)
         # Driver completes if destination reached
-        dtransC = CompletionTrans().set_name(self.name+"_completion")
+        dtransC = CompletionTrans().set_name(my_name+"_completion")
         dtransC.add_sources(driver)
         dtransC.add_destinations(pcomp)
 
