@@ -89,10 +89,10 @@ class WorldMap():
         self.objects = dict()
         
     def update_map(self):
-        "Called to update the map just before the path planner runs.
+        """Called to update the map just before the path planner runs.
         Cubes and faces are updated automatically in reponse to observation events, but
         we update them here to get the freshest possible value.  Walls must be
-        generated fresh as they have no observation events."
+        generated fresh as they have no observation events."""
         self.generate_walls_from_markers()
         for (id,cube) in self.robot.world.light_cubes.items():
             self.update_cube(cube)
