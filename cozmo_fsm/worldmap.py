@@ -60,13 +60,24 @@ class CustomCubeObj(WorldObject):
 
 class ChipObj(WorldObject):
     def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
-        super().__init__(id,x,y)
+        super().__init__(id,x,y,z)
         self.radius = radius
         self.thickness = thickness
 
     def __repr__(self):
         return '<ChipObj (%.1f,%.1f) radius %.1f>' % \
                (self.x, self.y, self.radius)
+
+class FaceObj(WorldObject):
+    def __init__(self, sdk_obj, id, x, y, z, name):
+        super().__init__(id, x, y, z, is_visible=sdk_obj.is_visible)
+        self.sdk_obj = sdk_obj
+        self.name = name
+        self.obstacle = False
+
+    def __repr__(self):
+        return "<Face '%s' %s (%.1f, %.1f, %.1f)>" % \
+               (self.name, self.expression, self.x, self.y, self.z)
 
 #================ WorldMap ================
 
@@ -78,9 +89,15 @@ class WorldMap():
         self.objects = dict()
         
     def update_map(self):
+        "Called to update the map just before the path planner runs.
+        Cubes and faces are updated automatically in reponse to observation events, but
+        we update them here to get the freshest possible value.  Walls must be
+        generated fresh as they have no observation events."
         self.generate_walls_from_markers()
         for (id,cube) in self.robot.world.light_cubes.items():
             self.update_cube(cube)
+        for face in self.robot.world._faces.values():
+            self.update_face(face)
 
     def generate_walls_from_markers(self):
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
@@ -124,6 +141,22 @@ class WorldMap():
             self.objects[cube] = world_obj
         self.update_coords(world_obj, cube)
 
+    def update_face(self,face):
+        pos = face.pose.position
+        if face in self.robot.world.world_map.objects:
+            face_obj = self.robot.world.world_map.objects[face]
+        else:
+            face_obj = FaceObj(face, face.face_id, pos.x, pos.y, pos.z,
+                               face.name)
+            self.robot.world.world_map.objects[face] = face_obj
+        face_obj.is_visible = face.is_visible
+        if face.is_visible:
+            face_obj.x = pos.x
+            face_obj.y = pos.y
+            face_obj.z = pos.z
+            face_obj.expression = face.expression
+            self.update_coords(face_obj, face)
+
     def update_custom_object(self, sdk_obj):
         if not sdk_obj.pose.is_comparable(self.robot.pose):
             return
@@ -143,6 +176,7 @@ class WorldMap():
         (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
         world_obj.x = rob_x + r * cos(alpha + rob_theta)
         world_obj.y = rob_y + r * sin(alpha + rob_theta)
+        world_obj.z = sdk_obj.pose.position.z
         orient_diff = wrap_angle(rob_theta - self.robot.pose.rotation.angle_z.radians)
         world_obj.theta = wrap_angle(sdk_obj.pose.rotation.angle_z.radians + orient_diff)
         world_obj.is_visible = sdk_obj.is_visible
@@ -152,6 +186,8 @@ class WorldMap():
             self.update_cube(evt.obj)
         elif isinstance(evt.obj, CustomObject):
             self.update_custom_object(evt.obj)
+        elif isinstance(evt.obj, Face):
+            self.update_face(evt.obj)
 
 #================ Wall Specification  ================
 

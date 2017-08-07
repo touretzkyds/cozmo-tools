@@ -291,6 +291,22 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
+    def make_face(self,face):
+        global gl_lists
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(face.x, face.y, face.z)
+        glColor4f(0., 1., 0., 0.9)
+        quadric = gluNewQuadric()
+        gluQuadricOrientation(quadric, GLU_OUTSIDE)
+        glScalef(1.0, 1.0, 2.0)
+        gluSphere(quadric, 100, 20, 10)
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+
     def make_wall(self,wall_obst):
         global gl_lists
         wall_spec = worldmap.wall_marker_dict[wall_obst.id]
@@ -503,6 +519,8 @@ class WorldMapViewer():
                 self.make_wall(obj)
             elif isinstance(obj, worldmap.ChipObj):
                 self.make_chip(obj)
+            elif isinstance(obj, worldmap.FaceObj):
+                self.make_face(obj)
 
     def make_shapes(self):
         global gl_lists

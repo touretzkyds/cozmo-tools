@@ -99,6 +99,7 @@ class StateMachineProgram(StateNode):
         self.robot.carrying = None
 
         # World map and path planner
+        self.robot.enable_facial_expression_estimation(True)
         self.robot.world.world_map = \
                 self.world_map or WorldMap(self.robot)
         self.robot.world.rrt = self.rrt or RRT(self.robot)
