@@ -2,9 +2,12 @@
 Particle filter display in OpenGL.
 """
 
-from OpenGL.GLUT import *
-from OpenGL.GL import *
-from OpenGL.GLU import *
+try:
+    from OpenGL.GLUT import *
+    from OpenGL.GL import *
+    from OpenGL.GLU import *
+except:
+    pass
 
 import time
 import math
@@ -49,6 +52,7 @@ class ParticleViewer():
 
     def start(self): # Displays in background
         if not WINDOW:
+            opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)

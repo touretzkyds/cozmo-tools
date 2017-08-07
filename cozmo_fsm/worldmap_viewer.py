@@ -7,9 +7,12 @@ import time
 import array
 import numpy as np
 
-from OpenGL.GLUT import *
-from OpenGL.GL import *
-from OpenGL.GLU import *
+try:
+    from OpenGL.GLUT import *
+    from OpenGL.GL import *
+    from OpenGL.GLU import *
+except:
+    pass
 
 from . import opengl
 from . import transform
@@ -535,6 +538,7 @@ class WorldMapViewer():
 
     def start(self): # Displays in background
         if not WINDOW:
+            opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)

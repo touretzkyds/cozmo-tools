@@ -107,9 +107,6 @@ class StateMachineProgram(StateNode):
         self.set_polling_interval(0.025)  # for kine and motion model update
 
         # Launch viewers
-        opengl.init()
-        opengl.launch_event_loop()
-
         if self.cam_viewer:
             self.windowName = self.name
             cv2.namedWindow(self.windowName)

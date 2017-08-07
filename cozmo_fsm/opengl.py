@@ -2,9 +2,12 @@
   Common code for OpenGL window management
 """
 
-from OpenGL.GLUT import *
-from OpenGL.GL import *
-from OpenGL.GLU import *
+try:
+    from OpenGL.GLUT import *
+    from OpenGL.GL import *
+    from OpenGL.GLU import *
+except:
+    pass
 
 from threading import Thread  # for backgrounding window
 
@@ -26,12 +29,13 @@ def init():
 
         # Killing window should not directly kill main program
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
+        launch_event_loop()
 
 def create_window(name,size=(500,500)):
     global WINDOW_REGISTRY
-    init()
     glutInitWindowSize(*size)
     w = glutCreateWindow(name)
+    print('request creation of',w)
     WINDOW_REGISTRY.append(w)
     return w
 
@@ -52,6 +56,7 @@ def launch_event_loop():
     global MAIN_LOOP_LAUNCHED
     if MAIN_LOOP_LAUNCHED: return
     MAIN_LOOP_LAUNCHED = True
+    print('launching opengl event loop')
     thread = Thread(target=event_loop)
     thread.daemon = True #ending fg program will kill bg program
     thread.start()
