@@ -1,6 +1,7 @@
 import time
 import asyncio
 import inspect
+import types
 import random
 import numpy as np
 import math
@@ -248,12 +249,17 @@ class DriveContinuous(StateNode):
         self.handle = asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
 
 class Print(StateNode):
-    def __init__(self,text=""):
+    "Argument can be a string, or a function to be evaluated at print time."
+    def __init__(self,spec=""):
         super().__init__()
-        self.text = text
+        self.spec = spec
 
     def start(self,event=None):
         super().start(event)
+        if isinstance(self.spec, types.FunctionType):
+            text = self.spec()
+        else:
+            text = self.spec
         print(text)
         self.post_completion()
 
