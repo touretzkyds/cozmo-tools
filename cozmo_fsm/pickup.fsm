@@ -108,7 +108,7 @@ class GoToCube(StateNode):
             super().start(event)
 
     $setup{
-        start: SetLiftHeight(0) =T(0.5)=> check_start    # time for vision to set up world map
+        droplift: SetLiftHeight(0) =T(0.5)=> check_start    # time for vision to set up world map
 
         check_start: PilotCheckStart()
         check_start =S=> go_side
@@ -172,7 +172,7 @@ class PickUpCube(StateNode):
             asum = int(after.sum())
             diff = abs(asum-bsum)
             print('>>> Verify: before:',bsum,' after:', asum, ' diff=',diff)
-            if diff > 25000:
+            if diff > 20000:
                 self.post_success()
             else:
                 self.post_failure()
@@ -192,7 +192,7 @@ class PickUpCube(StateNode):
         goto_cube =C=> self.StoreImagePatch([200],'before') =N=> raise_lift
 
         raise_lift: SetLiftHeight(1)
-            =C=> StateNode()
+            =C=> lift_raised: StateNode()
             =T(0.5)=> self.StoreImagePatch([200],'after')
             =N=> verify
 
