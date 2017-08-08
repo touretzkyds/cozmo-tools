@@ -46,17 +46,23 @@ class StateNode(EventListener):
         for t in self.transitions:
             t.start()
         if self.start_node:
+            if TRACE.trace_level >= TRACE.statenode_start:
+                print('TRACE%d:' % TRACE.statenode_start, self, 'starting child', self.start_node)
             self.start_node.start()
 
     def stop(self):
-        if not self.running: return
-        if TRACE.trace_level >= TRACE.statenode_startstop:
-            print('TRACE%d:' % TRACE.statenode_startstop, self, 'stopping')
-        super().stop()
-        # Stop children before transitions, because a child's stop()
-        # method could post an event we want to handle.
-        self.stop_children()
-        for t in self.transitions: t.stop()
+        # If this node was stopped by an outgoing transition firing,
+        # and then its parent tries to stop it, we need to cancel the
+        # pending fire2 call.
+        if self.running:
+            if TRACE.trace_level >= TRACE.statenode_startstop:
+                print('TRACE%d:' % TRACE.statenode_startstop, self, 'stopping')
+            super().stop()
+            self.stop_children()
+        # Stop transitions even if we're not running, because a firing
+        # transition could have stopped us and left a fire2 pending.
+        for t in self.transitions:
+            t.stop()
 
     def stop_children(self):
         if self.children == {}:
@@ -160,25 +166,28 @@ class Transition(EventListener):
 
     def start(self):
         if self.running: return
+        self.handle = None
         if TRACE.trace_level >= TRACE.transition_startstop:
             print('TRACE%d:' % TRACE.transition_startstop, self, 'starting')
         super().start()
-        self.handle = None
 
     def stop(self):
-        if not self.running: return
-        # don't stop if we still have a live source
-        for src in self.sources:
-            if src.running:
-                # print(self,'saved from stopping by',src)
-                return
-        if TRACE.trace_level >= TRACE.transition_startstop:
-            print('TRACE%d:' % TRACE.transition_startstop, self, 'stopping')
+        if self.running:
+            # don't stop if we still have a live source
+            for src in self.sources:
+                if src.running:
+                    if TRACE.trace_level >= TRACE.transition_startstop:
+                        print('TRACE%d:' % TRACE.transition_startstop,self,'saved from stopping by',src)
+                        return
+            if TRACE.trace_level >= TRACE.transition_startstop:
+                print('TRACE%d:' % TRACE.transition_startstop, self, 'stopping')
+            super().stop()
+        # stop pending fire2 if fire already stopped this transition
         if self.handle:
-            if True or TRACE.trace_level >= TRACE.task_cancel:
+            if TRACE.trace_level >= TRACE.task_cancel:
                 print('TRACE%d:' % TRACE.task_cancel, self.handle, 'cancelled')
             self.handle.cancel()
-        super().stop()
+            self.handle = None
 
     def fire(self,event=None):
         """Shut down source nodes and schedule start of destination nodes.
@@ -195,10 +204,14 @@ class Transition(EventListener):
             src.stop()
         self.stop()
         action_cancel_delay = 0.01  # wait for source node action cancellations to take effect
-        self.robot.loop.call_later(action_cancel_delay, self.fire2, event)
+        self.handle = self.robot.loop.call_later(action_cancel_delay, self.fire2, event)
 
     def fire2(self,event):
+        if not self.handle:
+            print('@ @ @ @ @ HANDLE GONE: I SHOULD BE DEAD', self, event)
         for dest in self.destinations:
+            if TRACE.trace_level >= TRACE.transition_fire:
+                print('TRACE%d: ' % TRACE.transition_fire, self, 'starting', dest)
             dest.start(event)
 
     default_value_delay = 0.1  # delay before wildcard match will fire
