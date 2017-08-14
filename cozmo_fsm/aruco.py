@@ -49,13 +49,16 @@ class Aruco(object):
             cv2.aruco.detectMarkers(gray,self.aruco_lib,parameters=self.aruco_params)
         if self.ids is None: return
 
-        #estimate poses
-        (self.rvecs,self.tvecs) = \
+        # Estimate poses
+        # Warning: OpenCV 3.2 estimate returns a pair; 3.3 returns a triplet
+        estimate = \
             cv2.aruco.estimatePoseSingleMarkers(self.corners,
                                                 self.marker_size,
                                                 self.camera_matrix,
                                                 self.distortion_array)
 
+        self.rvecs = estimate[0]
+        self.tvecs = estimate[1]
         for i in range(len(self.ids)):
             marker = ArucoMarker(self.ids[i][0], self.corners[i],self.tvecs[i][0],self.rvecs[i][0])
             self.seen_marker_ids.append(marker.id)
