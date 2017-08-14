@@ -21,6 +21,7 @@ class Thesaurus():
         self.phrase_tree = dict()
         self.add_phrases('cube1',['cube 1'])
         self.add_phrases('cube2',['cube 2'])
+        self.add_phrases('cube2',['cube to'])
         self.add_phrases('cube3',['cube 3'])
         self.add_phrases('paperclip',['paper clip'])
         self.add_phrases('deli-slicer',['deli slicer'])
