@@ -79,6 +79,37 @@ class FaceObj(WorldObject):
         return "<Face '%s' %s (%.1f, %.1f, %.1f)>" % \
                (self.name, self.expression, self.x, self.y, self.z)
 
+class CameraObj(WorldObject):
+    camera_size = (44., 44., 44.)
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0, phi =0):
+        super().__init__(id,x,y,z)
+        self.size = self.camera_size
+        self.id = id
+        self.x = x
+        self.y = y
+        self.z = z
+        self.theta = theta
+        self.phi = phi
+        #self.is_visible = sdk_obj.is_visible
+
+    def __repr__(self):
+        return '<CameraObj %d: (%.1f, %.1f, %.1f).>' % \
+               (self.id, self.x, self.y, self.z)
+
+class RobotGhostObj(WorldObject):
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+        super().__init__(id,x,y,z)
+        self.id = id
+        self.x = x
+        self.y = y
+        self.z = z
+        self.theta = theta
+        #self.is_visible = sdk_obj.is_visible
+
+    def __repr__(self):
+        return '<RobotGhostObj %d: (%.1f, %.1f, %.1f).>' % \
+               (self.id, self.x, self.y, self.z)
+
 #================ WorldMap ================
 
 class WorldMap():
