@@ -81,7 +81,7 @@ class FaceObj(WorldObject):
 
 class CameraObj(WorldObject):
     camera_size = (44., 44., 44.)
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0, phi =0):
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0, phi =0, initial_position =(0,0)):
         super().__init__(id,x,y,z)
         self.size = self.camera_size
         self.id = id
@@ -90,6 +90,7 @@ class CameraObj(WorldObject):
         self.z = z
         self.theta = theta
         self.phi = phi
+        self.initial_position = initial_position
         #self.is_visible = sdk_obj.is_visible
 
     def __repr__(self):

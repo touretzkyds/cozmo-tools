@@ -153,16 +153,6 @@ class WorldMapViewer():
         self.scale = 1
         self.show_axes = True
 
-        global cap, aruco_dict, parameters, F
-
-        cap = cv2.VideoCapture(1)
-        cap.set(3,1280)
-        cap.set(4,720)
-
-        aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_250)
-        parameters =  aruco.DetectorParameters_create()
-        F = 1140
-
     def __del__(self):
         global cap
         cap.release()
@@ -514,37 +504,6 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
-
-        #Update Ghost
-        for i in range(5):
-            cap.grab()
-        ret, frame = cap.read()
-        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
-
-        if type(ids) is np.ndarray:
-            (x0, y0) = corners[0][0][0]
-            (x1, y1) = corners[0][0][1]
-            (x2, y2) = corners[0][0][2]
-            (x3, y3) = corners[0][0][3]
-
-
-            A = (x0-x3)#/np.cos(omega_x)
-            C = (x1-x0)#/np.cos(omega_x)
-
-            phi = np.arctan2(A,C)
-
-
-            l = np.sqrt(A**2 + C**2)
-            r = np.sqrt(F*F + (np.mean(corners[0][0][:,0])-640)**2 + (np.mean(corners[0][0][:,1])-360)**2 )
-
-            R1 = 5*r/l
-            
-            self.robot.world.world_map.objects['Ghost1'].y = 10*(np.mean(corners[0][0][:,0])-640)*R1/r
-            self.robot.world.world_map.objects['Ghost1'].x = 10*(360 - np.mean(corners[0][0][:,1]))*R1/(r*np.cos(angle))
-            self.robot.world.world_map.objects['Ghost1'].theta =  -phi
-
     def make_ghost(self,RobotGhostObj):
         global gl_lists
         c = glGenLists(1)
@@ -556,7 +515,48 @@ class WorldMapViewer():
         glTranslatef(*p)
         glTranslatef(*robot_body_offset_mm)
         glRotatef(RobotGhostObj.theta*180/pi, 0, 0, 1)
-        self.make_cube(robot_body_size_mm)
+        self.make_cube(robot_body_size_mm, color=color_white)
+
+        # Draw the head
+        glPushMatrix()
+        glTranslatef(*robot_head_offset_mm)
+        glRotatef(-self.robot.head_angle.degrees, 0, 1, 0)
+        self.make_cube(robot_head_size_mm, color=color_white)
+        glPopMatrix()
+
+        # Draw the lift
+        glTranslatef(-robot_body_offset_mm[0], -robot_body_offset_mm[1], -robot_body_offset_mm[2])
+        glPushMatrix()
+        self.robot.kine.get_pose()
+        lift_tran = self.robot.kine.joint_to_base('lift_attach')
+        lift_pt = transform.point(0, 0, 0)
+        lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
+        glTranslatef(*lift_point)
+        self.make_cube(lift_size_mm, color=color_white)
+        glPopMatrix()
+
+        # Draw the lift arms
+        glPushMatrix()
+        lift_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
+
+        shoulder_tran = self.robot.kine.joint_to_base('shoulder')
+        shoulder_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        shoulder_point = self.tran_to_tuple(shoulder_tran.dot(shoulder_pt));
+
+        arm_point = ((shoulder_point[0] + lift_point[0]) / 2,
+                     (shoulder_point[1] + lift_point[1]) / 2,
+                     (shoulder_point[2] + lift_point[2]) / 2)
+
+        arm_angle = atan2(lift_point[2] - shoulder_point[2],
+                          lift_point[0] - shoulder_point[0])
+
+        glTranslatef(*arm_point)
+        glRotatef(-(180 * arm_angle / pi), 0, 1, 0)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white)
+        glTranslatef(0, lift_arm_spacing_mm, 0)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white)
+        glPopMatrix()
 
         glPopMatrix()
         glEndList()
