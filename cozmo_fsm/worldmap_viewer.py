@@ -489,7 +489,7 @@ class WorldMapViewer():
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
 
-        t = transform.quat2rot( cos(-angle/2 + pi/4) ,sin(-angle/2 + pi/4)*sin(phi) ,sin(-angle/2 + pi/4)*cos(phi) ,0 ).transpose()
+        t = transform.quat2rot( cos(-angle/2 + pi/4) ,0 ,sin(-angle/2 + pi/4) ,0 ).transpose()
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
 
