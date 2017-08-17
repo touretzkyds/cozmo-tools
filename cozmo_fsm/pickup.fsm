@@ -172,7 +172,7 @@ class PickUpCube(StateNode):
             asum = int(after.sum())
             diff = abs(asum-bsum)
             print('>>> Verify: before:',bsum,' after:', asum, ' diff=',diff)
-            if diff > 20000:
+            if diff > 15000:
                 self.post_success()
             else:
                 self.post_failure()

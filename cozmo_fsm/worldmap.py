@@ -186,7 +186,7 @@ class WorldMap():
             self.update_cube(evt.obj)
         elif isinstance(evt.obj, CustomObject):
             self.update_custom_object(evt.obj)
-        elif isinstance(evt.obj, Face):
+        elif isinstance(evt.obj, cozmo.faces.Face):
             self.update_face(evt.obj)
 
 #================ Wall Specification  ================
