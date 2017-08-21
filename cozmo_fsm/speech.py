@@ -2,6 +2,7 @@ try:
     import speech_recognition as sr
 except: pass      
 
+import time
 from threading import Thread
 
 from .evbase import Event
@@ -78,35 +79,46 @@ class SpeechListener():
         self.debug = debug
 
     def speech_listener(self):
+        warned_no_mic = False
         print('Launched speech listener.')
         self.rec = sr.Recognizer()
-        with sr.Microphone() as source:
-            while True:
-                if self.debug: print('--> Listening...')
-                audio = self.rec.listen(source)
-                audio_len = len(audio.frame_data)
-                if self.debug:
-                    print('--> Got audio data: length = {:,d} bytes.'. \
-                          format(audio_len))
-                if audio_len > 500000:
-                    print('**** Audio segment too long.  Try again.')
-                    continue
-                try:
-                    utterance = self.rec.recognize_google(audio).lower()
-                    print("Raw utterance: '%s'" % utterance)
-                    words = [self.thesaurus.lookup_word(w) for w in utterance.split(" ")]
-                    words = self.thesaurus.substitute_phrases(words)
-                    string = " ".join(words)
-                    print("Heard: '%s'" % string)
-                    evt = SpeechEvent(string,words)
-                    self.robot.erouter.post(evt)
-                except sr.RequestError as e:
-                    print("Could not request results form google speech recognition service; {0}".format(e)) 
-                except sr.UnknownValueError:
-                    if self.debug:
-                        print('--> Recognizer found no words.')
-                except Exception as e:
-                    print('Speech recognition got exception:', repr(e))
+        while True:
+            try:
+                with sr.Microphone() as source:
+                    if warned_no_mic:
+                        print('Got a microphone!')
+                        warned_no_mic = False
+                    while True:
+                        if self.debug: print('--> Listening...')
+                        audio = self.rec.listen(source)
+                        audio_len = len(audio.frame_data)
+                        if self.debug:
+                            print('--> Got audio data: length = {:,d} bytes.'. \
+                                  format(audio_len))
+                        if audio_len > 500000:
+                            print('**** Audio segment too long.  Try again.')
+                            continue
+                        try:
+                            utterance = self.rec.recognize_google(audio).lower()
+                            print("Raw utterance: '%s'" % utterance)
+                            words = [self.thesaurus.lookup_word(w) for w in utterance.split(" ")]
+                            words = self.thesaurus.substitute_phrases(words)
+                            string = " ".join(words)
+                            print("Heard: '%s'" % string)
+                            evt = SpeechEvent(string,words)
+                            self.robot.erouter.post(evt)
+                        except sr.RequestError as e:
+                            print("Could not request results form google speech recognition service; {0}".format(e)) 
+                        except sr.UnknownValueError:
+                            if self.debug:
+                                print('--> Recognizer found no words.')
+                        except Exception as e:
+                            print('Speech recognition got exception:', repr(e))
+            except OSError as e:
+                if not warned_no_mic:
+                    print("Couldn't get a microphone:",e)
+                    warned_no_mic = True
+                time.sleep(10)
 
     def start(self):
         self.thread = Thread(target=self.speech_listener)
