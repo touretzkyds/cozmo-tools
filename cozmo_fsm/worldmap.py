@@ -98,18 +98,30 @@ class CameraObj(WorldObject):
                (self.id, self.x, self.y, self.z)
 
 class RobotGhostObj(WorldObject):
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0, is_visible=False):
         super().__init__(id,x,y,z)
         self.id = id
         self.x = x
         self.y = y
         self.z = z
         self.theta = theta
-        #self.is_visible = sdk_obj.is_visible
+        self.is_visible = is_visible
 
     def __repr__(self):
         return '<RobotGhostObj %d: (%.1f, %.1f, %.1f).>' % \
                (self.id, self.x, self.y, self.z)
+
+
+class LightCubeGhostObj(WorldObject):
+    light_cube_size = (44., 44., 44.)
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+        super().__init__(id,x,y,z)
+        self.theta = theta
+        self.size = self.light_cube_size
+
+    def __repr__(self):
+        return '<LightCubeGhostObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
+               (self.id, self.x, self.y, self.z, self.theta*180/pi)
 
 #================ WorldMap ================
 

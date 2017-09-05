@@ -512,16 +512,17 @@ class WorldMapViewer():
 
         # Draw the body
         p = (RobotGhostObj.x, RobotGhostObj.y, RobotGhostObj.z)
+        color = (None, color_red, color_green, color_blue)[RobotGhostObj.id]
         glTranslatef(*p)
         glTranslatef(*robot_body_offset_mm)
         glRotatef(RobotGhostObj.theta*180/pi, 0, 0, 1)
-        self.make_cube(robot_body_size_mm, color=color_white)
+        self.make_cube(robot_body_size_mm, color=color_white,body=RobotGhostObj.is_visible)
 
         # Draw the head
         glPushMatrix()
         glTranslatef(*robot_head_offset_mm)
         glRotatef(-self.robot.head_angle.degrees, 0, 1, 0)
-        self.make_cube(robot_head_size_mm, color=color_white)
+        self.make_cube(robot_head_size_mm, color=color_white,body=RobotGhostObj.is_visible)
         glPopMatrix()
 
         # Draw the lift
@@ -532,7 +533,7 @@ class WorldMapViewer():
         lift_pt = transform.point(0, 0, 0)
         lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
         glTranslatef(*lift_point)
-        self.make_cube(lift_size_mm, color=color_white)
+        self.make_cube(lift_size_mm, color=color,body=RobotGhostObj.is_visible)
         glPopMatrix()
 
         # Draw the lift arms
@@ -553,11 +554,33 @@ class WorldMapViewer():
 
         glTranslatef(*arm_point)
         glRotatef(-(180 * arm_angle / pi), 0, 1, 0)
-        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white,body=RobotGhostObj.is_visible)
         glTranslatef(0, lift_arm_spacing_mm, 0)
-        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white,body=RobotGhostObj.is_visible)
         glPopMatrix()
 
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+
+    def make_Cubeghost(self, CubeGhostObj):
+        global gl_lists
+        pos = (CubeGhostObj.x, CubeGhostObj.y, CubeGhostObj.z)
+        color = color_white
+        valid_pose = (CubeGhostObj.x, CubeGhostObj.y, CubeGhostObj.z)
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(*pos)
+        # Transpose the matrix for sending to OpenCV
+
+        s = light_cube_size_mm
+        self.make_cube((s,s,s), color=color)
+
+        glRotatef(-90, 0., 0., 1.)
+        glTranslatef(-s/4, -s/4, s/2+0.5)
+        glScalef(0.25, 0.2, 0.25)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -678,6 +701,8 @@ class WorldMapViewer():
                 self.make_camera(obj)
             elif isinstance(obj, worldmap.RobotGhostObj):
                 self.make_ghost(obj)
+            elif isinstance(obj, worldmap.LightCubeGhostObj):
+                self.make_Cubeghost(obj)
 
     def make_shapes(self):
         global gl_lists

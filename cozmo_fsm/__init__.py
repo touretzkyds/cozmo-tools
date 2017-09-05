@@ -16,4 +16,5 @@ from .pilot import *
 from .pickup import *
 from . import wall_defs
 from . import custom_objs
-from .calibrate import *
+from . calibrate import *
+

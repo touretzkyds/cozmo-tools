@@ -18,9 +18,8 @@ from .worldmap import *
 
 #________________ Action Nodes ________________
 
-
+"""
 class LocateCam1(ActionNode):
-    """ Locates Camera1."""
     def __init__(self, camera_number=1, abort_on_stop=True, **action_kwargs):
         if 'should_play_anim' not in action_kwargs:
             action_kwargs['should_play_anim'] = False
@@ -127,7 +126,6 @@ class LocateCam1(ActionNode):
 
 
 class LocateCam2(ActionNode):
-    """ Locates Camera1."""
     def __init__(self, camera_number=1, abort_on_stop=True, **action_kwargs):
         if 'should_play_anim' not in action_kwargs:
             action_kwargs['should_play_anim'] = False
@@ -257,3 +255,4 @@ class LocateCam2(ActionNode):
         self.robot.world.world_map.objects['Ghost1'] = RobotGhostObj(1, self.robot.pose.position._x, self.robot.pose.position._y, self.robot.pose.position._z, self.robot.pose.rotation.angle_z.radians)
         
         return self.robot.drive_straight(distance_mm(0), speed_mmps(100),**self.action_kwargs)
+        """
