@@ -98,9 +98,10 @@ class CameraObj(WorldObject):
                (self.id, self.x, self.y, self.z)
 
 class RobotGhostObj(WorldObject):
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0, is_visible=False):
+    def __init__(self, camera_id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=True):
         super().__init__(id,x,y,z)
-        self.id = id
+        self.camera_id = camera_id
+        self.cozmo_id = cozmo_id
         self.x = x
         self.y = y
         self.z = z
@@ -111,6 +112,11 @@ class RobotGhostObj(WorldObject):
         return '<RobotGhostObj %d: (%.1f, %.1f, %.1f).>' % \
                (self.id, self.x, self.y, self.z)
 
+    def update(self, x=0, y=0, z=0, theta=0):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.theta = theta
 
 class LightCubeGhostObj(WorldObject):
     light_cube_size = (44., 44., 44.)
