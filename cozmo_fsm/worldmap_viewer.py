@@ -19,6 +19,8 @@ from . import transform
 from . import worldmap
 
 import cozmo
+import cv2
+import cv2.aruco as aruco
 
 WINDOW = None
 
@@ -51,6 +53,17 @@ cube_vertices = array.array('f', [ \
      +0.5, -0.5, +0.5, \
      -0.5, -0.5, -0.5, \
      -0.5, +0.5, -0.5, \
+     +0.5, +0.5, -0.5, \
+     +0.5, -0.5, -0.5  \
+     ])
+
+eye_vertices = array.array('f', [ \
+     -0.5, 0, 0, \
+     -0.5, 0, 0, \
+     +0.5, +0.5, +0.5, \
+     +0.5, -0.5, +0.5, \
+     -0.5, 0, 0, \
+     -0.5, 0, 0, \
      +0.5, +0.5, -0.5, \
      +0.5, -0.5, -0.5  \
      ])
@@ -139,6 +152,10 @@ class WorldMapViewer():
         self.translation = [0., 0.]  # Translation in mm
         self.scale = 1
         self.show_axes = True
+
+    def __del__(self):
+        global cap
+        cap.release()
 
     def make_cube(self,size=(1,1,1), highlight=False, color=None, body=True, edges=True):
         """Make a cube centered on the origin"""
@@ -409,6 +426,168 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
+    def make_eye(self,size=(1,1,1), highlight=False, color=None, body=True, edges=True):
+        """Make a cube centered on the origin"""
+        glEnableClientState(GL_VERTEX_ARRAY)
+        if color is None:
+            glEnableClientState(GL_COLOR_ARRAY)
+            if highlight:
+                glColorPointer(3, GL_FLOAT, 0, cube_colors_1.tobytes())
+            else:
+                glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tobytes())
+        else:
+            if not highlight:
+                s = 0.5   # scale down the brightness if necessary
+                color = (color[0]*s, color[1]*s, color[2]*s)
+            glColor4f(*color,1)
+        verts = eye_vertices * 1; # copy the array
+        for i in range(0,24,3):
+            verts[i  ] *= size[0]
+            verts[i+1] *= size[1]
+            verts[i+2] *= size[2]
+        if body:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+            glVertexPointer(3, GL_FLOAT, 0, verts.tobytes())
+            glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tobytes())
+        if edges:
+            # begin wireframe
+            for i in range(0,24): verts[i] *= 1.02
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+            glVertexPointer(3, GL_FLOAT, 0, verts.tobytes())
+            glDisableClientState(GL_COLOR_ARRAY)
+            if body:
+                if highlight:
+                    glColor4f(*color_white,1)
+                else:
+                    glColor4f(*color_black,1)
+            else:
+                if highlight:
+                    glColor4f(*color,1)
+                else:
+                    s = 0.7   # scale down the brightness if necessary
+                    glColor4f(color[0]*s, color[1]*s, color[2]*s, 1)
+            glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, cube_cIndices.tobytes())
+            # end wireframe
+        glDisableClientState(GL_COLOR_ARRAY)
+        glDisableClientState(GL_VERTEX_ARRAY)
+
+    def make_camera(self,cameraobj):
+        global gl_lists, cap, aruco_dict, parameters, F
+        camera_number = cameraobj.id
+        pos = (cameraobj.x, cameraobj.y, cameraobj.z)
+        color = (None, color_red, color_green, color_blue)[camera_number]
+        valid_pose = (cameraobj.x, cameraobj.y, cameraobj.z)
+        angle = cameraobj.theta
+        phi = cameraobj.phi
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(*pos)
+        # Transpose the matrix for sending to OpenCV
+
+        t = transform.quat2rot(cos(phi/2),0,0,sin(phi/2)).transpose()
+        rotmat = array.array('f',t.flatten()).tobytes()
+        glMultMatrixf(rotmat)
+
+        t = transform.quat2rot( cos(-angle/2 + pi/4) ,0 ,sin(-angle/2 + pi/4) ,0 ).transpose()
+        rotmat = array.array('f',t.flatten()).tobytes()
+        glMultMatrixf(rotmat)
+
+        s = light_cube_size_mm
+        self.make_eye((s,s,s), color=color)
+
+        glRotatef(-90, 0., 0., 1.)
+        glTranslatef(-s/4, -s/4, s/2+0.5)
+        glScalef(0.25, 0.2, 0.25)
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(camera_number)))
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+    def make_ghost(self,RobotGhostObj):
+        global gl_lists
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+
+        # Draw the body
+        p = (RobotGhostObj.x, RobotGhostObj.y, RobotGhostObj.z)
+        color = (None, color_red, color_green, color_blue)[RobotGhostObj.camera_id]
+        glTranslatef(*p)
+        glTranslatef(*robot_body_offset_mm)
+        glRotatef(RobotGhostObj.theta*180/pi, 0, 0, 1)
+        self.make_cube(robot_body_size_mm, color=color_white,body=RobotGhostObj.is_visible)
+
+        # Draw the head
+        glPushMatrix()
+        glTranslatef(*robot_head_offset_mm)
+        glRotatef(-self.robot.head_angle.degrees, 0, 1, 0)
+        self.make_cube(robot_head_size_mm, color=color_white,body=RobotGhostObj.is_visible)
+        glTranslatef(*( 0,  0,   36))
+        glScalef(0.25, 0.2, 0.25)
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(RobotGhostObj.cozmo_id)))
+        glPopMatrix()
+
+        # Draw the lift
+        glTranslatef(-robot_body_offset_mm[0], -robot_body_offset_mm[1], -robot_body_offset_mm[2])
+        glPushMatrix()
+        self.robot.kine.get_pose()
+        lift_tran = self.robot.kine.joint_to_base('lift_attach')
+        lift_pt = transform.point(0, 0, 0)
+        lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
+        glTranslatef(*lift_point)
+        self.make_cube(lift_size_mm, color=color,body=RobotGhostObj.is_visible)
+        glPopMatrix()
+
+        # Draw the lift arms
+        glPushMatrix()
+        lift_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
+
+        shoulder_tran = self.robot.kine.joint_to_base('shoulder')
+        shoulder_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        shoulder_point = self.tran_to_tuple(shoulder_tran.dot(shoulder_pt));
+
+        arm_point = ((shoulder_point[0] + lift_point[0]) / 2,
+                     (shoulder_point[1] + lift_point[1]) / 2,
+                     (shoulder_point[2] + lift_point[2]) / 2)
+
+        arm_angle = atan2(lift_point[2] - shoulder_point[2],
+                          lift_point[0] - shoulder_point[0])
+
+        glTranslatef(*arm_point)
+        glRotatef(-(180 * arm_angle / pi), 0, 1, 0)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white,body=RobotGhostObj.is_visible)
+        glTranslatef(0, lift_arm_spacing_mm, 0)
+        self.make_cube((lift_arm_len_mm, lift_arm_diam_mm, lift_arm_diam_mm), color=color_white,body=RobotGhostObj.is_visible)
+        glPopMatrix()
+
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+
+    def make_Cubeghost(self, CubeGhostObj):
+        global gl_lists
+        pos = (CubeGhostObj.x, CubeGhostObj.y, CubeGhostObj.z)
+        color = color_white
+        valid_pose = (CubeGhostObj.x, CubeGhostObj.y, CubeGhostObj.z)
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(*pos)
+        # Transpose the matrix for sending to OpenCV
+
+        s = light_cube_size_mm
+        self.make_cube((s,s,s), color=color)
+
+        glRotatef(-90, 0., 0., 1.)
+        glTranslatef(-s/4, -s/4, s/2+0.5)
+        glScalef(0.25, 0.2, 0.25)
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
     @staticmethod
     def tran_to_tuple(tran):
         return (tran[0][0], tran[1][0], tran[2][0])
@@ -521,6 +700,12 @@ class WorldMapViewer():
                 self.make_chip(obj)
             elif isinstance(obj, worldmap.FaceObj):
                 self.make_face(obj)
+            elif isinstance(obj, worldmap.CameraObj):
+                self.make_camera(obj)
+            elif isinstance(obj, worldmap.RobotGhostObj):
+                self.make_ghost(obj)
+            elif isinstance(obj, worldmap.LightCubeGhostObj):
+                self.make_Cubeghost(obj)
 
     def make_shapes(self):
         global gl_lists
