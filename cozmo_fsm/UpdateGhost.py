@@ -1,12 +1,14 @@
 import cv2
 import socket
 import pickle
+import threading
+import uuid
 from cozmo_fsm import *
 
 class LocateCam(StateNode):
     """ Locates Camera1."""
     def __init__(self, camera_number=1, focus=1140):
-        self.camera_number = camera_number # Set according to camera
+        self.camera_number = camera_number + (uuid.getnode()%100)*10 # Set according to camera
         self.focus = focus
         super().__init__()
 
@@ -26,7 +28,7 @@ class LocateCam(StateNode):
 
     def start(self, event=None):
         super().start(event)
-        self.cap = cv2.VideoCapture(self.camera_number) # Camera_capture Object
+        self.cap = cv2.VideoCapture(self.camera_number%10) # Camera_capture Object
         self.cap.set(3,4000)
         self.cap.set(4,4000)
         self.camera_width = self.cap.get(3)
@@ -40,7 +42,7 @@ class LocateCam(StateNode):
             print('Try',tries)
 
             if tries >5:
-                print("Cannot find cozmo from Camera"+str(self.camera_number))
+                print("Cannot find cozmo from Camera"+str(self.camera_number%10))
                 self.cap.release()
                 self.post_completion()
                 return
@@ -188,18 +190,18 @@ class Findcubes(StateNode):
 
 class ProcessImage(StateNode):
     def __init__(self, camera_number=1, focus=1140):
-        self.camera_number = camera_number # Set according to camera
+        self.camera_number = camera_number + (uuid.getnode()%100)*10 # Set according to camera
         self.focus = focus
+        self.cap = None
         super().__init__()
         self.flag=1
 
-    def __del__(self):
-        super().__del__()
-        self.cap.release()
+    def uncertainity(self, corners):
+        return(abs(np.mean(corners[0][0][:,1])/self.camera_height -0.5) + abs(np.mean(corners[0][0][:,0])/self.camera_width -0.5))
 
     def start(self, event=None):
         if self.flag:
-            self.cap = cv2.VideoCapture(self.camera_number)
+            self.cap = cv2.VideoCapture(self.camera_number%10)
             self.cap.set(3,4000)
             self.cap.set(4,4000)
             self.camera_width = self.cap.get(3)
@@ -208,7 +210,7 @@ class ProcessImage(StateNode):
             self.parameters =  cv2.aruco.DetectorParameters_create()
             self.focus = 1140
             self.flag=0
-            self.seen={}
+            self.seen=dict(dict())
         super().start(event)
 
         #Update Ghost
@@ -245,67 +247,153 @@ class ProcessImage(StateNode):
                 X = (self.camera_height/2 - np.mean(corners[id][0][:,1]))*R1/(r*np.cos(theta)) - initial_position[0]
                 Y = -( ((np.mean(corners[id][0][:,0])-self.camera_width/2)*R1/r) - initial_position[1] )
 
-                gname = 'Ghost'+str(self.camera_number)+'-'+str(ids[id][0])
+                gname = 'Ghost'+str(self.camera_number)
 
-                if gname in self.robot.world.world_map.objects:
-                    self.robot.world.world_map.objects[gname].update(X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi)
-                    self.seen[gname]=True
+                if (gname,str(ids[id][0])) in self.robot.world.world_map.temp_objects:
+                    self.robot.world.world_map.temp_objects[gname,str(ids[id][0])].update(X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi, self.uncertainity(corners))
+                    self.seen[gname,str(ids[id][0])]=True
                 else:
-                    print(gname)
-                    self.robot.world.world_map.objects[gname] = RobotGhostObj(self.camera_number, ids[id][0], X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi)
-                    self.seen[gname]=True
+                    print(gname+'-'+str(ids[id][0]))
+                    self.robot.world.world_map.temp_objects[gname,str(ids[id][0])] = RobotGhostObj(self.camera_number, ids[id][0], X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi, self.uncertainity(corners))
+                    self.seen[gname,str(ids[id][0])]=True
 
         for key in self.seen:
-            self.robot.world.world_map.objects[key].is_visible = self.seen[key]
+            self.robot.world.world_map.temp_objects[key].is_visible = self.seen[key]
         #else:
         #    self.robot.world.world_map.objects['Ghost'+str(self.camera_number)+'-'+str(id)].is_visible = False
         self.post_completion()
 
-class Send(StateNode):
-    """ Sends data to server"""
-    def __init__(self, ip='127.0.0.1', port=55566):
-        self.s = socket.socket()
-        self.host = socket.gethostbyaddr(ip)[0]
-        self.port = 55566
-        self.s.connect((self.host, self.port))
-        super().__init__()
-
+class Fusion(StateNode):
     def start(self, event=None):
         super().start(event)
-        ghosts = {}
+        minn = {}
+        for key, value in self.robot.world.world_map.temp_objects.items():
+            if value.is_visible:
+                if key[1] in minn:
+                    if minn[key[1]] > value.uncertainity:
+                        minn[key[1]] = value.uncertainity
+                        self.robot.world.world_map.objects['Ghost'+key[1]]=value
+                else:
+                    minn[key[1]] = value.uncertainity
+                    self.robot.world.world_map.objects['Ghost'+key[1]]=value
+
+        self.post_completion()
+
+class Client(object):
+    def __init__(self, robot):
+        self.port = None
+        self.socket = None #not running until startClient is called
+        self.ipaddr = None
+        self.robot= robot
+
+    def startClient(self,ipaddr="",port=1800):
+        self.port = port
+        self.ipaddr = ipaddr
+        self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True)
+        print("Attempting to connect to %s at port %d" % (ipaddr,port))
+        self.socket.connect((ipaddr,port))
+        print("Connected.")
+        return self #lets user to call client = Client().startClient()
+
+    def sendMessage(self,msg):
+        self.socket.recv(1024)
+        if type(msg) == str:
+            self.socket.send((msg).encode()) #send as byte string
+        else:
+            self.socket.send(pickle.dumps(msg))
+
+
+class Server(object):
+    def __init__(self, robot):
+        self.port = None
+        self.socket = None #not running until startServer is called
+        self.robot= robot
+
+    def startServer(self,port=42):
+        self.port = port
+        self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.socket.setblocking(True) #lets select work properly I think
+        self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True) #enables easy server restart
+        self.socket.bind(("",port)) #binds to any address the computer can be accessed by
+        self.socket.listen() #start awaiting connections
+        print("running server on %d" % (self.port))
+        self.c, addr = self.socket.accept()
+        print('Got connection from', addr)
+        return self #enables user to call server = Server().startServer()
+
+    def getMessage(self):
+        self.c.send(b'Thank you for connecting')
+        ghosts = pickle.loads(self.c.recv(1024))
+
+        for key, value in ghosts.items():
+            self.robot.world.world_map.temp_objects[key]=value
+
+
+class Send(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        ghosts = dict(dict())
         for key, value in self.robot.world.world_map.objects.items():
             if type(key)==str and ('Ghost' in key or 'Cam' in key):
                 ghosts[key] = value
 
-        ghosts["Ghost1"] = RobotGhostObj(1, self.robot.pose.position.x, self.robot.pose.position.y, self.robot.pose.position.z, self.robot.pose.rotation.angle_z.radians)
+        ghosts["Ghost1"] = RobotGhostObj(1, 1, self.robot.pose.position.x, self.robot.pose.position.y, self.robot.pose.position.z, self.robot.pose.rotation.angle_z.radians)
+        self.parent.client.sendMessage(ghosts)
+        self.post_completion()
 
-        print(self.s.recv(1024))
-        self.s.send(pickle.dumps(ghosts))
 
-        #self.s.close()
+class Recieve(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        self.parent.server.getMessage()
         self.post_completion()
 
 
 class UpdateGhost(StateMachineProgram):
     def start(self):
+        super().__init__(cam_viewer=False)
+        print("Enter your server's ip address:")
+        ipaddr = input().strip() # get user input to be server ip
+        if ipaddr not in ["None",""]:
+            print("ipaddr is "+ipaddr)
+            self.client = Client(self.robot).startClient(ipaddr=ipaddr,port=1800)
+        else:
+            print("Launching Server...")
+            #self.server = Server(self.robot).startServer(port=1800)
         super().start()
+
     def setup(self):
         """
-            launch:  LocateCam(0,1140) =C=> process
-            #launch:  LocateCam(1,1140) =C=> LocateCam(2,1140) =C=> process
-            process: Send('128.237.210.1') =C=> process
-            #process: ProcessImage(1,1140) =C=> ProcessImage(2,1140) =C=> process
+            #launch:  Recieve() =C=> process
+            launch:  LocateCam(1,1140) =C=> LocateCam(2,1140) =C=> process
+            #process: Recieve() =C=> process
+            process: ProcessImage(1,1140) =C=> ProcessImage(2,1140) =C=> Fusion() =C=>process
         """
         
-        # Code generated by genfsm on Tue Sep 12 13:00:06 2017:
+        # Code generated by genfsm on Thu Sep 14 11:32:29 2017:
         
-        launch = LocateCam(0,1140) .set_name("launch") .set_parent(self)
-        process = Send('128.237.210.1') .set_name("process") .set_parent(self)
+        launch = LocateCam(1,1140) .set_name("launch") .set_parent(self)
+        locatecam1 = LocateCam(2,1140) .set_name("locatecam1") .set_parent(self)
+        process = ProcessImage(1,1140) .set_name("process") .set_parent(self)
+        processimage1 = ProcessImage(2,1140) .set_name("processimage1") .set_parent(self)
+        fusion1 = Fusion() .set_name("fusion1") .set_parent(self)
         
         completiontrans1 = CompletionTrans() .set_name("completiontrans1")
-        completiontrans1 .add_sources(launch) .add_destinations(process)
+        completiontrans1 .add_sources(launch) .add_destinations(locatecam1)
         
         completiontrans2 = CompletionTrans() .set_name("completiontrans2")
-        completiontrans2 .add_sources(process) .add_destinations(process)
+        completiontrans2 .add_sources(locatecam1) .add_destinations(process)
+        
+        completiontrans3 = CompletionTrans() .set_name("completiontrans3")
+        completiontrans3 .add_sources(process) .add_destinations(processimage1)
+        
+        completiontrans4 = CompletionTrans() .set_name("completiontrans4")
+        completiontrans4 .add_sources(processimage1) .add_destinations(fusion1)
+        
+        completiontrans5 = CompletionTrans() .set_name("completiontrans5")
+        completiontrans5 .add_sources(fusion1) .add_destinations(process)
         
         return self
+
+

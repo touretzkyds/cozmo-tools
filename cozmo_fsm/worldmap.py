@@ -98,7 +98,7 @@ class CameraObj(WorldObject):
                (self.id, self.x, self.y, self.z)
 
 class RobotGhostObj(WorldObject):
-    def __init__(self, camera_id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=True):
+    def __init__(self, camera_id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=True, uncertainity=0):
         super().__init__(id,x,y,z)
         self.camera_id = camera_id
         self.cozmo_id = cozmo_id
@@ -106,17 +106,19 @@ class RobotGhostObj(WorldObject):
         self.y = y
         self.z = z
         self.theta = theta
+        self.uncertainity = uncertainity
         self.is_visible = is_visible
 
     def __repr__(self):
-        return '<RobotGhostObj %d: (%.1f, %.1f, %.1f).>' % \
-               (self.id, self.x, self.y, self.z)
+        return '<RobotGhostObj %d-%d: (%.1f, %.1f, %.1f).>' % \
+               (self.camera_id, self.cozmo_id, self.x, self.y, self.z)
 
-    def update(self, x=0, y=0, z=0, theta=0):
+    def update(self, x=0, y=0, z=0, theta=0, uncertainity=0):
         self.x = x
         self.y = y
         self.z = z
         self.theta = theta
+        self.uncertainity = uncertainity
 
 class LightCubeGhostObj(WorldObject):
     light_cube_size = (44., 44., 44.)
@@ -137,6 +139,7 @@ class WorldMap():
     def __init__(self,robot):
         self.robot = robot
         self.objects = dict()
+        self.temp_objects = dict(dict())
         
     def update_map(self):
         """Called to update the map just before the path planner runs.

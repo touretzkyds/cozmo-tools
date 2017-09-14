@@ -3,7 +3,6 @@ import inspect
 import random
 import cv2
 import cv2.aruco as aruco
-from scipy.optimize import fsolve
 from math import sqrt, sin, asin
 import numpy as np
 import cozmo
