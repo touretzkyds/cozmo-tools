@@ -317,7 +317,7 @@ def make_floor():
 
 def make_charger():
     charger = robot.world.charger
-    if (not charger.pose) or not charger.pose.is_valid: return None
+    if (not charger) or (not charger.pose) or not charger.pose.is_valid: return None
     comparable = charger.pose.is_comparable(robot.pose)
     highlight = charger.is_visible or (robot.is_on_charger and comparable)
     c = glGenLists(1)
