@@ -143,6 +143,8 @@ class WorldMap():
         self.update_coords(world_obj, cube)
 
     def update_face(self,face):
+        if face.pose is None:
+            return
         pos = face.pose.position
         if face in self.robot.world.world_map.objects:
             face_obj = self.robot.world.world_map.objects[face]
