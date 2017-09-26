@@ -467,7 +467,7 @@ class RRT():
     def generate_chip_obstacle(self,obj):
         r = Circle(center=transform.point(obj.x,obj.y),
                    radius=obj.radius)
-        r.obstalce = obj
+        r.obstacle = obj
         return r
 
     def make_robot_parts(self,robot):
