@@ -213,6 +213,28 @@ class HearTrans(PatternMatchTrans):
         super().__init__(pattern,SpeechEvent)
 
 
+class PilotTrans(Transition):
+    """Fires if a matching PilotEvent is observed."""
+    def __init__(self,status=None):
+        super().__init__()
+        self.status = status
+
+    def start(self):
+        if self.running: return
+        super().start()
+        for source in self.sources:
+            if self.status == None:
+                self.robot.erouter.add_wildcard_listener(self, PilotEvent, source)
+            else:
+                self.robot.erouter.add_listener(self, PilotEvent, source)
+
+    def handle_event(self,event):
+        if not self.running: return
+        super().handle_event(event)
+        if self.status == None or self.status == event.status:
+            self.fire(event)
+        
+
 class RandomTrans(Transition):
     """Picks a destination node at random."""
     def start(self):
