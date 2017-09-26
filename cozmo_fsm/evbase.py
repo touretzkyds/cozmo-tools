@@ -18,7 +18,9 @@ class Event:
     """Base class for all events."""
     def __init__(self, source=None):
         self.source = source
+
     cozmo_evt_type = None
+
     def generator(self,erouter,cozmo_evt): pass
 
     def __repr__(self):
