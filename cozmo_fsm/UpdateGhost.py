@@ -286,7 +286,7 @@ class FindTransforms(StateNode):
         super().start(event)
         self.supreme_cozmo_id = self.parent.supreme_cozmo_id
         for key, value in self.robot.world.world_map.temp_ghosts.items():
-            if value.cozmo_number != self.supreme_cozmo_id and value.cozmo_number == value.cozmo_id:
+            if value.cozmo_number != self.supreme_cozmo_id and value.cozmo_number == value.cozmo_id and (value.cozmo_number,self.supreme_cozmo_id) not in self.parent.tranforms:
                 for k, v in self.robot.world.world_map.temp_ghosts.items():
                     if v.cozmo_number == self.supreme_cozmo_id and v.cozmo_id == value.cozmo_id:
                         self.supreme = v
@@ -409,34 +409,47 @@ class Client(object):
             self.socket.sendall(pickle.dumps(msg))
 
 
-class Server(object):
-    def __init__(self, robot):
-        self.port = None
+class myThread (threading.Thread):
+    def __init__(self, threadID, name, client, robot):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+        self.c = client
+        self.robot = robot
+    def run(self):
+        for i in range(300):
+            self.c.send(b'Thank you for connecting')
+            ghosts = pickle.loads(self.c.recv(4096))
+
+            for key, value in ghosts.items():
+                if 'Cam' in key:
+                    self.robot.world.world_map.temp_cams[key]=value
+                else:
+                    self.robot.world.world_map.temp_ghosts[key]=value
+
+
+class Server(threading.Thread):
+    def __init__(self, robot, port=42):
+        threading.Thread.__init__(self)
+        self.port = port
         self.socket = None #not running until startServer is called
         self.robot= robot
 
-    def startServer(self,port=42):
-        self.port = port
+    def run(self):
         self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.socket.setblocking(True) #lets select work properly I think
         self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True) #enables easy server restart
-        self.socket.bind(("",port)) #binds to any address the computer can be accessed by
-        self.socket.listen() #start awaiting connections
-        print("running server on %d" % (self.port))
-        self.c, addr = self.socket.accept()
-        print('Got connection from', addr)
-        return self #enables user to call server = Server().startServer()
+        self.socket.bind(("",self.port)) #binds to any address the computer can be accessed by
 
-    def getMessage(self):
-        self.c.send(b'Thank you for connecting')
-        ghosts = pickle.loads(self.c.recv(4096))
+        self.threadLock = threading.Lock()
+        self.threads =[]
 
-        for key, value in ghosts.items():
-            if 'Cam' in key:
-                self.robot.world.world_map.temp_cams[key]=value
-            else:
-                self.robot.world.world_map.temp_ghosts[key]=value
-
+        for i in range(100):
+            self.socket.listen(5)   # Now wait for client connection.
+            c, addr = self.socket.accept()    # Establish connection with client.
+            print('Got connection from', addr)
+            self.threads.append(myThread(i, "Client"+str(i), c, self.robot))
+            self.threads[i].start()
 
 class Send(StateNode):
     def start(self,event=None):
@@ -453,13 +466,6 @@ class Send(StateNode):
         self.post_completion()
 
 
-class Recieve(StateNode):
-    def start(self,event=None):
-        super().start(event)
-        self.parent.server.getMessage()
-        self.post_completion()
-
-
 class UpdateGhost(StateMachineProgram):
     def start(self):
         super().__init__(cam_viewer=False)
@@ -470,7 +476,8 @@ class UpdateGhost(StateMachineProgram):
             self.client = Client(self.robot).startClient(ipaddr=ipaddr,port=1800)
         else:
             print("Launching Server...")
-            self.server = Server(self.robot).startServer(port=1800)
+            self.server = Server(self.robot, port=1800)
+            self.server.start()
         self.cozmo_map = { 1:"a", 2:"tekkotsu2" }
         self.tranforms = {}
         self.caplist = {}
@@ -480,50 +487,38 @@ class UpdateGhost(StateMachineProgram):
     def setup(self):
         """
             #launch:  Recieve() =C=> process
-            launch:  LocateCam(1,1140) =C=> setup
-            setup :  ProcessImage(1,1140) =C=> Recieve() =C=> FindTransforms() =C=> Set_current_cozmo() =C=> process
+            launch:  LocateCam(1,1140) =C=> process
+            #setup :  ProcessImage(1,1140)  =C=> FindTransforms() =C=> Set_current_cozmo() =C=> process
             #process: Recieve() =C=> process
-            process: ProcessImage(1,1140) =C=> Recieve() =C=> Correct_cam()=C=> Fusion() =C=> process
+            process: ProcessImage(1,1140) =C=> FindTransforms() =C=> Set_current_cozmo() =C=> Correct_cam()=C=> Fusion() =C=> process
         """
         
-        # Code generated by genfsm on Mon Sep 25 14:20:36 2017:
+        # Code generated by genfsm on Tue Sep 26 10:00:36 2017:
         
         launch = LocateCam(1,1140) .set_name("launch") .set_parent(self)
-        setup = ProcessImage(1,1140) .set_name("setup") .set_parent(self)
-        recieve1 = Recieve() .set_name("recieve1") .set_parent(self)
+        process = ProcessImage(1,1140) .set_name("process") .set_parent(self)
         findtransforms1 = FindTransforms() .set_name("findtransforms1") .set_parent(self)
         set_current_cozmo1 = Set_current_cozmo() .set_name("set_current_cozmo1") .set_parent(self)
-        process = ProcessImage(1,1140) .set_name("process") .set_parent(self)
-        recieve2 = Recieve() .set_name("recieve2") .set_parent(self)
         correct_cam1 = Correct_cam() .set_name("correct_cam1") .set_parent(self)
         fusion1 = Fusion() .set_name("fusion1") .set_parent(self)
         
         completiontrans1 = CompletionTrans() .set_name("completiontrans1")
-        completiontrans1 .add_sources(launch) .add_destinations(setup)
+        completiontrans1 .add_sources(launch) .add_destinations(process)
         
         completiontrans2 = CompletionTrans() .set_name("completiontrans2")
-        completiontrans2 .add_sources(setup) .add_destinations(recieve1)
+        completiontrans2 .add_sources(process) .add_destinations(findtransforms1)
         
         completiontrans3 = CompletionTrans() .set_name("completiontrans3")
-        completiontrans3 .add_sources(recieve1) .add_destinations(findtransforms1)
+        completiontrans3 .add_sources(findtransforms1) .add_destinations(set_current_cozmo1)
         
         completiontrans4 = CompletionTrans() .set_name("completiontrans4")
-        completiontrans4 .add_sources(findtransforms1) .add_destinations(set_current_cozmo1)
+        completiontrans4 .add_sources(set_current_cozmo1) .add_destinations(correct_cam1)
         
         completiontrans5 = CompletionTrans() .set_name("completiontrans5")
-        completiontrans5 .add_sources(set_current_cozmo1) .add_destinations(process)
+        completiontrans5 .add_sources(correct_cam1) .add_destinations(fusion1)
         
         completiontrans6 = CompletionTrans() .set_name("completiontrans6")
-        completiontrans6 .add_sources(process) .add_destinations(recieve2)
-        
-        completiontrans7 = CompletionTrans() .set_name("completiontrans7")
-        completiontrans7 .add_sources(recieve2) .add_destinations(correct_cam1)
-        
-        completiontrans8 = CompletionTrans() .set_name("completiontrans8")
-        completiontrans8 .add_sources(correct_cam1) .add_destinations(fusion1)
-        
-        completiontrans9 = CompletionTrans() .set_name("completiontrans9")
-        completiontrans9 .add_sources(fusion1) .add_destinations(process)
+        completiontrans6 .add_sources(fusion1) .add_destinations(process)
         
         return self
 
