@@ -69,7 +69,7 @@ class Rectangle(Polygon):
         self.center = center
         self.dimensions = dimensions
         self.orient = orient
-        self.obstacle = None
+
         dx2 = dimensions[0]/2
         dy2 = dimensions[1]/2
         vertices = np.array([[-dx2,  dx2, dx2, -dx2 ],
