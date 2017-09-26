@@ -82,7 +82,7 @@ class FaceObj(WorldObject):
 
 class CameraObj(WorldObject):
     camera_size = (44., 44., 44.)
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0, phi =0, initial_position =(0,0)):
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0, phi =0, initial_position = (0,0), cozmo_number = 1):
         super().__init__(id,x,y,z)
         self.size = self.camera_size
         self.id = id
@@ -92,14 +92,14 @@ class CameraObj(WorldObject):
         self.theta = theta
         self.phi = phi
         self.initial_position = initial_position
-        #self.is_visible = sdk_obj.is_visible
+        self.cozmo_number = cozmo_number
 
     def __repr__(self):
-        return '<CameraObj %d: (%.1f, %.1f, %.1f).>' % \
-               (self.id, self.x, self.y, self.z)
+        return '<CameraObj %d: (%.1f, %.1f, %.1f) @ %f.> Calibrated on %d' % \
+               (self.id, self.x, self.y, self.z, self.phi*180/3.14, self.cozmo_number)
 
 class RobotGhostObj(WorldObject):
-    def __init__(self, camera_id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=True):
+    def __init__(self, camera_id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=True, uncertainity=0, cozmo_number = 1):
         super().__init__(id,x,y,z)
         self.camera_id = camera_id
         self.cozmo_id = cozmo_id
@@ -107,17 +107,21 @@ class RobotGhostObj(WorldObject):
         self.y = y
         self.z = z
         self.theta = theta
+        self.uncertainity = uncertainity
         self.is_visible = is_visible
+        self.cozmo_number = cozmo_number
+        self.size = (120., 70., 100.)
 
     def __repr__(self):
-        return '<RobotGhostObj %d: (%.1f, %.1f, %.1f).>' % \
-               (self.id, self.x, self.y, self.z)
+        return '<RobotGhostObj %d-%d: (%.1f, %.1f, %.1f) @ %f.> Calibrated on %d' % \
+               (self.camera_id, self.cozmo_id, self.x, self.y, self.z, self.theta*180/3.14, self.cozmo_number)
 
-    def update(self, x=0, y=0, z=0, theta=0):
+    def update(self, x=0, y=0, z=0, theta=0, uncertainity=0):
         self.x = x
         self.y = y
         self.z = z
         self.theta = theta
+        self.uncertainity = uncertainity
 
 class LightCubeGhostObj(WorldObject):
     light_cube_size = (44., 44., 44.)
@@ -138,6 +142,8 @@ class WorldMap():
     def __init__(self,robot):
         self.robot = robot
         self.objects = dict()
+        self.temp_cams = dict()
+        self.temp_ghosts = dict(dict())
         
     def update_map(self):
         """Called to update the map just before the path planner runs.

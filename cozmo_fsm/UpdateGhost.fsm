@@ -1,12 +1,15 @@
 import cv2
 import socket
 import pickle
+import threading
+import random
 from cozmo_fsm import *
 
 class LocateCam(StateNode):
     """ Locates Camera1."""
     def __init__(self, camera_number=1, focus=1140):
-        self.camera_number = camera_number # Set according to camera
+        self.camera_number = camera_number
+        self.owner = socket.gethostname()
         self.focus = focus
         super().__init__()
 
@@ -26,34 +29,47 @@ class LocateCam(StateNode):
 
     def start(self, event=None):
         super().start(event)
-        self.cap = cv2.VideoCapture(self.camera_number) # Camera_capture Object
-        self.cap.set(3,4000)
-        self.cap.set(4,4000)
+
+        if self.camera_number not in self.parent.caplist:
+            self.parent.caplist[self.camera_number] = cv2.VideoCapture(self.camera_number)
+            self.parent.caplist[self.camera_number].set(3,4000)
+            self.parent.caplist[self.camera_number].set(4,4000)
+
+        self.cap = self.parent.caplist[self.camera_number]
         self.camera_width = self.cap.get(3)
         self.camera_height = self.cap.get(4)
+
         print("Camera"+str(self.camera_number)+" resolution", self.camera_width,'x', self.camera_height)
         self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
         self.parameters = cv2.aruco.DetectorParameters_create()
         tries = 0
+
+        for i in range(100):
+            ret, self.frame = self.cap.read()
+            cv2.imshow('Make sure Cozmo is visible',self.frame)
+            cv2.waitKey(1)
+
+        cv2.destroyAllWindows()
+
         while(True):
             tries += 1
             print('Try',tries)
 
             if tries >5:
-                print("Cannot find cozmo from Camera"+str(self.camera_number))
-                self.cap.release()
+                print("Cannot find cozmo from Camera"+str(self.camera_number%10))
                 self.post_completion()
                 return
 
             self.getframe()
             self.corners, self.ids1 = self.getcorners()
             print(self.ids1)
+
+
             if type(self.ids1) is np.ndarray:
                 (x0, y0) = self.corners[0][0][0]
                 (x1, y1) = self.corners[0][0][1]
                 (x2, y2) = self.corners[0][0][2]
                 (x3, y3) = self.corners[0][0][3]
-
 
                 omega_x = np.arctan((self.camera_height/2 - np.mean(self.corners[0][0][:,1]))/self.focus)
                 omega_y = np.arctan((self.camera_width/2 - np.mean(self.corners[0][0][:,0]))/self.focus)
@@ -80,11 +96,8 @@ class LocateCam(StateNode):
                 Y = (np.mean(self.corners[0][0][:,0])-self.camera_width/2)*R1/r
                 X = (self.camera_height/2 - np.mean(self.corners[0][0][:,1]))*R1/(r*np.cos( theta ))
                 height = np.sqrt( R1*R1 - X*X )*np.cos(theta+omega_x)
+                print('Calibrated on',self.ids1[0][0])
                 break
-
-
-        self.cap.release()
-        print("Released")
 
         self.theta = theta
         self.height = height + 100
@@ -92,12 +105,10 @@ class LocateCam(StateNode):
 
         camera_x = self.robot.pose.position._x - (self.height*np.tan(self.theta + omega_x)*np.cos(self.phi) + Y*np.sin(self.phi))
         camera_y = self.robot.pose.position._y - ( -self.height*np.tan(self.theta + omega_x)*np.sin(self.phi) + Y*np.cos(self.phi))
-
         print("Theta:",self.theta*180/np.pi,"Phi",self.phi*180/np.pi, "Camera" +str(self.camera_number)+ " at: ",camera_x, camera_y)
-
-        self.robot.world.world_map.objects['Cam'+str(self.camera_number)] = CameraObj(self.camera_number, camera_x, -camera_y, self.height, self.theta, self.phi, (X,Y) )
-        #self.robot.world.world_map.objects['Ghost'+str(self.camera_number)] = RobotGhostObj(self.camera_number, self.robot.pose.position._x, self.robot.pose.position._y, self.robot.pose.position._z, self.robot.pose.rotation.angle_z.radians)
-
+        self.robot.world.world_map.objects['Cam-'+self.owner+'-'+str(self.camera_number)] = CameraObj(random.randint(0,255), camera_x, -camera_y, self.height, self.theta, self.phi, (X,Y), self.ids1[0][0] )
+        self.parent.supreme_cozmo_id = self.ids1[0][0]
+        print("World Coordinate frame is the current frame of Cozmo",self.parent.supreme_cozmo_id)
         self.post_completion()
 
 
@@ -188,27 +199,31 @@ class Findcubes(StateNode):
 
 class ProcessImage(StateNode):
     def __init__(self, camera_number=1, focus=1140):
-        self.camera_number = camera_number # Set according to camera
+        self.camera_number = camera_number
+        self.owner = socket.gethostname()
         self.focus = focus
+        self.cap = None
         super().__init__()
-        self.flag=1
+        self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
+        self.parameters =  cv2.aruco.DetectorParameters_create()
+        self.focus = 1140
+        self.flag=0
+        self.seen=dict(dict())
 
-    def __del__(self):
-        super().__del__()
-        self.cap.release()
+    def uncertainity(self, corners):
+        return(abs(np.mean(corners[0][0][:,1])/self.camera_height -0.5) + abs(np.mean(corners[0][0][:,0])/self.camera_width -0.5))
 
     def start(self, event=None):
-        if self.flag:
-            self.cap = cv2.VideoCapture(self.camera_number)
-            self.cap.set(3,4000)
-            self.cap.set(4,4000)
-            self.camera_width = self.cap.get(3)
-            self.camera_height = self.cap.get(4)
-            self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
-            self.parameters =  cv2.aruco.DetectorParameters_create()
-            self.focus = 1140
-            self.flag=0
-            self.seen={}
+
+        if self.camera_number not in self.parent.caplist:
+            print("HEER")
+            self.parent.caplist[self.camera_number] = cv2.VideoCapture(self.camera_number)
+            self.parent.caplist[self.camera_number].set(3,4000)
+
+        self.cap = self.parent.caplist[self.camera_number]
+        self.camera_width = self.cap.get(3)
+        self.camera_height = self.cap.get(4)
+
         super().start(event)
 
         #Update Ghost
@@ -234,64 +249,239 @@ class ProcessImage(StateNode):
                 C = (x1-x0)#/np.cos(omega_x)
 
                 gphi = np.arctan2(-A,-C)
-                phi = self.robot.world.world_map.objects['Cam'+str(self.camera_number)].phi
-                theta = self.robot.world.world_map.objects['Cam'+str(self.camera_number)].theta
-                initial_position = self.robot.world.world_map.objects['Cam'+str(self.camera_number)].initial_position
 
-                l = np.sqrt(A**2 + C**2)
-                r = np.sqrt(self.focus*self.focus + (np.mean(corners[id][0][:,0])-self.camera_width/2)**2 + (np.mean(corners[id][0][:,1])-self.camera_height/2)**2 )
-                R1 = 50*r/l
+                try:
+                    Cam = self.robot.world.world_map.objects['Cam-'+self.owner+'-'+str(self.camera_number)]
+                    phi = Cam.phi
+                    theta = Cam.theta
+                    initial_position = Cam.initial_position
 
-                X = (self.camera_height/2 - np.mean(corners[id][0][:,1]))*R1/(r*np.cos(theta)) - initial_position[0]
-                Y = -( ((np.mean(corners[id][0][:,0])-self.camera_width/2)*R1/r) - initial_position[1] )
+                    l = np.sqrt(A**2 + C**2)
+                    r = np.sqrt(self.focus*self.focus + (np.mean(corners[id][0][:,0])-self.camera_width/2)**2 + (np.mean(corners[id][0][:,1])-self.camera_height/2)**2 )
+                    R1 = 50*r/l
 
-                gname = 'Ghost'+str(self.camera_number)+'-'+str(ids[id][0])
+                    X = (self.camera_height/2 - np.mean(corners[id][0][:,1]))*R1/(r*np.cos(theta)) - initial_position[0]
+                    Y = -( ((np.mean(corners[id][0][:,0])-self.camera_width/2)*R1/r) - initial_position[1] )
 
-                if gname in self.robot.world.world_map.objects:
-                    self.robot.world.world_map.objects[gname].update(X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi)
-                    self.seen[gname]=True
-                else:
-                    print(gname)
-                    self.robot.world.world_map.objects[gname] = RobotGhostObj(self.camera_number, ids[id][0], X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi)
-                    self.seen[gname]=True
+                    gname = 'Ghost'+str(self.camera_number)
+
+                    if (gname,str(ids[id][0])) in self.robot.world.world_map.temp_ghosts:
+                        self.robot.world.world_map.temp_ghosts[gname,str(ids[id][0])].update(X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi, self.uncertainity(corners))
+                        self.seen[gname,str(ids[id][0])]=True
+                    else:
+                        print(gname+'-'+str(ids[id][0]))
+                        self.robot.world.world_map.temp_ghosts[gname,str(ids[id][0])] = RobotGhostObj(Cam.id, ids[id][0], X*cos(phi) - Y*sin(phi), X*sin(phi) + Y*cos(phi), 0, -gphi + phi, True, self.uncertainity(corners), Cam.cozmo_number)
+                        self.seen[gname,str(ids[id][0])]=True
+                except:
+                    print('Camera not found')
 
         for key in self.seen:
-            self.robot.world.world_map.objects[key].is_visible = self.seen[key]
+            self.robot.world.world_map.temp_ghosts[key].is_visible = self.seen[key]
         #else:
         #    self.robot.world.world_map.objects['Ghost'+str(self.camera_number)+'-'+str(id)].is_visible = False
         self.post_completion()
 
-class Send(StateNode):
-    """ Sends data to server"""
-    def __init__(self, ip='127.0.0.1', port=55566):
-        self.s = socket.socket()
-        self.host = socket.gethostbyaddr(ip)[0]
-        self.port = 55566
-        self.s.connect((self.host, self.port))
-        super().__init__()
+class FindTransforms(StateNode):
+    def start(self, event=None):
+        super().start(event)
+        self.supreme_cozmo_id = self.parent.supreme_cozmo_id
+        for key, value in self.robot.world.world_map.temp_ghosts.items():
+            if value.cozmo_number != self.supreme_cozmo_id and value.cozmo_number == value.cozmo_id:
+                for k, v in self.robot.world.world_map.temp_ghosts.items():
+                    if v.cozmo_number == self.supreme_cozmo_id and v.cozmo_id == value.cozmo_id:
+                        self.supreme = v
+                        break
+
+                theta = value.theta - self.supreme.theta
+
+                X = self.supreme.x -( cos(theta)*value.x + sin(theta)*value.y )
+                Y = self.supreme.y -( cos(theta)*value.y - sin(theta)*value.x )
+                self.parent.tranforms[(value.cozmo_number,self.supreme_cozmo_id)] = (theta,X,Y)
+
+                print("Added Transform from",value.cozmo_number,"to",self.supreme_cozmo_id)
+
+        self.post_completion()
+
+class Set_current_cozmo(StateNode):
+    def transform_ghost(self, ghost):
+        theta, X, Y = self.parent.tranforms[ghost.cozmo_number,self.supreme_cozmo_id]
+        x = X + cos(theta)*ghost.x + sin(theta)*ghost.y
+        y = Y + cos(theta)*ghost.y - sin(theta)*ghost.x
+        ghost.x=x
+        ghost.y=y
+        ghost.theta-=theta
+        ghost.cozmo_number = self.supreme_cozmo_id
 
     def start(self, event=None):
         super().start(event)
-        ghosts = {}
+        self.supreme_cozmo_id = self.parent.supreme_cozmo_id
+        minn = {}
+        for key, value in self.robot.world.world_map.temp_ghosts.items():
+            if value.is_visible and int(key[1]) in self.parent.cozmo_map:
+                if self.parent.cozmo_map[int(key[1])] == socket.gethostname():
+                    if key[1] in minn:
+                        if minn[key[1]] > value.uncertainity:
+                            minn[key[1]] = value.uncertainity
+                            if value.cozmo_number != self.supreme_cozmo_id:
+                                self.transform_ghost(value)
+                            self.robot.world.particle_filter.set_pose(value.x, value.y, value.theta)
+                    else:
+                        minn[key[1]] = value.uncertainity
+                        if value.cozmo_number != self.supreme_cozmo_id:
+                            self.transform_ghost(value)
+                        self.robot.world.particle_filter.set_pose(value.x, value.y, value.theta)
+        self.post_completion()
+
+class Correct_cam(StateNode):
+    def trans(self, cam):
+        theta, X, Y = self.parent.tranforms[cam.cozmo_number,self.supreme_cozmo_id]
+        x = X + cos(theta)*cam.x + sin(theta)*cam.y
+        y = Y + cos(theta)*cam.y - sin(theta)*cam.x
+        cam.x=x
+        cam.y=y
+        cam.phi+=theta
+        cam.cozmo_number = self.supreme_cozmo_id
+
+    def start(self, event=None):
+        super().start(event)
+        self.supreme_cozmo_id = self.parent.supreme_cozmo_id
+        for key, value in self.robot.world.world_map.temp_cams.items():
+            if 'Cam' in key and value.cozmo_number != self.supreme_cozmo_id:
+                self.trans(value)
+
+            self.robot.world.world_map.objects[key] = value
+
+        self.post_completion()
+
+class Fusion(StateNode):
+    def transform_ghost(self, ghost):
+        theta, X, Y = self.parent.tranforms[ghost.cozmo_number,self.supreme_cozmo_id]
+        x = X + cos(theta)*ghost.x + sin(theta)*ghost.y
+        y = Y + cos(theta)*ghost.y - sin(theta)*ghost.x
+        ghost.x=x
+        ghost.y=y
+        ghost.theta-=theta
+        ghost.cozmo_number = self.supreme_cozmo_id
+
+    def start(self, event=None):
+        super().start(event)
+        self.supreme_cozmo_id = self.parent.supreme_cozmo_id
+        minn = {}
+        for key, value in self.robot.world.world_map.temp_ghosts.items():
+            if value.is_visible and int(key[1]) in self.parent.cozmo_map:
+                if self.parent.cozmo_map[int(key[1])] != socket.gethostname():
+                    if key[1] in minn:
+                        if minn[key[1]] > value.uncertainity:
+                            minn[key[1]] = value.uncertainity
+                            if value.cozmo_number != self.supreme_cozmo_id:
+                                self.transform_ghost(value)
+                            self.robot.world.world_map.objects['Ghost'+key[1]]=value
+                    else:
+                        minn[key[1]] = value.uncertainity
+                        if value.cozmo_number != self.supreme_cozmo_id:
+                            self.transform_ghost(value)
+                        self.robot.world.world_map.objects['Ghost'+key[1]]=value
+
+        self.post_completion()
+
+class Client(object):
+    def __init__(self, robot):
+        self.port = None
+        self.socket = None #not running until startClient is called
+        self.ipaddr = None
+        self.robot= robot
+
+    def startClient(self,ipaddr="",port=1800):
+        self.port = port
+        self.ipaddr = ipaddr
+        self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True)
+        print("Attempting to connect to %s at port %d" % (ipaddr,port))
+        self.socket.connect((ipaddr,port))
+        print("Connected.")
+        return self #lets user to call client = Client().startClient()
+
+    def sendMessage(self,msg):
+        self.socket.recv(1024)
+        if type(msg) == str:
+            self.socket.sendall((msg).encode()) #send as byte string
+        else:
+            self.socket.sendall(pickle.dumps(msg))
+
+
+class Server(object):
+    def __init__(self, robot):
+        self.port = None
+        self.socket = None #not running until startServer is called
+        self.robot= robot
+
+    def startServer(self,port=42):
+        self.port = port
+        self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.socket.setblocking(True) #lets select work properly I think
+        self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True) #enables easy server restart
+        self.socket.bind(("",port)) #binds to any address the computer can be accessed by
+        self.socket.listen() #start awaiting connections
+        print("running server on %d" % (self.port))
+        self.c, addr = self.socket.accept()
+        print('Got connection from', addr)
+        return self #enables user to call server = Server().startServer()
+
+    def getMessage(self):
+        self.c.send(b'Thank you for connecting')
+        ghosts = pickle.loads(self.c.recv(4096))
+
+        for key, value in ghosts.items():
+            if 'Cam' in key:
+                self.robot.world.world_map.temp_cams[key]=value
+            else:
+                self.robot.world.world_map.temp_ghosts[key]=value
+
+
+class Send(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        ghosts = dict(dict())
         for key, value in self.robot.world.world_map.objects.items():
-            if type(key)==str and ('Ghost' in key or 'Cam' in key):
+            if type(key)==str:
                 ghosts[key] = value
 
-        ghosts["Ghost1"] = RobotGhostObj(1, self.robot.pose.position.x, self.robot.pose.position.y, self.robot.pose.position.z, self.robot.pose.rotation.angle_z.radians)
+        for key, value in self.robot.world.world_map.temp_ghosts.items():
+            ghosts[key] = value
 
-        print(self.s.recv(1024))
-        self.s.send(pickle.dumps(ghosts))
+        self.parent.client.sendMessage(ghosts)
+        self.post_completion()
 
-        #self.s.close()
+
+class Recieve(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        self.parent.server.getMessage()
         self.post_completion()
 
 
 class UpdateGhost(StateMachineProgram):
     def start(self):
+        super().__init__(cam_viewer=False)
+        print("Enter your server's ip address:",end='')
+        ipaddr = '' #input().strip() # get user input to be server ip
+        if ipaddr not in ["None",""]:
+            print("ipaddr is "+ipaddr)
+            self.client = Client(self.robot).startClient(ipaddr=ipaddr,port=1800)
+        else:
+            print("Launching Server...")
+            self.server = Server(self.robot).startServer(port=1800)
+        self.cozmo_map = { 1:"a", 2:"tekkotsu2" }
+        self.tranforms = {}
+        self.caplist = {}
+        self.supreme_cozmo_id = 1
         super().start()
+
     $setup {
-        launch:  LocateCam(0,1140) =C=> process
-        #launch:  LocateCam(1,1140) =C=> LocateCam(2,1140) =C=> process
-        process: Send('128.237.210.1') =C=> process
-        #process: ProcessImage(1,1140) =C=> ProcessImage(2,1140) =C=> process
+        #launch:  Recieve() =C=> process
+        launch:  LocateCam(1,1140) =C=> setup
+        setup :  ProcessImage(1,1140) =C=> Recieve() =C=> FindTransforms() =C=> Set_current_cozmo() =C=> process
+        #process: Recieve() =C=> process
+        process: ProcessImage(1,1140) =C=> Recieve() =C=> Correct_cam()=C=> Fusion() =C=> process
     }
+

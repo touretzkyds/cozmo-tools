@@ -475,7 +475,7 @@ class WorldMapViewer():
         global gl_lists, cap, aruco_dict, parameters, F
         camera_number = cameraobj.id
         pos = (cameraobj.x, cameraobj.y, cameraobj.z)
-        color = (None, color_red, color_green, color_blue)[camera_number]
+        color = (color_orange, color_red, color_green, color_blue)[camera_number%4]
         valid_pose = (cameraobj.x, cameraobj.y, cameraobj.z)
         angle = cameraobj.theta
         phi = cameraobj.phi
@@ -499,7 +499,7 @@ class WorldMapViewer():
         glRotatef(-90, 0., 0., 1.)
         glTranslatef(-s/4, -s/4, s/2+0.5)
         glScalef(0.25, 0.2, 0.25)
-        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(camera_number)))
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(camera_number%4)))
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -512,7 +512,7 @@ class WorldMapViewer():
 
         # Draw the body
         p = (RobotGhostObj.x, RobotGhostObj.y, RobotGhostObj.z)
-        color = (None, color_red, color_green, color_blue)[RobotGhostObj.camera_id]
+        color = (color_orange, color_red, color_green, color_blue)[RobotGhostObj.camera_id%4]
         glTranslatef(*p)
         glTranslatef(*robot_body_offset_mm)
         glRotatef(RobotGhostObj.theta*180/pi, 0, 0, 1)
@@ -525,7 +525,7 @@ class WorldMapViewer():
         self.make_cube(robot_head_size_mm, color=color_white,body=RobotGhostObj.is_visible)
         glTranslatef(*( 0,  0,   36))
         glScalef(0.25, 0.2, 0.25)
-        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(RobotGhostObj.cozmo_id)))
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(RobotGhostObj.cozmo_id%9)))
         glPopMatrix()
 
         # Draw the lift
