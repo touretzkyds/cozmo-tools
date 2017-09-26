@@ -1,4 +1,5 @@
 from math import pi, inf, sin, cos, atan2, sqrt
+from cozmo.faces import Face
 from cozmo.objects import CustomObject, LightCube
 
 from .transform import wrap_angle
@@ -198,6 +199,8 @@ class WorldMap():
         self.update_coords(world_obj, cube)
 
     def update_face(self,face):
+        if face.pose is None:
+            return
         pos = face.pose.position
         if face in self.robot.world.world_map.objects:
             face_obj = self.robot.world.world_map.objects[face]
@@ -242,7 +245,7 @@ class WorldMap():
             self.update_cube(evt.obj)
         elif isinstance(evt.obj, CustomObject):
             self.update_custom_object(evt.obj)
-        elif isinstance(evt.obj, cozmo.faces.Face):
+        elif isinstance(evt.obj, Face):
             self.update_face(evt.obj)
 
 #================ Wall Specification  ================

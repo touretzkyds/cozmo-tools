@@ -117,6 +117,7 @@ class DriveContinuous(StateNode):
     def __init__(self,path=[]):
         self.path = path
         self.polling_interval = 0.05
+        self.handle = None
         super().__init__()
 
     def start(self,event=None):

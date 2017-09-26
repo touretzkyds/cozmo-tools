@@ -70,6 +70,8 @@ class StateMachineProgram(StateNode):
         self.particle_filter = particle_filter
         self.particle_viewer = particle_viewer
         self.particle_viewer_scale = particle_viewer_scale
+        self.picked_up_handler = self.robot_picked_up
+        self.put_down_handler = self.robot_put_down
 
         self.aruco = aruco
         if self.aruco:
@@ -156,6 +158,15 @@ class StateMachineProgram(StateNode):
         # Call parent's start() to launch the state machine by invoking the start node.
         super().start()
 
+    def robot_picked_up(self):
+        print('** Robot was picked up!')
+        self.robot.stop_all_motors()
+        
+    def robot_put_down(self):
+        print('** Robot was put down.')
+        pf = self.robot.world.particle_filter
+        pf.initializer.initialize(self.robot)
+
     def stop(self):
         super().stop()
         try:
@@ -172,14 +183,12 @@ class StateMachineProgram(StateNode):
             if self.robot.was_picked_up:
                 pass  # we already knew that
             else:
-                print('** Robot was picked up!')
-                self.robot.stop_all_motors()
+                self.picked_up_handler()
         else:  # robot is on the ground
             pf = self.robot.world.particle_filter
             if pf:
                 if self.robot.was_picked_up:
-                    print('** Robot was put down.')
-                    pf.initializer.initialize(self.robot)
+                    self.put_down_handler()
                 else:
                     pf.move()
         self.robot.was_picked_up = self.robot.is_picked_up
