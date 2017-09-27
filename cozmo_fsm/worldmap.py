@@ -2,6 +2,7 @@ from math import pi, inf, sin, cos, atan2, sqrt
 from cozmo.faces import Face
 from cozmo.objects import CustomObject, LightCube
 
+from . import transform
 from .transform import wrap_angle
 
 class WorldObject():
@@ -12,6 +13,7 @@ class WorldObject():
         self.z = z
         self.obstacle = True
         self.is_visible = is_visible
+        self.update_from_sdk = False
 
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
@@ -33,6 +35,7 @@ class LightCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
+        self.update_from_sdk = True
         self.theta = theta
         self.size = self.light_cube_size
         self.is_visible = sdk_obj.is_visible
@@ -46,6 +49,7 @@ class CustomCubeObj(WorldObject):
         # id is a CustomObjecType
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
+        self.update_from_sdk = True
         self.theta = theta
         if (size is None) and isinstance(id, CustomObject):
             self.size = (id.x_size_mm, id.y_size_mm, id.z_size_mm)
@@ -90,10 +94,11 @@ class WorldMap():
         self.objects = dict()
         
     def update_map(self):
-        """Called to update the map just before the path planner runs.
-        Cubes and faces are updated automatically in reponse to observation events, but
-        we update them here to get the freshest possible value.  Walls must be
-        generated fresh as they have no observation events."""
+        """Called to update the map just before the path planner runs.  Cubes,
+        custom objects, and faces are updated automatically in reponse
+        to observation events, but we update them here to get the
+        freshest possible value.  Walls must be generated fresh as
+        they have no observation events."""
         self.generate_walls_from_markers()
         for (id,cube) in self.robot.world.light_cubes.items():
             self.update_cube(cube)
@@ -132,15 +137,21 @@ class WorldMap():
                            door_height=wall_spec.door_height)
         
     def update_cube(self, cube):
-        if cube.pose is None or not cube.pose.is_comparable(self.robot.pose):
-            return
         if cube in self.objects:
             world_obj = self.objects[cube]
+            if self.robot.carrying is world_obj:
+                self.update_carried_object(world_obj)
+                return
+        elif cube.pose is None or not cube.pose.is_comparable(self.robot.pose):
+            return
         else:
             id = tuple(key for (key,value) in self.robot.world.light_cubes.items() if value == cube)[0]
             world_obj = LightCubeObj(cube, id)
             self.objects[cube] = world_obj
-        self.update_coords(world_obj, cube)
+        if cube.is_visible:
+            world_obj.update_from_sdk = True  # In case we've dropped it; now we see it
+        if world_obj.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
+            self.update_coords(world_obj, cube)
 
     def update_face(self,face):
         if face.pose is None:
@@ -170,6 +181,22 @@ class WorldMap():
             world_obj = CustomCubeObj(sdk_obj,id)
             self.objects[sdk_obj] = world_obj
         self.update_coords(world_obj, sdk_obj)
+
+    def update_carried_object(self, world_obj):
+        #print('Updating carried object ',world_obj)
+        # set x,y based on robot's pose
+        # need to cache initial orientation relative to robot:
+        #   grasped_orient = world_obj.theta - robot.pose.rotation.angle_z
+        world_frame = self.robot.kine.joints['world']
+        lift_attach_frame = self.robot.kine.joints['lift_attach']
+        tmat = self.robot.kine.base_to_link(world_frame).dot(self.robot.kine.joint_to_base(lift_attach_frame))
+        # *** HACK *** : width calculation only works for cubes; need to handle custom obj, chips
+        half_width = 22 # world_obj.size[0] / 2
+        new_pose = tmat.dot(transform.point(half_width,0))
+        theta = self.robot.world.particle_filter.pose[2]
+        world_obj.x = new_pose[0,0]
+        world_obj.y = new_pose[1,0]
+        world_obj.theta = theta
 
     def update_coords(self, world_obj, sdk_obj):
         dx = sdk_obj.pose.position.x - self.robot.pose.position.x

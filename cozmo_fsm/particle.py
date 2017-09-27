@@ -406,6 +406,8 @@ class ParticleFilter():
             if var > 0:
                 # print('resample')
                 self.resample()
+        if self.robot.carrying:
+            self.robot.world.world_map.update_carried_object(self.robot.carrying)
 
     def pose_estimate(self):
         cx = 0.0; cy = 0.0
