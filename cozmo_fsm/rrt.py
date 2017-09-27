@@ -126,7 +126,7 @@ class RRT():
         else:
             return (self.INTERPOLATE, new_node)
 
-    def parts_to_node(self,node):
+    def robot_parts_to_node(self,node):
         parts = []
         for part in self.robot_parts:
             tmat = transform.aboutZ(part.orient)
@@ -138,7 +138,7 @@ class RRT():
         return parts
 
     def collides(self, node):
-        for part in self.parts_to_node(node):
+        for part in self.robot_parts_to_node(node):
             for obstacle in self.obstacles:
                 if part.collides(obstacle):
                     return obstacle
@@ -200,7 +200,7 @@ class RRT():
         if status is self.REACHED:
             return self.get_path(treeA, treeB)
         else:
-            raise MaxIterations()
+            raise MaxIterations(self.max_iter)
 
     def get_path(self, treeA, treeB):
         nodeA = treeA[-1]
