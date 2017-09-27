@@ -21,6 +21,7 @@ class CozmoKinematics(Kinematics):
         # cor is center of rotation
         cor_frame = Joint('cor', parent=base_frame, r=-19.)
 
+        # Use link instead of joint for world_frame
         world_frame = Joint('world', parent=base_frame, type='world', getter=self.get_world)
 
         front_axle_frame = Joint('front_axle', parent=base_frame, alpha=pi/2)
@@ -62,6 +63,7 @@ class CozmoKinematics(Kinematics):
 
     def get_shoulder(self):
         # Formula supplied by Mark Wesley at Anki
+        # Check SDK documentation for new lift-related calls that might replace this
         return math.asin( (self.robot.lift_height.distance_mm-45.0) / 66.0)
 
     def get_lift_attach(self):
