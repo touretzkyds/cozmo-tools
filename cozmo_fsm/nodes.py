@@ -13,6 +13,7 @@ from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 from .base import *
 from .events import *
 from .cozmo_kin import wheelbase
+from .worldmap import WorldObject
 
 #________________ Ordinary Nodes ________________
 
@@ -247,7 +248,57 @@ class DriveContinuous(StateNode):
               (self.mode+flag, x, y, q*180/pi, d_error, q_error*180/pi,
                correcting_q*180/pi, speedinc, dist))
                """
-        self.handle = asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
+        #self.handle = asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
+        self.robot.drive_wheel_motors(lspeed, rspeed, 200, 200)
+
+class LookAtObject(StateNode):
+    def __init__(self):
+        super().__init__()
+        self.object = None
+        self.handle = None
+
+    def start(self,event=None):
+        self.set_polling_interval(0.1)
+        self.handle = None
+        super().start()
+
+    def stop(self):
+        if self.handle:
+            self.handle.cancel()
+        super().stop()
+
+    def poll(self):
+        if isinstance(self.object, WorldObject):
+            rpose = self.robot.world.particle_filter.pose
+            dx = self.object.x - rpose[0]
+            dy = self.object.y - rpose[1]
+        else:
+            opos = self.object.pose.position
+            rpos = self.robot.pose.position
+            dx = opos.x - rpos.x
+            dy = opos.y - rpos.y
+        dist = math.sqrt(dx**2 + dy**2)
+        if dist < 60:
+            angle = -0.4
+        elif dist < 80:
+            angle = -0.3
+        elif dist < 100:
+            angle = -0.2
+        elif dist < 140:
+            angle = -0.1
+        elif dist < 180:
+            angle = 0
+        else:
+            angle = 0.1
+        if abs(self.robot.head_angle.radians - angle) > 0.03:
+            self.handle = self.robot.loop.call_soon(self.move_head, angle)
+
+    def move_head(self,angle):
+        try:
+            self.robot.set_head_angle(cozmo.util.radians(angle), in_parallel=True, num_retries=0)
+        except cozmo.exceptions.RobotBusy:
+            print("LookAtObject: robot busy; can't move head to",angle)
+            pass
 
 class Print(StateNode):
     "Argument can be a string, or a function to be evaluated at print time."
@@ -277,6 +328,8 @@ class CoroutineNode(StateNode):
         cor = self.coroutine_launcher()
         if inspect.iscoroutine(cor):
             self.handle = self.robot.loop.create_task(cor)
+        elif cor is False:
+            self.handle = None
         else:
             print('cor=',cor,'type=',type(cor))
             raise ValueError("Result of %s launch_couroutine() is %s, not a coroutine." %
@@ -360,17 +413,22 @@ class SmallTurn(CoroutineNode):
     """Estimates how many polling cycles to run the wheels; doesn't use odometry."""
     def __init__(self, angle=5):
         self.angle = angle
+        self.counter = 0
         self.polling_interval = 0.025
         super().__init__()
 
     def start(self,event=None):
         # constants were determined empirically for speed 50
-        self.counter = round((abs(self.angle) + 5) / 1.25)
+        self.counter = round((abs(self.angle) + 5) / 1.25) if self.angle else 0
         super().start(event)
 
     def coroutine_launcher(self):
-        speed = 50 if self.angle < 0 else -50
-        return self.robot.drive_wheels(speed,-speed,500,500)
+        if self.angle:
+            speed = 50 if self.angle < 0 else -50
+            return self.robot.drive_wheels(speed,-speed,500,500)
+        else:
+            self.robot.stop_all_motors()
+            return False
 
     def poll(self):
         self.counter -= 1

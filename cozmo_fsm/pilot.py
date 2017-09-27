@@ -6,6 +6,7 @@ import asyncio
 from .base import *
 from .rrt import *
 from .nodes import ParentFails, ParentCompletes, DriveArc, DriveContinuous
+from .events import PilotEvent
 from .transitions import CompletionTrans, FailureTrans, DataTrans
 from .cozmo_kin import wheelbase, center_of_rotation_offset
 
@@ -131,7 +132,8 @@ class PilotBase(StateNode):
         self.robot.stop_all_motors()
         if self.verbose:
             print('drive_arc angle=',angle,'deg.,  traveled=',traveled,'deg.')
-        
+
+"""
 class PilotToPoseOld(PilotBase):
     def __init__(self, target_pose=None, verbose=False):
         super().__init__(verbose)
@@ -157,14 +159,17 @@ class PilotToPoseOld(PilotBase):
             (treeA, treeB, path) = self.planner(start_node, goal_node)                    
         except StartCollides as e:
             print('Start collides!',e)
+            self.post_event(PilotEvent(StartCollides, e.args))
             self.post_failure()
             return
         except GoalCollides as e:
             print('Goal collides!',e)
+            self.post_event(PilotEvent(GoalCollides, e.args))
             self.post_failure()
             return
-        except MaxIterations:
-            print('Max iteration exceeded!')
+        except MaxIterations as e:
+            print('Max iterations %d exceeded!' % e.args[0])
+            self.post_event(PilotEvent(MaxIterations, e.args))
             self.post_failure()
             return
 
@@ -268,6 +273,7 @@ class PilotToPoseOld(PilotBase):
         if self.verbose:
             print('done executing')
         self.post_completion()
+"""
 
 class PilotToPose(StateNode):
     def __init__(self, target_pose=None, verbose=False):
@@ -295,23 +301,26 @@ class PilotToPose(StateNode):
             try:
                 (treeA, treeB, path) = self.planner(start_node, goal_node)                    
             except StartCollides as e:
-                print('Start collides!',e)
-                self.post_failure()
+                print('PilotPlanner: Start collides!',e)
+                self.parent.post_event(PilotEvent(StartCollides, e.args))
+                self.parent.post_failure()
                 return
             except GoalCollides as e:
-                print('Goal collides!',e)
-                self.post_failure()
+                print('PilotPlanner: Goal collides!',e)
+                self.parent.post_event(PilotEvent(GoalCollides, e.args))
+                self.parent.post_failure()
                 return
-            except MaxIterations:
-                print('Max iteration exceeded!')
-                self.post_failure()
+            except MaxIterations as e:
+                print('PilotPlanner: Max iterations %d exceeded!' % e.args[0])
+                self.parent.post_event(PilotEvent(MaxIterations, e.args))
+                self.parent.post_failure()
                 return
 
             if self.parent.verbose:
                 print(len(treeA)+len(treeB),'nodes')
-            if self.robot.world.path_viewer:
-                self.robot.world.path_viewer.clear()
-                self.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
+            if self.parent.robot.world.path_viewer:
+                self.parent.robot.world.path_viewer.clear()
+                self.parent.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
             # Construct and execute nav plan
             if self.parent.verbose:
@@ -367,11 +376,13 @@ class PilotCheckStart(StateNode):
         try:
             self.robot.world.rrt.plan_path(start_node,start_node)
         except StartCollides as e:
-            print('Start collides!',e)
+            print('PilotCheckStart: Start collides!',e)
+            self.post_event(PilotEvent(StartCollides, e.args))
             self.post_failure()
             return
         except Exception as e:
-            print('Unexpected planner exception',e)
+            print('PilotCheckStart: Unexpected planner exception',e)
             self.post_failure()
             return
+        self.post_event(PilotEvent(True))
         self.post_success()
