@@ -81,8 +81,8 @@ class FaceObj(WorldObject):
         self.obstacle = False
 
     def __repr__(self):
-        return "<Face '%s' %s (%.1f, %.1f, %.1f)>" % \
-               (self.name, self.expression, self.x, self.y, self.z)
+        return "<FaceObj name:'%s' expr:%s (%.1f, %.1f, %.1f) vis:%s>" % \
+               (self.name, self.expression, self.x, self.y, self.z, self.sdk_obj.is_visible)
 
 #================ WorldMap ================
 
@@ -153,16 +153,27 @@ class WorldMap():
         if world_obj.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
             self.update_coords(world_obj, cube)
 
+    def lookup_face_obj(self,face):
+        "Look up face by name, not by Face instance."
+        for (key,value) in self.robot.world.world_map.objects.items():
+            if isinstance(key, Face) and key.name == face.name:
+                if key is not face and face.is_visible:
+                    # Older Face object with same name: replace it with new one
+                    self.robot.world.world_map.objects.pop(key)
+                    self.robot.world.world_map.objects[face] = value
+                return value
+        return None
+
     def update_face(self,face):
         if face.pose is None:
             return
         pos = face.pose.position
-        if face in self.robot.world.world_map.objects:
-            face_obj = self.robot.world.world_map.objects[face]
-        else:
+        face_obj = self.lookup_face_obj(face)
+        if face_obj is None:
             face_obj = FaceObj(face, face.face_id, pos.x, pos.y, pos.z,
                                face.name)
             self.robot.world.world_map.objects[face] = face_obj
+        # now update the face
         face_obj.is_visible = face.is_visible
         if face.is_visible:
             face_obj.x = pos.x
