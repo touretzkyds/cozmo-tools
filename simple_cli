@@ -349,6 +349,12 @@ def suppress_filter(log_record):
 
 logging_is_setup = False
 
+# Hack to detect SDK version mismatch error
+class CozmoConnection_Hack(cozmo.conn.CozmoConnection):
+    def abort(self,exc):
+        cozmo.conn.saved_exception = exc
+        self.old_abort(exc)
+
 def start_connection():
     global logging_is_setup, VERBOSE
     if not logging_is_setup:
@@ -359,6 +365,12 @@ def start_connection():
     cozmo.logger.addFilter(suppress_filter)
     cozmo.robot.Robot.drive_off_charger_on_connect = False
     connection_error = None
+
+    # Replace Anki's CozmoConnection.abort method with our own
+    cozmo.conn.saved_exception = None
+    cozmo.conn.CozmoConnection.old_abort = cozmo.conn.CozmoConnection.abort
+    cozmo.conn.CozmoConnection.abort = CozmoConnection_Hack.abort
+
     try:
         if len(sys.argv) >= 2:
             if sys.argv[1] == "TK_VIEWER":
@@ -369,6 +381,9 @@ def start_connection():
         else:
             cozmo.connect(run)
     except cozmo.ConnectionError as e:
+        exc = cozmo.conn.saved_exception
+        if isinstance(exc, cozmo.exceptions.SDKVersionMismatch):
+            print('\n\n***** SDK version mismatch:',exc,'\n\n')
         connection_error = e
     if connection_error is not None:
         sys.exit("A connection error occurred: %s" % connection_error)
