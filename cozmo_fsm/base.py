@@ -8,7 +8,7 @@
 import cozmo
 
 from .trace import TRACE
-from .evbase import EventListener
+from .evbase import Event, EventListener
 from .events import CompletionEvent, SuccessEvent, FailureEvent, DataEvent
 
 class StateNode(EventListener):
@@ -92,6 +92,15 @@ class StateNode(EventListener):
         if not parent.start_node:
             parent.start_node = self
         return self
+
+    def post_event(self,event):
+        if not isinstance(event,Event):
+            raise ValuError('post_event given a non-Event argument:',event)
+        if event.source is None:
+            event.source = self
+        if TRACE.trace_level >= TRACE.event_posted:
+            print('TRACE%d:' % TRACE.event_posted, self, 'posting event',event)
+        self.robot.erouter.post(event)
 
     def post_completion(self):
         if TRACE.trace_level > TRACE.statenode_startstop:

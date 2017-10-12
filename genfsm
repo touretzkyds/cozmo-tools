@@ -398,6 +398,7 @@ transition_names = dict(
     D = 'DataTrans',
     TM = 'TextMsgTrans',
     RND = 'RandomTrans',
+    PILOT = 'PilotTrans',
     Tap = 'TapTrans',
     Aruco = 'ArucoTrans',
     Next = 'NextTrans',

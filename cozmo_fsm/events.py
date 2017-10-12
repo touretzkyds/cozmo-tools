@@ -55,6 +55,12 @@ class SpeechEvent(Event):
         self.words = words
         self.result = result
 
+class PilotEvent(Event):
+    """Results of a pilot request."""
+    def __init__(self,status,*args):
+        super().__init__()
+        self.status = status
+        self.args = args
 
 #________________ Cozmo-generated events ________________
 
