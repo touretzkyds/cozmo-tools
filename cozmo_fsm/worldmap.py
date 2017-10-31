@@ -77,8 +77,12 @@ class FaceObj(WorldObject):
     def __init__(self, sdk_obj, id, x, y, z, name):
         super().__init__(id, x, y, z, is_visible=sdk_obj.is_visible)
         self.sdk_obj = sdk_obj
-        self.name = name
         self.obstacle = False
+
+    # Faces can be renamed, so check the Face object
+    @property
+    def name(self):
+        return self.sdk_obj.name
 
     def __repr__(self):
         return "<FaceObj name:'%s' expr:%s (%.1f, %.1f, %.1f) vis:%s>" % \
