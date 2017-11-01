@@ -16,3 +16,4 @@ from .pilot import *
 from .pickup import *
 from . import wall_defs
 from . import custom_objs
+from .wallpass import *
