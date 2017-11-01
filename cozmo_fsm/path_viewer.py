@@ -173,7 +173,7 @@ class PathViewer():
                     (init_x,init_y) = (cur_x,cur_y)
 
     def draw_robot(self,start_node):
-        parts = the_rrt.parts_to_node(start_node)
+        parts = the_rrt.robot_parts_to_node(start_node)
         for part in parts:
             if isinstance(part,Circle):
                 self.draw_circle(center=(part.center[0,0],part.center[1,0]),
