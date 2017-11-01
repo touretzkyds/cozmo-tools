@@ -19,8 +19,6 @@ from . import transform
 from . import worldmap
 
 import cozmo
-import cv2
-import cv2.aruco as aruco
 
 WINDOW = None
 
@@ -223,6 +221,47 @@ class WorldMapViewer():
         else:
             # make wireframe cube if coords no longer comparable
             self.make_cube((s,s,s), body=False, highlight=True, color=color)
+        glRotatef(-90, 0., 0., 1.)
+        glTranslatef(-s/4, -s/4, s/2+0.5)
+        glScalef(0.25, 0.2, 0.25)
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(cube_number)))
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+    def make_marker(self,marker):
+        global gl_lists
+        marker_number = marker.id
+        s = light_cube_size_mm
+        pos = (marker.x, marker.y, s)
+        color = (color_red, color_green, color_blue)[marker_number%3]
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(*pos)
+        self.make_cube((1,s,s), color=color)
+        glRotatef(-90, 0., 0., 1.)
+        glTranslatef(-s/4, -s/4, s/2+0.5)
+        glScalef(0.25, 0.2, 0.25)
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(marker_number%9)))
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+
+
+    def make_ghost_cube(self,cube_obst):
+        global gl_lists
+        cube_number = cube_obst.id
+        pos = (cube_obst.x, cube_obst.y, cube_obst.z)
+        color = color_white
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(*pos)
+        # Transpose the matrix for sending to OpenCV
+        s = light_cube_size_mm
+        self.make_cube((s,s,s), body=cube_obst.is_visible, color=color)
         glRotatef(-90, 0., 0., 1.)
         glTranslatef(-s/4, -s/4, s/2+0.5)
         glScalef(0.25, 0.2, 0.25)
@@ -566,27 +605,49 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
-
-    def make_Cubeghost(self, CubeGhostObj):
+    def make_ghost_wall(self,wall_obst):
         global gl_lists
-        pos = (CubeGhostObj.x, CubeGhostObj.y, CubeGhostObj.z)
-        color = color_white
-        valid_pose = (CubeGhostObj.x, CubeGhostObj.y, CubeGhostObj.z)
+        wall_spec = worldmap.wall_marker_dict[wall_obst.id]
+        half_length = wall_obst.length / 2
+        half_height = wall_obst.height / 2
+        door_height = wall_obst.door_height
+        widths = []
+        last_x = -half_length
+        edges = [ [0, -half_length, door_height/2, 1.] ]
+        for (center,width) in wall_spec.doorways:
+            left_edge = center - width/2 - half_length
+            edges.append([0., left_edge, door_height/2, 1.])
+            widths.append(left_edge - last_x)
+            right_edge = center + width/2 - half_length
+            edges.append([0., right_edge, door_height/2, 1.])
+            last_x = right_edge
+        edges.append([0., half_length, door_height/2, 1.])
+        widths.append(half_length-last_x)
+        edges = np.array(edges).T
+        edges = transform.aboutZ(wall_obst.theta).dot(edges)
+        edges = transform.translate(wall_obst.x,wall_obst.y).dot(edges)
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
+        for i in range(0,len(widths)):
+            center = edges[:, 2*i : 2*i+2].mean(1).reshape(4,1)
+            dimensions=(4.0, widths[i], wall_obst.door_height)
+            glPushMatrix()
+            glTranslatef(*center.flatten()[0:3])
+            glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
+            self.make_cube(size=dimensions, color=color_white)
+            glPopMatrix()
+        # Make the transom
         glPushMatrix()
-        glTranslatef(*pos)
-        # Transpose the matrix for sending to OpenCV
-
-        s = light_cube_size_mm
-        self.make_cube((s,s,s), color=color)
-
-        glRotatef(-90, 0., 0., 1.)
-        glTranslatef(-s/4, -s/4, s/2+0.5)
-        glScalef(0.25, 0.2, 0.25)
+        transom_height = wall_obst.height - wall_obst.door_height
+        z = wall_obst.door_height + transom_height/2
+        glTranslatef(wall_obst.x, wall_obst.y, z)
+        glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
+        self.make_cube(size=(4.0, wall_obst.length, transom_height),
+                       edges=False, color=color_white)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
+
 
     @staticmethod
     def tran_to_tuple(tran):
@@ -705,7 +766,12 @@ class WorldMapViewer():
             elif isinstance(obj, worldmap.RobotGhostObj):
                 self.make_ghost(obj)
             elif isinstance(obj, worldmap.LightCubeGhostObj):
-                self.make_Cubeghost(obj)
+                self.make_ghost_cube(obj)
+            elif isinstance(obj, worldmap.WallGhostObj):
+                self.make_ghost_wall(obj)
+            elif isinstance(obj, worldmap.MarkerObj):
+                self.make_marker(obj)
+                
 
     def make_shapes(self):
         global gl_lists

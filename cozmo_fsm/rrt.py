@@ -427,7 +427,7 @@ class RRT():
             elif isinstance(obj, ChipObj):
                 obstacles.append(self.generate_chip_obstacle(obj))
             elif isinstance(obj, RobotGhostObj):
-            	obstacles.append(self.generate_ghost_obstacle(obj))
+                obstacles.append(self.generate_ghost_obstacle(obj))
         self.obstacles = obstacles
 
     def generate_wall_obstacles(self,wall):
