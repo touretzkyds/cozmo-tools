@@ -5,6 +5,7 @@ from .transitions import *
 from .transform import wrap_angle
 from .pilot import PilotToPose, PilotCheckStart
 from .worldmap import LightCubeObj
+from .doorpass import WallPilotToPose
 
 from math import sin, cos, atan2, pi, sqrt
 
@@ -238,3 +239,64 @@ class DropObject(StateNode):
     $setup {
         Print('DropObject...') =N=> SetLiftHeight(0) =C=> SetNotCarrying() =N=> Forward(-10) =C=> ParentCompletes()
     }
+
+
+class PickUpCubeForeign(StateNode):
+
+    def __init__(self, cube_id=None):
+        self.object_id = cube_id
+        super().__init__()
+
+    def start(self, event=None):
+        # self.object will be set up by the parent of this node
+        self.object = self.robot.world.light_cubes[self.object_id]
+        self.foreign_cube_id = 'LightCubeForeignObj-'+str(self.object_id)
+        super().start(event)
+
+    def pick_side(self, dist, use_world_map):
+        "NOTE: This code is only correct for upright cubes"
+        cube = self.foreign_cube_id
+        cobj = self.robot.world.world_map.objects[cube]
+        x = cobj.x
+        y = cobj.y
+        ang = cobj.theta
+        rx = self.robot.world.particle_filter.pose[0]
+        ry = self.robot.world.particle_filter.pose[1]
+
+        side1 = (x + cos(ang) * dist, y + sin(ang) * dist, ang + pi)
+        side2 = (x - cos(ang) * dist, y - sin(ang) * dist, ang)
+        side3 = (x + sin(ang) * dist, y - cos(ang) * dist, ang + pi/2)
+        side4 = (x - sin(ang) * dist, y + cos(ang) * dist, ang - pi/2)
+        sides = [side1, side2, side3, side4]
+        sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
+        return sorted_sides[0]
+
+    class GoToSide(WallPilotToPose):
+        def __init__(self):
+            super().__init__(None)
+
+        def start(self, event=None):
+            cube = self.parent.foreign_cube_id
+            print('Selected cube',self.robot.world.world_map.objects[cube])
+            (x, y, theta) = self.parent.pick_side(200, True)
+            self.target_pose = Pose(x, y, self.robot.pose.position.z,
+                                    angle_z=Angle(radians = wrap_angle(theta)))
+            print('pickup.GoToSide: traveling to (%.1f, %.1f) @ %.1f deg.' %
+                  (self.target_pose.position.x, self.target_pose.position.y,
+                   self.target_pose.rotation.angle_z.degrees))
+            super().start(event)
+
+    class Pick(PickUpCube):
+        def __init__(self):
+            super().__init__(None)
+
+        def start(self, event=None):
+            self.object = self.parent.object
+            super().start(event)
+
+    $setup{  # PickUpCube machine
+        goto_cube: self.GoToSide() =C=> one
+
+        one: self.Pick() =C=> end
+        end: Say("Done") =C=> ParentCompletes()
+        }

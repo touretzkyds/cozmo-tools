@@ -5,12 +5,14 @@ Particle filter localization.
 import math, array, random
 import numpy as np
 from math import pi, sqrt, sin, cos, atan2, exp
-
+import cv2
 import cozmo
 
-from .transform import wrap_angle
+from .transform import wrap_angle, wrap_selected_angles
 from .aruco import ArucoMarker
 from .cozmo_kin import center_of_rotation_offset
+from .worldmap import WallObj, wall_marker_dict, MarkerObj
+from .perched import Cam
 
 class Particle():
     def __init__(self):
@@ -553,18 +555,41 @@ class SLAMParticle(Particle):
 
     sigma_r = 50
     sigma_alpha = 15 * (pi/180)
-    sensor_variance_Qt = np.array([[sigma_r**2, 0             ],
-                                [0,          sigma_alpha**2]])
+    sigma_phi = 15 * (pi/180)
+    sigma_theta =  15 * (pi/180)
+    sigma_z = 50
+    landmark_sensor_variance_Qt = np.array([[sigma_r**2, 0             , 0],
+                                            [0         , sigma_alpha**2, 0],
+                                            [0         , 0             , sigma_phi**2]])
+    camera_sensor_variance_Qt = np.array([[sigma_r**2 , 0             , 0          ,0           , 0],
+                                          [0          , sigma_alpha**2, 0          ,0           , 0],
+                                          [0          , 0             , sigma_z**2 ,0           , 0],
+                                          [0          , 0             , 0          ,sigma_phi**2, 0],
+                                          [0          , 0             , 0          ,0           , sigma_theta**2]])
 
     @staticmethod
     def sensor_jacobian_H(dx, dy, dist):
         """Jacobian of sensor values (r, alpha) wrt particle state x,y
            where (dx,dy) is vector from particle to lm, and
-           r = sqrt(dx**2 + dy**2), alpha = atan2(dy,dx)"""
+           r = sqrt(dx**2 + dy**2), alpha = atan2(dy,dx), phi = phi"""
         q = dist**2
         sqr_q = dist
-        return np.array([[dx/sqr_q, dy/sqr_q],
-                         [-dy/q    , dx/q     ]])
+        return np.array([[dx/sqr_q, dy/sqr_q, 0],
+                         [-dy/q   , dx/q    , 0],
+                         [0       , 0       , 1]])
+
+    @staticmethod
+    def sensor_jacobian_H_cam(dx, dy, dist):
+        """Jacobian of sensor values (r, alpha) wrt particle state x,y
+           where (dx,dy) is vector from particle to lm, and
+           r = sqrt(dx**2 + dy**2), alpha = atan2(dy,dx), z = z, phi = phi, theta = theta"""
+        q = dist**2
+        sqr_q = dist
+        return np.array([[dx/sqr_q, dy/sqr_q, 0, 0, 0],
+                         [-dy/q   , dx/q    , 0, 0, 0],
+                         [0       , 0       , 1, 0, 0],
+                         [0       , 0       , 0, 1, 0],
+                         [0       , 0       , 0, 0, 1],])
 
     def add_landmark(self, lm_id, sensor_dist, sensor_bearing, sensor_orient):
         direction = self.theta + sensor_bearing
@@ -581,32 +606,62 @@ class SLAMParticle(Particle):
         lm_mu =  np.array([[lm_x], [lm_y]])
         H = self.sensor_jacobian_H(dx, dy, sensor_dist)
         Hinv = np.linalg.inv(H)
-        Q = self.sensor_variance_Qt
+        Q = self.landmark_sensor_variance_Qt
         lm_sigma = Hinv.dot(Q.dot(Hinv.T))
         self.landmarks[lm_id] = (lm_mu, lm_orient, lm_sigma)
 
     def update_landmark(self, id, sensor_dist, sensor_bearing, sensor_orient,
-                        dx, dy, I=np.eye(2)):
+                        dx, dy, I=np.eye(3)):
         # (dx,dy) is vector from particle to SENSOR position of lm
         (old_mu, old_orient, old_sigma) = self.landmarks[id]
         H = self.sensor_jacobian_H(dx, dy, sensor_dist)
-        Ql =  H.dot(old_sigma.dot(H.T)) + self.sensor_variance_Qt
+        Ql =  H.dot(old_sigma.dot(H.T)) + self.landmark_sensor_variance_Qt
         Ql_inv = np.linalg.inv(Ql)
         K = old_sigma.dot((H.T).dot(Ql_inv))
-        z = np.array([[sensor_dist], [sensor_bearing]])
+        z = np.array([[sensor_dist], [sensor_bearing], [sensor_orient]])
         # (ex,ey) is vector from particle to MAP position of lm
         ex = old_mu[0,0] - self.x
         ey = old_mu[1,0] - self.y
-        h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)]])
-        new_mu = old_mu + K.dot(z - h)
+        h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)], [wrap_angle(old_orient - self.theta)] ])
+        new_mu = np.append(old_mu,[old_orient]).reshape([3,1]) + K.dot(wrap_selected_angles(z - h,[1,2]))
         new_sigma = (I - K.dot(H)).dot(old_sigma)
-        # Should be deriving H for (x,y,phi) instead of (x,y), to update orient
-        # For now, just do exponential averaging to update phi
-        computed_orient = sensor_orient + self.theta
-        ori_c = 9*cos(old_orient) + cos(computed_orient)
-        ori_s = 9*sin(old_orient) + sin(computed_orient)
-        new_orient = atan2(ori_s, ori_c)
-        self.landmarks[id] = (new_mu, new_orient, new_sigma)
+        # [ [x,y], [orient], covarience_matrix]
+        self.landmarks[id] = (new_mu[0:2], new_mu[2], new_sigma)
+
+    def add_landmark_cam(self, lm_id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta):
+        direction = self.theta + sensor_bearing
+        dx = sensor_dist * cos(direction)
+        dy = sensor_dist * sin(direction)
+        lm_x = self.x + dx
+        lm_y = self.y + dy
+
+        lm_height = (sensor_height,wrap_angle(sensor_phi+self.theta), sensor_theta)
+
+        lm_mu =  np.array([[lm_x], [lm_y]])
+        H = self.sensor_jacobian_H_cam(dx, dy, sensor_dist)
+        Hinv = np.linalg.inv(H)
+        Q = self.camera_sensor_variance_Qt
+        lm_sigma = Hinv.dot(Q.dot(Hinv.T))
+        self.landmarks[lm_id] = (lm_mu, lm_height, lm_sigma)
+
+    def update_landmark_cam(self, id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta,
+                        dx, dy, I=np.eye(5)):
+        # (dx,dy) is vector from particle to SENSOR position of lm
+        (old_mu, old_height, old_sigma) = self.landmarks[id]
+        H = self.sensor_jacobian_H_cam(dx, dy, sensor_dist)
+        Ql =  H.dot(old_sigma.dot(H.T)) + self.camera_sensor_variance_Qt
+        Ql_inv = np.linalg.inv(Ql)
+        K = old_sigma.dot((H.T).dot(Ql_inv))
+        z = np.array([[sensor_dist], [sensor_bearing], [sensor_height], [wrap_angle(sensor_phi+self.theta)], [sensor_theta]])
+        # (ex,ey) is vector from particle to MAP position of lm
+        ex = old_mu[0,0] - self.x
+        ey = old_mu[1,0] - self.y
+        h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)], [old_height[0]], [old_height[1]], [old_height[2]]])
+        new_mu = np.append(old_mu,[old_height]).reshape([5,1]) + K.dot(wrap_selected_angles(z - h,[1,3,4]))
+        new_sigma = (I - K.dot(H)).dot(old_sigma)
+        # [ [x,y], [z,orient,pitch], covarience_matrix]
+        self.landmarks[id] = (new_mu[0:2], new_mu[2:5], new_sigma)
+
 
 class SLAMSensorModel(SensorModel):
     @staticmethod
@@ -624,7 +679,86 @@ class SLAMSensorModel(SensorModel):
         self.landmark_test = landmark_test
         self.distance_variance = distance_variance
         self.candidate_landmarks = dict()
+        self.use_perched_cameras = False
         super().__init__(robot,landmarks)
+
+    def rotationMatrixToEulerAngles(self, R) :
+        sy = sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+        singular = sy < 1e-6
+        if  not singular :
+            x = atan2(R[2,1] , R[2,2])
+            y = atan2(-R[2,0], sy)
+            z = atan2(R[1,0], R[0,0])
+        else :
+            x = atan2(-R[1,2], R[1,1])
+            y = atan2(-R[2,0], sy)
+            z = 0
+
+        return np.array([x, y, z])
+
+    def infer_wall(self, id, markers):
+        # Find rotation and translation vector from camera frame using SolvePnP
+        world_points = []
+        image_points = []
+        marker_size=50 #mm
+        wall_spec = wall_marker_dict.get(markers[0][0],None)
+        if wall_spec is None: return  # spurious marker
+        for key, value in markers:
+            (s, (cx, cy)) = wall_spec.markers[key]
+
+            world_points.append((cx-s*marker_size/2, cy+marker_size/2,s))
+            world_points.append((cx+s*marker_size/2, cy+marker_size/2,s))
+            world_points.append((cx+s*marker_size/2, cy-marker_size/2,s))
+            world_points.append((cx-s*marker_size/2, cy-marker_size/2,s))
+
+            image_points.append(value[0])
+            image_points.append(value[1])
+            image_points.append(value[2])
+            image_points.append(value[3])
+
+        (success,rvecs, tvecs) = cv2.solvePnP(np.array(world_points), np.array(image_points), self.robot.world.aruco.camera_matrix, self.robot.world.aruco.distortion_array)
+        rotationm, jcob = cv2.Rodrigues(rvecs)
+        # Change to marker frame
+        transformed = np.matrix(rotationm).T*(-np.matrix(tvecs))
+        an = self.rotationMatrixToEulerAngles(rotationm)
+        # euler angle flip when back of wall is seen
+        if an[2] > pi/2:
+            wall_orient = wrap_angle(-(an[1]-pi))
+        elif an[2] >= -pi/2 and an[2] <= pi/2:
+            wall_orient = wrap_angle((an[1]))
+        else:
+            wall_orient = wrap_angle(-(an[1]+pi))
+
+        wall_x = -transformed[2]*cos(wall_orient) + (transformed[0]-wall_spec.length/2)*sin(wall_orient)
+        wall_y = (transformed[0]-wall_spec.length/2)*cos(wall_orient) - -transformed[2]*sin(wall_orient)
+
+        return WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=-wall_orient)
+
+    def generate_walls_from_markers(self, objects):
+        walls = []
+        seen_markers = dict()
+
+        for id, value in objects.items():
+            wall_spec = wall_marker_dict.get(id,None)
+            if wall_spec is None: continue  # marker not part of a known wall
+            wall_id = wall_spec.id
+            markers = seen_markers.get(wall_id, list())
+            markers.append((id,value.bbox[0]))
+            seen_markers[wall_id] = markers
+            # Now infer the walls from the markers
+        for (id,markers) in seen_markers.items():
+            if len(markers)>1:
+                walls.append(self.infer_wall(id,markers))
+                # Delete old Marker object
+                if "Marker-"+str(id) in self.robot.world.world_map.objects:
+                    del self.robot.world.world_map.objects["Marker-"+str(id)]
+
+            elif len(markers)==1 and ("Wall-"+str(id) not in self.robot.world.world_map.objects) and (markers[0][0] in self.landmarks):
+                m = self.landmarks[markers[0][0]]
+                self.robot.world.world_map.objects["Marker-"+str(id)] = MarkerObj(id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
+
+
+        return walls
 
     def evaluate(self, particles, force=False, just_looking=False):
         # Returns true if particles were evaluated.
@@ -648,7 +782,10 @@ class SLAMSensorModel(SensorModel):
             [cube for cube in self.robot.world.light_cubes.values()
                  if cube.is_visible and self.landmark_test(cube)] + \
             [marker.id for marker in seen_marker_objects.values()
-                 if self.landmark_test(marker)]
+                 if self.landmark_test(marker)] + self.generate_walls_from_markers(seen_marker_objects)
+        if self.use_perched_cameras:
+            seen_landmarks = seen_landmarks +  \
+                                list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
         # Process each seen landmark:
         for id in seen_landmarks:
             if isinstance(id, cozmo.objects.LightCube):
@@ -663,26 +800,42 @@ class SLAMSensorModel(SensorModel):
                 # sensor_orient is lm bearing relative to cube's North
                 sensor_orient = \
                     wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
+            elif isinstance(id, WallObj):
+                sensor_dist = sqrt(id.x**2 + id.y**2)
+                sensor_bearing = atan2(id.y,id.x)
+                sensor_orient = id.theta
+                id = "Wall-"+str(id.id)
+            elif isinstance(id, Cam):
+                sensor_dist = sqrt(id.x**2 + id.y**2)
+                sensor_bearing = atan2(id.y,id.x)
+                sensor_height = id.z
+                sensor_phi = id.phi
+                sensor_theta = id.theta
+                if sensor_height<0:
+                    print("FLIP!!!")
+                id = id.cap
             else:  # lm is an AruCo marker
                 marker = seen_marker_objects[id]
                 sensor_dist = marker.camera_distance
                 sensor_bearing = atan2(marker.camera_coords[0],
                                        marker.camera_coords[2])
-                # For AruCo, sensor_orient is a relative value that must
-                # be converted to asbolute for each particle separately since
-                # we don't have an independent coordinate system to measure by.
-                # Also, OpenCV's rotation has the wrong sign, so we must fix it.
-                sensor_orient = - marker.opencv_rotation[1] * (pi/180)
+                # Rotation about Y axis of marker. Fix sign
+                sensor_orient = - marker.euler_rotation[1] * (pi/180)
             if id not in particles[0].landmarks:
-                seen_count = self.candidate_landmarks.get(id,0)
-                if seen_count < 5:
-                    # add 2 because we're going to subtract 1 at the end
-                    self.candidate_landmarks[id] = seen_count + 2
-                    continue
+                if not (isinstance(id, str) or isinstance(id, WallObj) ):
+                    seen_count = self.candidate_landmarks.get(id,0)
+                    if seen_count < 5:
+                        # add 2 because we're going to subtract 1 at the end
+                        self.candidate_landmarks[id] = seen_count + 2
+                        continue
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
-                    p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
-                del self.candidate_landmarks[id]
+                    if isinstance(id, str) and 'Video' in id:
+                        p.add_landmark_cam(id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta)
+                    else:
+                        p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
+                if not (isinstance(id, str) or isinstance(id, WallObj) ):
+                    del self.candidate_landmarks[id]
                 continue
             if just_looking:
                 continue
@@ -706,8 +859,12 @@ class SLAMSensorModel(SensorModel):
                 error2_sq = 0 # *** (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
                 p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
                 # Update landmark in this particle's map
-                p.update_landmark(id, sensor_dist, sensor_bearing, sensor_orient,
-                                  dx, dy)
+                if isinstance(id, str) and 'Video' in id:
+                    p.update_landmark_cam(id, sensor_dist, sensor_bearing,
+                                          sensor_height, sensor_phi, sensor_theta, dx, dy)
+                else:
+                    p.update_landmark(id, sensor_dist, sensor_bearing,
+                                      sensor_orient, dx, dy)
         if evaluated:
             wmax = - np.inf
             for p in particles:

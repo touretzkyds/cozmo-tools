@@ -19,6 +19,8 @@ from .worldmap_viewer import WorldMapViewer
 from .speech import SpeechListener, Thesaurus
 from . import opengl
 from . import custom_objs
+from .perched import *
+from .sharedmap import *
 
 class StateMachineProgram(StateNode):
     def __init__(self,
@@ -34,6 +36,7 @@ class StateMachineProgram(StateNode):
 
                  aruco = True,
                  arucolibname = cv2.aruco.DICT_4X4_250,
+                 perched_cameras =True,
 
                  world_map = None,
                  worldmap_viewer = False,
@@ -74,8 +77,18 @@ class StateMachineProgram(StateNode):
         self.put_down_handler = self.robot_put_down
 
         self.aruco = aruco
+        self.perched_cameras = perched_cameras
         if self.aruco:
             self.robot.world.aruco = Aruco(self.robot,arucolibname)
+
+        if self.perched_cameras:
+            self.robot.world.perched = PerchedCameraThread(self.robot)
+
+        self.robot.aruco_id = -1
+        self.robot.use_shared_map = False
+        self.robot.world.server = ServerThread(self.robot)
+        self.robot.world.client = ClientThread(self.robot)
+        self.robot.world.is_server = True # Writes directly into perched.camera_pool
 
         self.world_map = world_map
         self.worldmap_viewer = worldmap_viewer

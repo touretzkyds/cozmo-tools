@@ -8,7 +8,7 @@ from .transform import wrap_angle
 
 from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
-from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, ChipObj
+from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, ChipObj, RobotForeignObj
 
 # *** TODO: Collision checking needs to use opposite headings
 # for treeB nodes because robot is asymmetric.
@@ -426,6 +426,8 @@ class RRT():
                 obstacles.append(self.generate_cube_obstacle(obj))
             elif isinstance(obj, ChipObj):
                 obstacles.append(self.generate_chip_obstacle(obj))
+            elif isinstance(obj, RobotForeignObj):
+               obstacles.append(self.generate_foreign_obstacle(obj))
         self.obstacles = obstacles
 
     def generate_wall_obstacles(self,wall):
@@ -467,6 +469,13 @@ class RRT():
     def generate_chip_obstacle(self,obj):
         r = Circle(center=transform.point(obj.x,obj.y),
                    radius=obj.radius)
+        r.obstacle = obj
+        return r
+
+    def generate_foreign_obstacle(self,obj):
+        r = Rectangle(center=transform.point(obj.x, obj.y),
+                      dimensions=(obj.size[0:2]),
+                      orient=obj.theta)
         r.obstacle = obj
         return r
 
