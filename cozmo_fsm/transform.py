@@ -75,6 +75,12 @@ def wrap_angle(angle_rads):
     else:
         return angle_rads
 
+def wrap_selected_angles(angle_rads, index):
+    """Keep angle between -pi and pi for list"""
+    for i in index:
+       angle_rads[i] =  wrap_angle(angle_rads[i])
+    return angle_rads
+
 def tprint(t):
     number_format = "%7.3f"
     def tprint_matrix(t):
