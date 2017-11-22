@@ -57,7 +57,13 @@ class PerchedCameraThread(threading.Thread):
             self.robot.aruco_id = int(input("Please enter the aruco id of the robot:"))
             self.robot.world.server.camera_landmark_pool[self.robot.aruco_id]={}
         self.use_perched_cameras=True
-        self.perched_cameras = [cv2.VideoCapture(x) for x in cameras]
+        self.perched_cameras = []
+        for x in cameras:
+            cap = cv2.VideoCapture(x)
+            if cap.isOpened():
+                self.perched_cameras.append(cap)
+            else:
+               raise RuntimeError("Could not open camera %s." % repr(x))
         for cap in self.perched_cameras:
             cap.set(3,4000)
             cap.set(4,4000)
@@ -79,6 +85,8 @@ class PerchedCameraThread(threading.Thread):
             for i in range(5):
                 cap.grab()
             ret, frame = cap.read()
+            if not ret:
+                raise ValueError('Failed to get camera frame from %s.' % repr(cap))
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
             corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.aruco_dict, parameters=self.parameters)
             gray = cv2.aruco.drawDetectedMarkers(gray, corners, ids)
