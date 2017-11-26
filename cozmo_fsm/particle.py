@@ -561,6 +561,9 @@ class SLAMParticle(Particle):
     landmark_sensor_variance_Qt = np.array([[sigma_r**2, 0             , 0],
                                             [0         , sigma_alpha**2, 0],
                                             [0         , 0             , sigma_phi**2]])
+    # variance of camera location (cylindrical coordinates)
+    # phi is the angle around the Z axis of the robot
+    # theta is the angle around the X axis of the camera (pitch)
     camera_sensor_variance_Qt = np.array([[sigma_r**2 , 0             , 0          ,0           , 0],
                                           [0          , sigma_alpha**2, 0          ,0           , 0],
                                           [0          , 0             , sigma_z**2 ,0           , 0],
@@ -642,6 +645,7 @@ class SLAMParticle(Particle):
         Hinv = np.linalg.inv(H)
         Q = self.camera_sensor_variance_Qt
         lm_sigma = Hinv.dot(Q.dot(Hinv.T))
+        # [ [x,y], [z,orient,pitch], covarience_matrix]
         self.landmarks[lm_id] = (lm_mu, lm_height, lm_sigma)
 
     def update_landmark_cam(self, id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta,
@@ -754,6 +758,9 @@ class SLAMSensorModel(SensorModel):
                     del self.robot.world.world_map.objects["Marker-"+str(id)]
 
             elif len(markers)==1 and ("Wall-"+str(id) not in self.robot.world.world_map.objects) and (markers[0][0] in self.landmarks):
+                # Only one marker seen. Estimation of wall is inaccurate due to low perspective effects in low resolution camera
+                # Adding MarkerObj at stimated location. Can later be used to direct robot to investigate the unknown Marker
+                # Permanently removed when atleast two markers of a wall are seen simultaneously
                 m = self.landmarks[markers[0][0]]
                 self.robot.world.world_map.objects["Marker-"+str(id)] = MarkerObj(id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
 
@@ -784,6 +791,7 @@ class SLAMSensorModel(SensorModel):
             [marker.id for marker in seen_marker_objects.values()
                  if self.landmark_test(marker)] + self.generate_walls_from_markers(seen_marker_objects)
         if self.use_perched_cameras:
+            # add cammeras that can see the robot as landmarks
             seen_landmarks = seen_landmarks +  \
                                 list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
         # Process each seen landmark:
@@ -801,11 +809,13 @@ class SLAMSensorModel(SensorModel):
                 sensor_orient = \
                     wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
             elif isinstance(id, WallObj):
+                # Turning to polar coordinates
                 sensor_dist = sqrt(id.x**2 + id.y**2)
                 sensor_bearing = atan2(id.y,id.x)
                 sensor_orient = id.theta
                 id = "Wall-"+str(id.id)
             elif isinstance(id, Cam):
+                # turning to cylindrical coordinates
                 sensor_dist = sqrt(id.x**2 + id.y**2)
                 sensor_bearing = atan2(id.y,id.x)
                 sensor_height = id.z
@@ -813,6 +823,7 @@ class SLAMSensorModel(SensorModel):
                 sensor_theta = id.theta
                 if sensor_height<0:
                     print("FLIP!!!")
+                # Using str instead of capture object as new object is added by perched_cam everytime
                 id = id.cap
             else:  # lm is an AruCo marker
                 marker = seen_marker_objects[id]
@@ -822,6 +833,7 @@ class SLAMSensorModel(SensorModel):
                 # Rotation about Y axis of marker. Fix sign
                 sensor_orient = - marker.euler_rotation[1] * (pi/180)
             if id not in particles[0].landmarks:
+                # Not checking for spurious wall as it is very unlikely to see two or more spurious makers simultaneously
                 if not (isinstance(id, str) or isinstance(id, WallObj) ):
                     seen_count = self.candidate_landmarks.get(id,0)
                     if seen_count < 5:
@@ -831,6 +843,7 @@ class SLAMSensorModel(SensorModel):
                 print('  *** ADDING LANDMARK ', id)
                 for p in particles:
                     if isinstance(id, str) and 'Video' in id:
+                        # special function for cameras as landmark list has more variables
                         p.add_landmark_cam(id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta)
                     else:
                         p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
@@ -860,6 +873,7 @@ class SLAMSensorModel(SensorModel):
                 p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
                 # Update landmark in this particle's map
                 if isinstance(id, str) and 'Video' in id:
+                    # special function for cameras as landmark list has more variables
                     p.update_landmark_cam(id, sensor_dist, sensor_bearing,
                                           sensor_height, sensor_phi, sensor_theta, dx, dy)
                 else:

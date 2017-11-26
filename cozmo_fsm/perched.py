@@ -33,18 +33,21 @@ class PerchedCameraThread(threading.Thread):
         self.robot = robot
         self.use_perched_cameras=False
         self.perched_cameras = []
-        # Set camera paramaters ( CUrrent code assumes same parameters for all cameras)
+        # Set camera paramaters ( Current code assumes same parameters for all cameras connected to a computer)
         self.cameraMatrix = microsoft_HD_webcam_cameraMatrix
         self.distCoeffs = microsoft_HD_webcam_distCoeffs
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_250)
         self.parameters =  aruco.DetectorParameters_create()
+        # camera landmarks from local cameras
         self.cameras = {}
+        # camera landamrks from network (sent from server)
         self.camera_pool = {}
 
     def run(self):
         while(True):
             if self.use_perched_cameras:
                 self.process_image()
+                # Computer overloaded if not given break
                 sleep(0.01)
             else:
                 break
@@ -65,6 +68,7 @@ class PerchedCameraThread(threading.Thread):
             else:
                raise RuntimeError("Could not open camera %s." % repr(x))
         for cap in self.perched_cameras:
+            # hack to set highest resolution
             cap.set(3,4000)
             cap.set(4,4000)
         self.robot.world.particle_filter.sensor_model.use_perched_cameras = True
@@ -82,6 +86,7 @@ class PerchedCameraThread(threading.Thread):
     def check_camera(self,camera):
         cap = cv2.VideoCapture(camera)
         for j in range(10):
+            # hack to clear buffer
             for i in range(5):
                 cap.grab()
             ret, frame = cap.read()
@@ -125,6 +130,7 @@ class PerchedCameraThread(threading.Thread):
                 rvecs, tvecs = vecs[0], vecs[1]
                 for i in range(len(ids)):
                     rotationm, jcob = cv2.Rodrigues(rvecs[i])
+                    # transform to robot coordinate frame
                     transformed = matrix(rotationm).T*(-matrix(tvecs[i]).T)
                     phi = self.rotationMatrixToEulerAngles(rotationm.T)
                     if ids[i][0] in self.temp_cams:
