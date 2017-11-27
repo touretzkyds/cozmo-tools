@@ -15,10 +15,10 @@ class ServerThread(threading.Thread):
         self.port = port
         self.socket = None #not running until startServer is called
         self.robot= robot
-        self.camera_landmark_pool = {}
+        self.camera_landmark_pool = {} # used to find transforms
         self.poses = {}
         self.started = False
-        self.foreign_objects = {}
+        self.foreign_objects = {} # foreign walls and cubes
 
     def run(self):
         self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -42,6 +42,7 @@ class ServerThread(threading.Thread):
         if self.robot.aruco_id == -1:
             self.robot.aruco_id = int(input("Please enter the aruco id of the robot:"))
         self.robot.world.server.camera_landmark_pool[self.robot.aruco_id]={}
+        # try to get transforms from camera_landmark_pool
         self.fusion = FusionThread(self.robot)
         self.start()
 
@@ -59,6 +60,7 @@ class ClientHandlerThread(threading.Thread):
         print("Started thread for",self.name)
 
     def run(self):
+        # Send from server to clients
         while(True):
             for key, value in self.robot.world.world_map.objects.items():
                 if isinstance(key,LightCube):
@@ -68,7 +70,9 @@ class ClientHandlerThread(threading.Thread):
                     self.to_send[key] = value         # Fix case when object removed from shared map
                 else:
                     pass                              # Nothing else in sent
+            # append 'end' to end to mark end
             self.c.sendall(pickle.dumps([self.robot.world.perched.camera_pool,self.to_send])+b'end')
+            # hack to recieve variable size data without crashing
             data = b''
             while True:
                 data += self.c.recv(1024)
@@ -146,6 +150,7 @@ class FusionThread(threading.Thread):
                     x2 =  v.x*cos(theta_t) + v.y*sin(theta_t) + x_t
                     y2 = -v.x*sin(theta_t) + v.y*cos(theta_t) + y_t
                     if isinstance(k,str) and "Wall" in k:
+                        # update wall
                         if k in self.robot.world.world_map.objects:
                             if self.robot.world.world_map.objects[k].foreign:
                                 self.robot.world.world_map.objects[k].update(x=x2, y=y2, theta=wrap_angle(v.theta-theta_t))
@@ -157,6 +162,7 @@ class FusionThread(threading.Thread):
                             copy_obj.foreign = True
                             self.robot.world.world_map.objects[k]=copy_obj
                     elif isinstance(k,str) and "Cube" in k and not self.robot.world.light_cubes[v.id].is_visible:
+                        # update cube
                         if k in self.robot.world.world_map.objects:
                             if self.robot.world.world_map.objects[k].foreign:
                                 self.robot.world.world_map.objects[k].update(x=x2, y=y2, theta=wrap_angle(v.theta-theta_t))
@@ -201,15 +207,17 @@ class ClientThread(threading.Thread):
         self.start()
 
     def use_shared_map(self):
-    	# currently affects only worldmap_viewer
-    	# uses robot.world.world_map.shared_objects instead of robot.world.world_map.objects
+        # currently affects only worldmap_viewer
+        # uses robot.world.world_map.shared_objects instead of robot.world.world_map.objects
         self.robot.use_shared_map = True
 
     def use_local_map(self):
         self.robot.use_shared_map = False
 
     def run(self):
+        # Send from client to server
         while(True):
+            # hack to recieve variable size data without crashing
             data = b''
             while True:
                 data += self.socket.recv(1024)

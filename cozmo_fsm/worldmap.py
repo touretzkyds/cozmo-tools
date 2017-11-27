@@ -30,6 +30,7 @@ class WallObj(WorldObject):
         self.foreign = foreign
 
     def update(self,x=0, y=0, theta=0):
+        # Used instead of making new object for efficiency
         self.x = x
         self.y = y
         self.theta = theta
@@ -44,6 +45,7 @@ class MarkerObj(WorldObject):
         self.theta = theta
 
     def update(self,x=0, y=0):
+        # Used instead of making new object for efficiency
         self.x = x
         self.y = y
 
@@ -64,6 +66,7 @@ class CameraObj(WorldObject):
         self.phi = phi
 
     def update(self,x=0, y=0, z=0, theta = 0, phi = 0):
+        # Used instead of making new object for efficiency
         self.x = x
         self.y = y
         self.z = z
@@ -90,6 +93,7 @@ class RobotForeignObj(WorldObject):
                (self.cozmo_id, self.x, self.y, self.z, self.theta*180/pi, self.camera_id)
 
     def update(self, x=0, y=0, z=0, theta=0, camera_id=-1):
+        # Used instead of making new object for efficiency
         self.x = x
         self.y = y
         self.z = z
@@ -110,6 +114,7 @@ class LightCubeForeignObj(WorldObject):
                (self.id, self.x, self.y, self.z, self.theta*180/pi, self.cozmo_id)
 
     def update(self, x=0, y=0, z=0, theta=0):
+        # Used instead of making new object for efficiency
         self.x = x
         self.y = y
         self.z = z
@@ -232,6 +237,7 @@ class WorldMap():
     def update_cube(self, cube):
         if cube in self.objects:
             if "LightCubeForeignObj-"+str(cube.cube_id) in self.objects:
+                # remove foreign cube when local cube seen
                 del self.objects["LightCubeForeignObj-"+str(cube.cube_id)]
             world_obj = self.objects[cube]
             if self.robot.carrying is world_obj:
