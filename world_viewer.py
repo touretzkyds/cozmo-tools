@@ -76,7 +76,7 @@ try:
     from OpenGL.GLU import *
 except:
     print("Can't find required OpenGL package.  Do 'pip3 install PyOpenGL PyOpenGL_accelerate'")
-    print("  and also 'sudo apt-get install freeglut3'")
+    print("  and also 'sudo apt-get install freeglut3'/ or 'brew install freeglut'")
     raise
 
 import cozmo
