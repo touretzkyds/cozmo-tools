@@ -5,7 +5,7 @@ OpenGL world viewer for Cozmo's world map.
 
 Run it by typing:  viewer(robot)
 
-  
+
 Author:  David S. Touretzky, Carnegie Mellon University
 =======
 
@@ -66,6 +66,8 @@ To Do:
 """
 
 from math import sin, cos, atan2, pi, radians
+from cozmo.nav_memory_map import NodeContentTypes
+
 import sys
 import threading
 import array
@@ -146,6 +148,7 @@ color_black  = (0., 0., 0.)
 color_white  = (1., 1., 1.)
 color_red    = (1., 0., 0.)
 color_green  = (0., 1., 0.)
+color_light_green  = (0., 0.5, 0.)
 color_blue   = (0., 0., 1.0)
 color_yellow = (1., .93, 0.)
 color_orange = (1., 0.5, .063)
@@ -402,8 +405,82 @@ def make_gazepoint():
     glEndList()
     return c
 
+def make_faces():
+    custom_faces = [v for v in robot.world._faces.values()
+                     if isinstance(v, (cozmo.faces.Face))]
+    if not custom_faces: return None
+    c = glGenLists(1)
+    glNewList(c, GL_COMPILE)
+    for obj in custom_faces:
+        if obj and obj.pose and obj.pose.position:
+            p = obj.pose.position.x_y_z
+
+            if obj.last_observed_image_box:
+                obj_size = (obj.last_observed_image_box.width, 10, obj.last_observed_image_box.height)
+            else:
+                obj_size = (50, 50, 10)
+
+            glPushMatrix()
+            glTranslatef(*p)
+            rotmat = array.array('f',quat2rot(*obj.pose.rotation.q0_q1_q2_q3)).tobytes()
+            glMultMatrixf(rotmat)
+
+            if obj.is_visible:
+                obj_color = color_yellow
+                highlight = True
+            else:
+                obj_color = color_gray
+                highlight = False
+
+            make_cube(obj_size, highlight=highlight, color=obj_color)
+
+            glPopMatrix()
+
+    glEndList()
+    return c
+
+def depth_first(node):
+    if node.children == None:
+        obj_color = None
+
+        if node.content == NodeContentTypes.ClearOfObstacle:
+            obj_color = color_green
+        elif node.content == NodeContentTypes.ClearOfCliff:
+            obj_color = color_light_green
+        elif node.content == NodeContentTypes.ObstacleCube:
+            obj_color = color_orange
+        elif node.content ==NodeContentTypes.ObstacleCharger:
+            obj_color = color_blue
+        elif node.content == NodeContentTypes.VisionBorder:
+            obj_color = color_light_gray
+        elif node.content == NodeContentTypes.Cliff:
+            obj_color = color_red
+        else:
+            obj_color = color_gray
+
+        if obj_color:
+                glPushMatrix()
+                p = (node.center.x,node.center.y, 0)
+                obj_size = (10, 10, 1)
+
+                glTranslatef(*p)
+                make_cube(obj_size, highlight=False, color=obj_color)
+                glPopMatrix()
+
+    else:
+        for child in node.children:
+            depth_first(child)
+
+def make_memory():
+    quadtree = robot.world.nav_memory_map
+    c = glGenLists(1)
+    glNewList(c, GL_COMPILE)
+    depth_first(quadtree.root_node)
+    glEndList()
+    return c
+
 def make_shapes():
-    global axes, gazepoint, cube1, cube2, cube3, charger, cozmo_robot, custom_objects, floor
+    global axes, gazepoint, cube1, cube2, cube3, charger, faces, cozmo_robot, custom_objects, floor, map_memory
     # axes
     axes = make_axes()
     # gaze point
@@ -414,12 +491,16 @@ def make_shapes():
     cube3 = make_light_cube(cozmo.objects.LightCube3Id)
     # charger
     charger = make_charger()
+    # faces
+    faces = make_faces()
     # cozmo robot
     cozmo_robot = make_cozmo_robot()
     # custom objects
     custom_objects = make_custom_objects()
     # floor
     floor = make_floor()
+    # Cozmo memory quadtree
+    map_memory = make_memory()
 
 def del_shapes():
     if gazepoint: glDeleteLists(gazepoint,1)
@@ -428,8 +509,10 @@ def del_shapes():
     if cube2: glDeleteLists(cube2,1)
     if cube3: glDeleteLists(cube3,1)
     if charger: glDeleteLists(charger,1)
+    if faces: glDeleteLists(faces,1)
     if custom_objects: glDeleteLists(custom_objects,1)
     if floor: glDeleteLists(floor,1)
+    if map_memory: glDeleteLists(map_memory,1)
     glDeleteLists(cozmo_robot,1)
 
 initial_fixation_point = [100, -25, 0]
@@ -472,13 +555,16 @@ def display():
         ]
     gluLookAt(*camera_loc, *fixation_point, 0.0, 0.0, 1.0)
     make_shapes()
+
     if axes: glCallList(axes)
     if cube1: glCallList(cube1)
     if cube2: glCallList(cube2)
     if cube3: glCallList(cube3)
     if charger: glCallList(charger)
+    if faces: glCallList(faces)
     if custom_objects: glCallList(custom_objects)
     if floor: glCallList(floor)
+    if map_memory: glCallList(map_memory)
     glCallList(cozmo_robot)
     if gazepoint: glCallList(gazepoint)
     glutSwapBuffers()
@@ -575,7 +661,7 @@ def visible(vis):
 
 def init_display():
     global GLwindow
-    
+
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(window_width, window_height)
@@ -596,6 +682,7 @@ RUNNING = False
 
 def viewer(_robot):
     global RUNNING, robot
+
     if RUNNING:
         return
     else:
@@ -603,5 +690,7 @@ def viewer(_robot):
     if not isinstance(_robot,cozmo.robot.Robot):
         raise TypeError('Argument must be a cozmo.robot.Robot instance.')
     robot = _robot
+    robot.world.request_nav_memory_map(1)
+
     th = threading.Thread(target=init_display)
     th.start()
