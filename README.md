@@ -11,7 +11,7 @@ Type `monitor(robot)` to start monitoring.  See doc for more options.
 
 * __world_viewer.py__ is an OpenGL viewer for Cozmo's world map.
 Requires the PyOpenGL and PyOpenGL_accelerate packages (from pip), and
-freeglut3. (On Linux you can install freeglut3 via apt-get, and on mac osx with brew).
+freeglut3. (On Linux you can install freeglut3 via apt-get, and on Mac OS X with brew).
  Run it by typing: `viewer(robot)`; type 'h' in the graphics window for a list of
 commands. May not work on Macs due to Tkinter brokenness.
 
