@@ -76,7 +76,7 @@ try:
     from OpenGL.GLU import *
 except:
     print("Can't find required OpenGL package.  Do 'pip3 install PyOpenGL PyOpenGL_accelerate'")
-    print("  and also 'sudo apt-get install freeglut3'")
+    print("  and also 'sudo apt-get install freeglut3'/ or 'brew install freeglut'")
     raise
 
 import cozmo
@@ -108,38 +108,38 @@ GLwindow = None
 
 window_width = window_height = 500
 
-cube_vertices = array.array('f', [ \
-     -0.5, -0.5, +0.5, \
-     -0.5, +0.5, +0.5, \
-     +0.5, +0.5, +0.5, \
-     +0.5, -0.5, +0.5, \
-     -0.5, -0.5, -0.5, \
-     -0.5, +0.5, -0.5, \
-     +0.5, +0.5, -0.5, \
-     +0.5, -0.5, -0.5  \
+cube_vertices = array.array('f', [
+     -0.5, -0.5, +0.5,
+     -0.5, +0.5, +0.5,
+     +0.5, +0.5, +0.5,
+     +0.5, -0.5, +0.5,
+     -0.5, -0.5, -0.5,
+     -0.5, +0.5, -0.5,
+     +0.5, +0.5, -0.5,
+     +0.5, -0.5, -0.5 
      ])
 
-cube_colors_0 = array.array('f', [ \
-     0.6, 0.6, 0.0, \
-     0.6, 0.6, 0.0, \
-     0.0, 0.0, 0.7, \
-     0.0, 0.0, 0.7, \
-     0.7, 0.0, 0.0, \
-     0.7, 0.0, 0.0, \
-     0.0, 0.7, 0.0, \
-     0.0, 0.7, 0.0, \
+cube_colors_0 = array.array('f', [
+     0.6, 0.6, 0.0,
+     0.6, 0.6, 0.0,
+     0.0, 0.0, 0.7,
+     0.0, 0.0, 0.7,
+     0.7, 0.0, 0.0,
+     0.7, 0.0, 0.0,
+     0.0, 0.7, 0.0,
+     0.0, 0.7, 0.0,
      ])
 
 cube_colors_1 = array.array('f', [x/0.7 for x in cube_colors_0])
 
-cube_colors_2 = array.array('f', \
-    [0.8, 0.8, 0.0, \
-     0.8, 0.8, 0.0, \
-     0.0, 0.8, 0.8, \
-     0.0, 0.8, 0.8, \
-     0.8, 0.0, 0.8, \
-     0.8, 0.0, 0.8, \
-     0.9, 0.9, 0.9, \
+cube_colors_2 = array.array('f',
+    [0.8, 0.8, 0.0,
+     0.8, 0.8, 0.0,
+     0.0, 0.8, 0.8,
+     0.0, 0.8, 0.8,
+     0.8, 0.0, 0.8,
+     0.8, 0.0, 0.8,
+     0.9, 0.9, 0.9,
      0.9, 0.9, 0.9 ])
 
 color_black  = (0., 0., 0.)
@@ -152,12 +152,12 @@ color_orange = (1., 0.5, .063)
 color_gray =   (0.5, 0.5, 0.5)
 color_light_gray =   (0.65, 0.65, 0.65)
 
-cube_cIndices = array.array('B', \
-    [0, 3, 2, 1, \
-     2, 3, 7, 6, \
-     0, 4, 7, 3, \
-     1, 2, 6, 5, \
-     4, 5, 6, 7, \
+cube_cIndices = array.array('B',
+    [0, 3, 2, 1,
+     2, 3, 7, 6,
+     0, 4, 7, 3,
+     1, 2, 6, 5,
+     4, 5, 6, 7,
      0, 1, 5, 4 ])
 
 light_cube_size_mm = 44.3
@@ -188,6 +188,7 @@ def quat2rot(q0,q1,q2,q3):
         t_q1q3+t_q0q2,           t_q2q3-t_q0q1,           q0_sq-q1_sq-q2_sq+q3_sq, 0,
         0.,                      0.,                      0.,                      1.
         )
+
 
 def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
     """Make a cube centered on the origin"""
@@ -234,6 +235,7 @@ def make_cube(size=(1,1,1), highlight=False, color=None, body=True, edges=True):
     glDisableClientState(GL_COLOR_ARRAY)
     glDisableClientState(GL_VERTEX_ARRAY)
 
+
 def make_light_cube(cube_number):
     lcube = robot.world.light_cubes[cube_number]
     if (not lcube.pose) or not lcube.pose.is_valid: return None
@@ -261,6 +263,7 @@ def make_light_cube(cube_number):
     glPopMatrix()
     glEndList()
     return c
+
 
 def make_custom_objects():
     custom_objects = [v for v in robot.world._objects.values()
@@ -291,6 +294,7 @@ def make_custom_objects():
     glEndList()
     return c
 
+
 def make_floor():
     floor_size = (800, 800, 1)
     blip = floor_size[2]
@@ -314,6 +318,7 @@ def make_floor():
     glPopMatrix()
     glEndList()
     return c
+
 
 def make_charger():
     charger = robot.world.charger
@@ -348,6 +353,7 @@ def make_charger():
     glEndList()
     return c
 
+
 def make_cozmo_robot():
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
@@ -370,6 +376,7 @@ axis_width = 1
 show_axes = True
 print_camera = False
 
+
 def make_axes():
     if not show_axes: return None
     c = glGenLists(1)
@@ -391,6 +398,7 @@ def make_axes():
     glEndList()
     return c
 
+
 def make_gazepoint():
     c = glGenLists(1)
     glNewList(c, GL_COMPILE)
@@ -401,6 +409,7 @@ def make_gazepoint():
     glPopMatrix()
     glEndList()
     return c
+
 
 def make_shapes():
     global axes, gazepoint, cube1, cube2, cube3, charger, cozmo_robot, custom_objects, floor
@@ -421,6 +430,7 @@ def make_shapes():
     # floor
     floor = make_floor()
 
+
 def del_shapes():
     if gazepoint: glDeleteLists(gazepoint,1)
     if axes: glDeleteLists(axes,1)
@@ -440,6 +450,7 @@ fixation_point = initial_fixation_point.copy()
 camera_rotation = initial_camera_rotation.copy()
 camera_distance = initial_camera_distance
 camera_loc = (0., 0., 0.)  # will be recomputed by display()
+
 
 def display():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -484,11 +495,13 @@ def display():
     glutSwapBuffers()
     del_shapes()
 
+
 def idle():
     if exited:
         glutDestroyWindow(GLwindow)
         return
     glutPostRedisplay()
+
 
 def keyboard(key, x, y):
     global exited
@@ -544,6 +557,7 @@ def keyboard(key, x, y):
               ' camera[%5.1f %5.1f %5.1f]' % (camera_loc[0], camera_loc[1], camera_loc[2]))
     display()
 
+
 def special(key, x, y):
     global fixation_point, camera_rotation, camera_distance
     heading = -camera_rotation[1]
@@ -561,17 +575,20 @@ def special(key, x, y):
         fixation_point[2] -= 1
     display()
 
+
 def reshape(width, height):
     global window_width, window_height
     window_width = width
     window_height = height
     glViewport(0, 0, width, height)
 
+
 def visible(vis):
     if vis == GLUT_VISIBLE:
         glutIdleFunc(idle)
     else:
         glutIdleFunc(None)
+
 
 def init_display():
     global GLwindow
@@ -593,6 +610,7 @@ def init_display():
     glutMainLoop()
 
 RUNNING = False
+
 
 def viewer(_robot):
     global RUNNING, robot

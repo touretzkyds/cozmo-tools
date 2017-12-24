@@ -1,0 +1,7 @@
+cozmo
+numpy
+opencv-python
+opencv-contrib-python
+termcolor
+PyOpenGL
+PyOpenGL_accelerate

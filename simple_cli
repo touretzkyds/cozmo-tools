@@ -109,6 +109,7 @@ RUNNING = True
 
 running_fsm = None
 
+
 def runfsm(module_name, running_modules=dict()):
     """runfsm('modname') reloads that module and expects it to contain
     a class of the same name. It calls that class's constructor and then
@@ -169,6 +170,7 @@ def runfsm(module_name, running_modules=dict()):
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
+
 def text_message(msg):
     if not running_fsm or not running_fsm.running:
         print('No state machine running. Use runfsm(module_name) to start a state machine.')
@@ -179,6 +181,7 @@ def text_message(msg):
     except Exception as e:
         traceback.print_exc()
         print()
+
 
 def show_stuff(spec):
     global running_fsm
@@ -214,6 +217,7 @@ def show_stuff(spec):
   show path_viewer
   """)
 
+
 def show_active(node,depth):
     if node.running: print('  '*depth, node)
     for child in node.children.values():
@@ -221,11 +225,13 @@ def show_active(node,depth):
     for trans in node.transitions:
         if trans.running: print('  '*(depth+1), trans)
 
+
 def do_shell_command(cmd):
     try:
         subprocess.call(cmd, shell=True)
     except Exception as e:
         print(e)
+
 
 def run(sdk_conn):
     global robot
@@ -238,6 +244,7 @@ def run(sdk_conn):
         cozmo_fsm.evbase.robot_for_loading = robot
     except: pass
     cli_loop(robot)
+
 
 def cli_loop(robot):
     global ans, RUNNING, running_fsm
@@ -327,6 +334,7 @@ def cli_loop(robot):
 
 VERBOSE = False  # True if we want all the log messages
 
+
 def suppress_filter(log_record):
     message = log_record.msg if isinstance(log_record.msg, str) else repr(log_record.msg)
     if VERBOSE:
@@ -386,6 +394,7 @@ def process_interrupt():
         running_fsm.stop()
     else:
         print("\nKeyboardInterrupt. Type 'exit' to exit.")
+
 
 if __name__ == '__main__':
     start_connection()
