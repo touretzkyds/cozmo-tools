@@ -19,6 +19,7 @@ from . import transform
 from . import worldmap
 
 import cozmo
+from cozmo.nav_memory_map import NodeContentTypes
 
 WINDOW = None
 
@@ -38,6 +39,7 @@ World viewer keyboard commands:
   up-arrow     Orbit camera upward
   down-arrow   Orbit camera downward
 
+  m            Toggle memory map
   x            Toggle axes
   z            Reset to initial view
   v            Toggle display of viewing parameters
@@ -93,6 +95,7 @@ color_black  = (0., 0., 0.)
 color_white  = (1., 1., 1.)
 color_red    = (1., 0., 0.)
 color_green  = (0., 1., 0.)
+color_light_green  = (0., 0.5, 0.)
 color_blue   = (0., 0., 1.0)
 color_yellow = (1., .93, 0.)
 color_orange = (1., 0.5, .063)
@@ -150,8 +153,9 @@ class WorldMapViewer():
         self.translation = [0., 0.]  # Translation in mm
         self.scale = 1
         self.show_axes = True
+        self.show_memory_map = False
 
-    def make_cube(self,size=(1,1,1), highlight=False, color=None, body=True, edges=True):
+    def make_cube(self, size=(1,1,1), highlight=False, color=None, body=True, edges=True):
         """Make a cube centered on the origin"""
         glEnableClientState(GL_VERTEX_ARRAY)
         if color is None:
@@ -727,15 +731,52 @@ class WorldMapViewer():
             elif isinstance(obj, worldmap.MarkerObj):
                 self.make_marker(obj)
 
+    def make_memory(self):
+        global gl_lists
+        quadtree = self.robot.world.nav_memory_map
+        if quadtree and self.show_memory_map:
+            c = glGenLists(1)
+            glNewList(c, GL_COMPILE)
+            self.memory_tree_crawl(quadtree.root_node, 0)
+            glEndList()
+            gl_lists.append(c)
+
+    def memory_tree_crawl(self, node, depth):
+        if node.content == NodeContentTypes.ClearOfObstacle:
+            obj_color = color_green
+        elif node.content == NodeContentTypes.ClearOfCliff:
+            obj_color = color_light_green
+        elif node.content == NodeContentTypes.ObstacleCube:
+            obj_color = color_orange
+        elif node.content == NodeContentTypes.ObstacleCharger:
+            obj_color = color_blue
+        elif node.content == NodeContentTypes.VisionBorder:
+            obj_color = color_light_gray
+        elif node.content == NodeContentTypes.Cliff:
+            obj_color = color_red
+        else:
+            obj_color = color_gray
+
+        glPushMatrix()
+        p = (node.center.x, node.center.y, depth)
+        glTranslatef(*p)
+        obj_size = (node.size, node.size, 1)
+        self.make_cube(obj_size, highlight=False, color=obj_color)
+        glPopMatrix()
+        if node.children is not None:
+            for child in node.children:
+                self.memory_tree_crawl(child,depth+1)
+
     def make_shapes(self):
         global gl_lists
         gl_lists = []
         self.make_axes()
         self.make_gazepoint()
         self.make_objects()  # walls, light cubes, custom cubes, and chips
-        charger = self.make_charger()
-        cozmo_robot = self.make_cozmo_robot()
-        floor = self.make_floor()
+        self.make_charger()
+        self.make_cozmo_robot()
+        self.make_memory()
+        self.make_floor()
 
     def del_shapes(self):
         global gl_lists
@@ -760,6 +801,7 @@ class WorldMapViewer():
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     def start(self): # Displays in background
+        self.robot.world.request_nav_memory_map(1)
         if not WINDOW:
             opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
@@ -836,6 +878,8 @@ class WorldMapViewer():
             camera_rotation[1] += 2.5
         elif key == b'x':
             self.show_axes = not self.show_axes
+        elif key == b'm':
+            self.show_memory_map = not self.show_memory_map
         elif key == b'h':
             print(help_text)
         elif key == b'v':
