@@ -83,7 +83,7 @@ readline.parse_and_bind('tab: complete')
 # history file
 if 'HOME' in os.environ:  # Linux
     histfile = os.path.join(os.environ['HOME'], '.pythonhistory')
-elif 'USERPROFILE' in os.path.environ:  # Windows
+elif 'USERPROFILE' in os.environ:  # Windows
     histfile = os.path.join(os.environ['USERPROFILE'], '.pythonhistory')
 else:
     histfile = '.pythonhistory'
