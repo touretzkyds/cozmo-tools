@@ -10,7 +10,7 @@ from cozmo_fsm import *
 class CV_OpticalFlow(StateMachineProgram):
     def __init__(self):
         super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
-                         annotate_cube = False)
+                         annotate_sdk = False)
 
     def start(self):
         self.feature_params = dict( maxCorners = 100,
