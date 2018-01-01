@@ -1,7 +1,9 @@
 import asyncio
-import inspect
-import time
 import functools
+import inspect
+import os
+import time
+
 import numpy, cv2
 
 import cozmo
@@ -243,7 +245,8 @@ class StateMachineProgram(StateNode):
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
             if self.windowName:
-                cv2.waitKey(1)
+                if os.name == 'nt':
+                    cv2.waitKey(1)
                 cv2.imshow(self.windowName, annotated_im)
 
         # Use this heartbeat signal to look for new landmarks on startup
