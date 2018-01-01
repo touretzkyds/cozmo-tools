@@ -43,6 +43,9 @@ Available commands:
         Runs 'cmd' in a shell and prints the result.
 *********
 
+NOTE: On Windows you must install the pyreadline package in
+order to get readline.
+
 Author:     David S. Touretzky, Carnegie Mellon University
 =======
 

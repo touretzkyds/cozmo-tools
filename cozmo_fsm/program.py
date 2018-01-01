@@ -243,6 +243,7 @@ class StateMachineProgram(StateNode):
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
             if self.windowName:
+                cv2.waitKey(1)
                 cv2.imshow(self.windowName, annotated_im)
 
         # Use this heartbeat signal to look for new landmarks on startup
