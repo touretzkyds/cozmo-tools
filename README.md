@@ -1,6 +1,8 @@
 # cozmo-tools
 
-## Tools for programming Anki's Cozmo robot.
+For a radically different approach to Cozmo programming more suited to beginners, try Calypso at https://Calypso.software
+
+## Tools for programming Anki's Cozmo robot via the Python SDK.
 
 * __simple_cli__ provides a _Command Line Interface_ for the Cozmo SDK
 so you can evaluate expressions in the context of an active SDK connection
