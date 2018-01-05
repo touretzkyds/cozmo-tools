@@ -36,6 +36,7 @@ import cozmo
 
 
 def print_prefix(evt):
+    robot.world.last_event = evt
     print('-> ', evt.event_name, ' ', sep='', end='')
 
 

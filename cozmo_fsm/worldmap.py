@@ -6,19 +6,22 @@ from . import transform
 from .transform import wrap_angle
 
 class WorldObject():
-    def __init__(self, id=None, x=0, y=0, z=0, is_visible=False):
+    def __init__(self, id=None, x=0, y=0, z=0, is_visible=None):
         self.id = id
         self.x = x
         self.y = y
         self.z = z
         self.obstacle = True
-        self.is_visible = is_visible
+        if is_visible is not None:
+            self.is_visible = is_visible
+        self.sdk_obj = None
         self.update_from_sdk = False
+        self.is_foreign = False
 
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
-                 door_width=75, door_height=105, markers=[], door_ids=[], foreign = False):
-        super().__init__(id,x,y)
+                 door_width=75, door_height=105, markers=[], door_ids=[], is_foreign=False):
+        super().__init__(id,x,y,is_visible=False)
         self.z = height/2
         self.theta = theta
         self.length = length
@@ -27,7 +30,7 @@ class WallObj(WorldObject):
         self.door_height = door_height
         self.markers = markers
         self.door_ids = door_ids
-        self.foreign = foreign
+        self.is_foreign = is_foreign
 
     def update(self,x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
@@ -102,7 +105,7 @@ class RobotForeignObj(WorldObject):
 
 class LightCubeForeignObj(WorldObject):
     light_cube_size = (44., 44., 44.)
-    def __init__(self, id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible= False):
+    def __init__(self, id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=False):
         super().__init__(id,x,y,z)
         self.theta = theta
         self.cozmo_id = cozmo_id
@@ -128,7 +131,10 @@ class LightCubeObj(WorldObject):
         self.update_from_sdk = True
         self.theta = theta
         self.size = self.light_cube_size
-        self.is_visible = sdk_obj.is_visible
+
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
 
     def __repr__(self):
         return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
@@ -147,7 +153,10 @@ class CustomCubeObj(WorldObject):
             self.size = size
         else:
             self.size = (50., 50., 50.)
-        self.is_visible = sdk_obj.is_visible
+
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
 
     def __repr__(self):
         return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
@@ -165,18 +174,21 @@ class ChipObj(WorldObject):
 
 class FaceObj(WorldObject):
     def __init__(self, sdk_obj, id, x, y, z, name):
-        super().__init__(id, x, y, z, is_visible=sdk_obj.is_visible)
+        super().__init__(id, x, y, z)
         self.sdk_obj = sdk_obj
         self.obstacle = False
 
-    # Faces can be renamed, so check the Face object
     @property
     def name(self):
         return self.sdk_obj.name
 
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
+
     def __repr__(self):
         return "<FaceObj name:'%s' expr:%s (%.1f, %.1f, %.1f) vis:%s>" % \
-               (self.name, self.expression, self.x, self.y, self.z, self.sdk_obj.is_visible)
+               (self.name, self.expression, self.x, self.y, self.z, self.is_visible)
 
 #================ WorldMap ================
 
@@ -226,13 +238,23 @@ class WorldMap():
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
             if isinstance(key,str) and 'Wall' in key:
-                if key in self.objects and isinstance(self.objects[key], WallObj) and (not self.objects[key].foreign):
+                if key in self.objects and isinstance(self.objects[key], WallObj) and \
+                        (not self.objects[key].is_foreign):
                     self.objects[key].update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
                     id = int(key[-(len(key)-5):])
                     wall_spec = wall_marker_dict[id]
-                    self.objects[key] = WallObj(id, x=value[0][0][0], y=value[0][1][0], theta=value[1], length=wall_spec.length, height=wall_spec.height,
-                 door_width=wall_spec.door_width, door_height=wall_spec.door_height, markers=wall_spec.markers, door_ids = wall_spec.door_ids, foreign = False)
+                    self.objects[key] = WallObj(id,
+                                                x=value[0][0][0],
+                                                y=value[0][1][0],
+                                                theta=value[1],
+                                                length=wall_spec.length,
+                                                height=wall_spec.height,
+                                                door_width=wall_spec.door_width,
+                                                door_height=wall_spec.door_height,
+                                                markers=wall_spec.markers,
+                                                door_ids=wall_spec.door_ids,
+                                                is_foreign=False)
         
     def update_cube(self, cube):
         if cube in self.objects:
@@ -275,7 +297,6 @@ class WorldMap():
                                face.name)
             self.robot.world.world_map.objects[face] = face_obj
         # now update the face
-        face_obj.is_visible = face.is_visible
         if face.is_visible:
             face_obj.x = pos.x
             face_obj.y = pos.y
@@ -321,7 +342,6 @@ class WorldMap():
         world_obj.z = sdk_obj.pose.position.z
         orient_diff = wrap_angle(rob_theta - self.robot.pose.rotation.angle_z.radians)
         world_obj.theta = wrap_angle(sdk_obj.pose.rotation.angle_z.radians + orient_diff)
-        world_obj.is_visible = sdk_obj.is_visible
 
     def handle_object_observed(self, evt, **kwargs):
         if isinstance(evt.obj, LightCube):

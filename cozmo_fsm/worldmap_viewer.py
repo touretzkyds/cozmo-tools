@@ -97,6 +97,7 @@ color_red    = (1., 0., 0.)
 color_green  = (0., 1., 0.)
 color_light_green  = (0., 0.5, 0.)
 color_blue   = (0., 0., 1.0)
+color_cyan   = (0., 1.0, 1.0)
 color_yellow = (1., .93, 0.)
 color_orange = (1., 0.5, .063)
 color_gray =   (0.5, 0.5, 0.5)
@@ -751,11 +752,11 @@ class WorldMapViewer():
         elif node.content == NodeContentTypes.ObstacleCharger:
             obj_color = color_blue
         elif node.content == NodeContentTypes.VisionBorder:
-            obj_color = color_light_gray
+            obj_color = color_cyan
         elif node.content == NodeContentTypes.Cliff:
             obj_color = color_red
         else:
-            obj_color = color_gray
+            obj_color = color_light_gray
 
         glPushMatrix()
         p = (node.center.x, node.center.y, depth)

@@ -316,6 +316,12 @@ class Print(StateNode):
         self.post_completion()
 
 
+class AbortAllActions(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        self.robot.abort_all_actions()
+        self.post_completion()
+
 #________________ Coroutine Nodes ________________
 
 class CoroutineNode(StateNode):
@@ -847,7 +853,7 @@ class AnimationNode(ActionNode):
         super().__init__()
 
     def action_launcher(self):
-        return self.robot.play_anim(self.anim_name)
+        return self.robot.play_anim(self.anim_name, **self.action_kwargs)
 
 class AnimationTriggerNode(ActionNode):
     def __init__(self, trigger=cozmo.anim.Triggers.CubePouncePounceNormal, **kwargs):
@@ -859,7 +865,7 @@ class AnimationTriggerNode(ActionNode):
         super().__init__()
 
     def action_launcher(self):
-        return self.robot.play_anim_trigger(self.trigger)
+        return self.robot.play_anim_trigger(self.trigger, **self.action_kwargs)
 
 #________________ Behaviors ________________
 

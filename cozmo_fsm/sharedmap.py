@@ -152,26 +152,26 @@ class FusionThread(threading.Thread):
                     if isinstance(k,str) and "Wall" in k:
                         # update wall
                         if k in self.robot.world.world_map.objects:
-                            if self.robot.world.world_map.objects[k].foreign:
+                            if self.robot.world.world_map.objects[k].is_foreign:
                                 self.robot.world.world_map.objects[k].update(x=x2, y=y2, theta=wrap_angle(v.theta-theta_t))
                         else:
                             copy_obj = deepcopy(v)
                             copy_obj.x = x2
                             copy_obj.y = y2
                             copy_obj.theta = wrap_angle(v.theta-theta_t)
-                            copy_obj.foreign = True
+                            copy_obj.is_foreign = True
                             self.robot.world.world_map.objects[k]=copy_obj
                     elif isinstance(k,str) and "Cube" in k and not self.robot.world.light_cubes[v.id].is_visible:
                         # update cube
                         if k in self.robot.world.world_map.objects:
-                            if self.robot.world.world_map.objects[k].foreign:
+                            if self.robot.world.world_map.objects[k].is_foreign:
                                 self.robot.world.world_map.objects[k].update(x=x2, y=y2, theta=wrap_angle(v.theta-theta_t))
                         else:
                             copy_obj = deepcopy(v)
                             copy_obj.x = x2
                             copy_obj.y = y2
                             copy_obj.theta = wrap_angle(v.theta-theta_t)
-                            copy_obj.foreign = True
+                            copy_obj.is_foreign = True
                             self.robot.world.world_map.objects[k]=copy_obj
 
 
