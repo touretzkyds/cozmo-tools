@@ -13,6 +13,7 @@ from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
 from .base import *
 from .events import *
 from .cozmo_kin import wheelbase
+from .transform import wrap_angle
 from .worldmap import WorldObject
 
 #________________ Ordinary Nodes ________________
@@ -163,11 +164,11 @@ class DriveContinuous(StateNode):
                 (dist - self.last_dist) > 0.1 and \
                 ( (self.mode == 'x' and np.sign(x-self.cur[0]) == np.sign(self.cur[0]-self.prev[0])) or
                   (self.mode == 'y' and np.sign(y-self.cur[1]) == np.sign(self.cur[1]-self.prev[1])) )
-        reached_waypoint = self.reached_dist and abs(q - self.target_q) < 5*pi/180
+        reached_waypoint = (self.path_index == 0) or (self.reached_dist and abs(q - self.target_q) < 5*pi/180)
         self.last_dist = dist
 
-        # Advance to next waypoint
-        if self.path_index == 0 or reached_waypoint:
+        # Advance to next waypoint if indicated
+        if reached_waypoint:
             self.path_index += 1
             print('DriveContinuous: path index advanced to',self.path_index)
             if self.path_index == len(self.path):
@@ -177,6 +178,7 @@ class DriveContinuous(StateNode):
                 return
             elif self.path_index > len(self.path):
                 # uncaught completion event
+                print('DriveContinuous: uncaught completion! Stopping.')
                 self.stop()
                 return
             self.prev = self.cur
@@ -184,6 +186,12 @@ class DriveContinuous(StateNode):
             self.last_dist = math.inf
             self.reached_dist = False
             self.target_q = math.atan2(self.cur[1]-self.prev[1], self.cur[0]-self.prev[0])
+
+            # Is the target behind us?
+            delta_q = wrap_angle(q - self.target_q)
+            delta_dist = math.sqrt((self.cur[0]-x)**2 + (self.cur[1]-y)**2)
+            if abs(delta_q) > pi/2:
+                print('DriveCont--> delta_q =',delta_q*180/pi,'degrees   delta_dist=',delta_dist)
 
             # Heading determines whether we're solving y=f(x) or x=f(y)
             if abs(self.target_q) < pi/4 or abs(abs(self.target_q)-pi) < pi/4:
@@ -194,12 +202,15 @@ class DriveContinuous(StateNode):
                 self.mode = 'y'
                 self.m = (self.cur[0]-self.prev[0]) / (self.cur[1]-self.prev[1])
                 self.b = self.cur[0] - self.m * (self.cur[1]-self.prev[1])
+
             if self.path_index > 1:
                 # come to a full stop before trying to change direction
                 self.robot.stop_all_motors()
                 self.pause_counter = 5
                 return
+        # Haven't reached waypoint yet
         elif self.reached_dist:
+            # But we have traveled far enough, so come to a stop and then fix heading
             if self.mode != 'q':
                 self.robot.stop_all_motors()
                 self.robot.pause_counter = 5
@@ -208,6 +219,7 @@ class DriveContinuous(StateNode):
 
         # Calculate error and correction based on present x/y/q position
         q_error = q - self.target_q
+        #print('DriveCont--> q_error is',q*180/pi,'degrees')
         if self.mode == 'x':      # y = f(x)
             target_y = self.m * (x-self.prev[0]) + self.b
             d_error = (y - target_y) * np.sign(pi/2 - abs(self.target_q))
@@ -220,7 +232,8 @@ class DriveContinuous(StateNode):
             d_error = math.sqrt((x-self.cur[0])**2 + (y-self.cur[1])**2)
             correcting_q = - 0.8*q_error
         else:
-            raise ValueError("Bad mode value '%s'" % repr(self.mode))
+            print("Bad mode value '%s'" % repr(self.mode))
+            return
 
         # Calculate wheel speeds based on correction value
         if self.mode == 'q' or abs(q_error*180/pi) >= 10:

@@ -17,6 +17,10 @@ class WorldObject():
         self.sdk_obj = None
         self.update_from_sdk = False
         self.is_foreign = False
+        if is_visible:
+            self.pose_confidence = +1
+        else:
+            self.pose_confidence = -1
 
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,

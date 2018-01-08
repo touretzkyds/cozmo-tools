@@ -21,7 +21,7 @@ class GoToCube(StateNode):
         if isinstance(self.object, LightCubeObj):
             self.object = self.object.sdk_obj
         self.children['looker'].object = self.object
-        tracefsm(1)
+        # tracefsm(1)
         super().start(event)
 
     def pick_side(self, dist, use_world_map):
@@ -70,7 +70,7 @@ class GoToCube(StateNode):
         def start(self, event=None):
             cube = self.parent.object
             print('Selected cube',self.robot.world.world_map.objects[cube])
-            (x, y, theta) = self.parent.pick_side(100, True)
+            (x, y, theta) = self.parent.pick_side(100, use_world_map=True)
             self.target_pose = Pose(x, y, self.robot.pose.position.z,
                                     angle_z=Angle(radians = wrap_angle(theta)))
             print('pickup.GoToSide: traveling to (%.1f, %.1f) @ %.1f deg.' %
@@ -170,7 +170,7 @@ class GoToCube(StateNode):
 
         check_start: PilotCheckStart()
         check_start =S=> go_side
-        check_start =F=> Forward(-70) =C=> StateNode() =T(0.5)=> check_start
+        check_start =F=> Forward(-80) =C=> StateNode() =T(0.5)=> check_start
 
         go_side: self.GoToSide()
         go_side =F=> ParentFails()
@@ -252,8 +252,8 @@ class PickUpCube(StateNode):
             finding the darkest ones to set the black threshold.
             """
             pixels = [im[r,col,0] for r in range(row_start,row_end)]
-            print('Column ',col,':',sep='')
-            [print('%4d' % i,end='') for i in pixels]
+            # print('Column ',col,':',sep='')
+            # [print('%4d' % i,end='') for i in pixels]
             pixels.sort()
             black_index = 20  # start with the 20th darkest pixel
             black_thresh = pixels[black_index] + 4
@@ -262,8 +262,7 @@ class PickUpCube(StateNode):
                 black_index += 1
                 black_thresh = pixels[black_index] + 4
             white_thresh = pixels[black_index] + 20
-            print('\nblack_thresh=',black_thresh,'  black_index=',black_index,
-                  '  white_thresh=',white_thresh)
+            # print('\nblack_thresh=',black_thresh,'  black_index=',black_index, '  white_thresh=',white_thresh)
             # initial white segment
             row = row_start
             while row <= row_end:
@@ -290,10 +289,8 @@ class PickUpCube(StateNode):
             # final white segment
             while row <= row_end:
                 if im[row,col,0] < white_thresh:
-                    print('col=',col,'  row=',row,'  im =',im[row,col],
-                          ' white_thresh=',white_thresh,
-                          ' black_thresh=',black_thresh,
-                          '  run_length=',run_length)
+                    #print('col=',col,'  row=',row,'  im =',im[row,col],
+                    #      ' white_thresh=',white_thresh,' black_thresh=',black_thresh,'  run_length=',run_length)
                     return -2
                 row += 1
             return run_length
@@ -301,14 +298,10 @@ class PickUpCube(StateNode):
         def start(self,event=None):
             super().start(event)
             im = np.array(self.robot.world.latest_image.raw_image)
-            print('shape=',im.shape,'  one is', im[0].shape)
-            print('\nColumn 140:')
-            [print(im[i,140,0],' ',sep='',end='') for i in range(10,100)]
-            print('\n')
             min_length = 20
             max_length = 26
             bad_runs = 0
-            print('Verifying.  Runs: ',end='')
+            print('Verifying cube capture.  Run widths: ',end='')
             for col in range(100,220,20):
                 run_length = self.probe_column(im, col, 10, 100)
                 print(run_length,' ',end='')
