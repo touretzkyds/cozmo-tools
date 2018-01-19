@@ -209,7 +209,7 @@ def show_stuff(spec):
         running_fsm.set_name("CamViewer")
         running_fsm.simple_cli_callback = simple_cli_callback
         cozmo_fsm.program.running_fsm = running_fsm
-        running_fsm.now()
+        robot.loop.call_soon(running_fsm.start)
     elif spec == "particle_viewer":
         if not robot.world.particle_viewer:
             robot.world.particle_viewer = ParticleViewer(robot)
