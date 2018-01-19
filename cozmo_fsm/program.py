@@ -24,6 +24,8 @@ from . import custom_objs
 from .perched import *
 from .sharedmap import *
 
+running_fsm = None
+
 class StateMachineProgram(StateNode):
     def __init__(self,
                  kine_class = CozmoKinematics,
@@ -48,10 +50,13 @@ class StateMachineProgram(StateNode):
 
                  speech = False,
                  speech_debug = False,
-                 thesaurus = Thesaurus()
+                 thesaurus = Thesaurus(),
+
+                 simple_cli_callback = None
                  ):
         super().__init__()
         self.name = self.__class__.__name__.lower()
+        self.simple_cli_callback = simple_cli_callback
 
         if not hasattr(self.robot, 'erouter'):
             self.robot.erouter = EventRouter()
@@ -75,7 +80,7 @@ class StateMachineProgram(StateNode):
         self.particle_filter = particle_filter
         self.particle_viewer = particle_viewer
         self.particle_viewer_scale = particle_viewer_scale
-        self.picked_up_handler = self.robot_picked_up
+        self.picked_up_callback = self.robot_picked_up
         self.put_down_handler = self.robot_put_down
 
         self.aruco = aruco
@@ -103,6 +108,8 @@ class StateMachineProgram(StateNode):
         self.thesaurus = thesaurus
 
     def start(self):
+        global running_fsm
+        running_fsm = self
         # Create a particle filter
         if not isinstance(self.particle_filter,ParticleFilter):
             self.particle_filter = SLAMParticleFilter(self.robot)
@@ -120,6 +127,18 @@ class StateMachineProgram(StateNode):
         self.robot.world.world_map = \
                 self.world_map or WorldMap(self.robot)
         self.robot.world.rrt = self.rrt or RRT(self.robot)
+
+        if self.simple_cli_callback:
+            # Make worldmap cubes accessible to simple_cli
+            cubes = self.robot.world.light_cubes
+            wc1 = wc2 = wc3 = None
+            if 1 in cubes:
+                wc1 = self.robot.world.world_map.update_cube(cubes[1])
+            if 2 in cubes:
+                wc2 = self.robot.world.world_map.update_cube(cubes[2])
+            if 3 in cubes:
+                wc3 = self.robot.world.world_map.update_cube(cubes[3])
+            self.simple_cli_callback(wc1, wc2, wc3)
 
         # Polling
         self.set_polling_interval(0.025)  # for kine and motion model update
@@ -165,6 +184,14 @@ class StateMachineProgram(StateNode):
             cozmo.objects.EvtObjectObserved,
             self.robot.world.world_map.handle_object_observed)
 
+        self.robot.world.add_event_handler(
+            cozmo.objects.EvtObjectMovingStarted,
+            self.robot.world.world_map.handle_object_moved)
+
+        self.robot.world.add_event_handler(
+            cozmo.objects.EvtObjectMovingStopped,
+            self.robot.world.world_map.handle_object_moved)
+
         # Start speech recognition if requested
         if self.speech:
             self.speech_listener = SpeechListener(self.robot,self.thesaurus,debug=self.speech_debug)
@@ -176,7 +203,17 @@ class StateMachineProgram(StateNode):
     def robot_picked_up(self):
         print('** Robot was picked up!')
         self.robot.stop_all_motors()
-        
+        self.run_picked_up_handler(self)
+
+    def run_picked_up_handler(self,node):
+        """Complex state machines use a picked_up_handler to abort the machine
+        gracefully, usually by posting a failure event from the parent."""
+        if node.running and hasattr(node,'picked_up_handler'):
+            node.picked_up_handler()
+        else:
+            for child in node.children.values():
+                self.run_picked_up_handler(child)
+            
     def robot_put_down(self):
         print('** Robot was put down.')
         pf = self.robot.world.particle_filter
@@ -198,7 +235,7 @@ class StateMachineProgram(StateNode):
             if self.robot.was_picked_up:
                 pass  # we already knew that
             else:
-                self.picked_up_handler()
+                self.picked_up_callback()
         else:  # robot is on the ground
             pf = self.robot.world.particle_filter
             if pf:

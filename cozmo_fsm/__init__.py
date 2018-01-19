@@ -1,5 +1,9 @@
 from cozmo.util import radians, degrees, Pose, Rotation
 
+from . import base
+from . import program
+base.program = program
+
 from .nodes import *
 from .transitions import *
 from .program import *
@@ -17,3 +21,6 @@ from .pickup import *
 from .doorpass import *
 from . import wall_defs
 from . import custom_objs
+
+del base
+

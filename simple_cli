@@ -110,15 +110,19 @@ ans = None
 
 RUNNING = True
 
-running_fsm = None
 
+def simple_cli_callback(wc1, wc2, wc3):
+    global wcube1, wcube2, wcube3
+    wcube1 = wc1
+    wcube2 = wc2
+    wcube3 = wc3
 
 def runfsm(module_name, running_modules=dict()):
     """runfsm('modname') reloads that module and expects it to contain
     a class of the same name. It calls that class's constructor and then
     calls the instance's start() method."""
-    global running_fsm
 
+    running_fsm = cozmo_fsm.program.running_fsm
     if running_fsm:
         robot.stop_all_motors()
         running_fsm.stop()
@@ -169,12 +173,14 @@ def runfsm(module_name, running_modules=dict()):
     the_module.cube2 = robot.world.light_cubes[cozmo.objects.LightCube2Id]
     the_module.cube3 = robot.world.light_cubes[cozmo.objects.LightCube3Id]
     # Class's __init__ method will call setup, which can reference the above variables.
-    running_fsm = the_class()
+    running_fsm = cozmo_fsm.program.running_fsm = the_class()
+    running_fsm.simple_cli_callback = simple_cli_callback
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
 
 def text_message(msg):
+    running_fsm = cozmo_fsm.program.running_fsm
     if not running_fsm or not running_fsm.running:
         print('No state machine running. Use runfsm(module_name) to start a state machine.')
         return
@@ -187,7 +193,7 @@ def text_message(msg):
 
 
 def show_stuff(spec):
-    global running_fsm
+    running_fsm = cozmo_fsm.program.running_fsm
     if spec == 'active':
         if not running_fsm:
             print('No state machine present.')
@@ -198,7 +204,12 @@ def show_stuff(spec):
     elif spec == 'cam_viewer' or spec=='viewer':
         if running_fsm:
             running_fsm.stop()
-        running_fsm = StateMachineProgram(cam_viewer=True).set_name("CamViewer").now()
+        running_fsm = StateMachineProgram(cam_viewer=True,
+                                          simple_cli_callback=simple_cli_callback)
+        running_fsm.set_name("CamViewer")
+        running_fsm.simple_cli_callback = simple_cli_callback
+        cozmo_fsm.program.running_fsm = running_fsm
+        running_fsm.now()
     elif spec == "particle_viewer":
         if not robot.world.particle_viewer:
             robot.world.particle_viewer = ParticleViewer(robot)
@@ -250,7 +261,7 @@ def run(sdk_conn):
 
 
 def cli_loop(robot):
-    global ans, RUNNING, running_fsm
+    global ans, RUNNING
     cli_loop.charger_warned = False
 
     cli_globals = globals()
@@ -262,7 +273,8 @@ def cli_loop(robot):
     cli_globals['charger'] = robot.world.charger
     cli_globals['ans'] = None
 
-    running_fsm = StateMachineProgram(cam_viewer=False)
+    running_fsm = cozmo_fsm.program.running_fsm = \
+        StateMachineProgram(cam_viewer=False, simple_cli_callback=simple_cli_callback)
     running_fsm.start()
 
     cli_loop._console = code.InteractiveConsole()
@@ -392,6 +404,7 @@ def start_connection():
 
 def process_interrupt():
     robot.stop_all_motors()
+    running_fsm = cozmo_fsm.program.running_fsm
     if running_fsm and running_fsm.running:
         print('\nKeyboardInterrupt: stopping', running_fsm.name)
         running_fsm.stop()

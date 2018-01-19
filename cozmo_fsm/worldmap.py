@@ -1,6 +1,6 @@
 from math import pi, inf, sin, cos, atan2, sqrt
 from cozmo.faces import Face
-from cozmo.objects import CustomObject, LightCube
+from cozmo.objects import LightCube, CustomObject, EvtObjectMovingStopped
 
 from . import transform
 from .transform import wrap_angle
@@ -141,8 +141,11 @@ class LightCubeObj(WorldObject):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
-               (self.id, self.x, self.y, self.z, self.theta*180/pi)
+        if self.pose_confidence >= 0:
+            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
+                (self.id, self.x, self.y, self.z, self.theta*180/pi)
+        else:
+            return '<LightCubeObj %d: position unknown>' % self.id
 
 class CustomCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
@@ -217,27 +220,33 @@ class WorldMap():
         for face in self.robot.world._faces.values():
             self.update_face(face)
 
-    def update_perched_cameras(self):
-        if self.robot.world.server.started:
-            for key, val in self.robot.world.server.camera_landmark_pool.get(self.robot.aruco_id,{}).items():
-                if isinstance(key,str) and 'Video' in key:
-                    if key in self.objects:
-                        self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
-                                                 theta=val[1][2], phi=val[1][1])
-                    else:
-                        # last digit of capture id as camera key
-                        self.objects[key]=CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
-                                                z=val[1][0], theta=val[1][2], phi=val[1][1])
+    def update_cube(self, cube):
+        if cube in self.objects:
+            if "LightCubeForeignObj-"+str(cube.cube_id) in self.objects:
+                # remove foreign cube when local cube seen
+                del self.objects["LightCubeForeignObj-"+str(cube.cube_id)]
+            wmobject = self.objects[cube]
+            if self.robot.carrying is wmobject:
+                if cube.is_visible: # we thought we were carrying it, but we're wrong
+                    self.robot.carrying = None
+                    return self.update_cube(cube)
+                else:  # we do appear to be carrying it
+                    self.update_carried_object(wmobject)
+        elif cube.pose is None:  # not in contact with cube
+            return None
         else:
-            for key, val in self.robot.world.particle_filter.sensor_model.landmarks.items():
-                if isinstance(key,str) and 'Video' in key:
-                    if key in self.objects:
-                        self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
-                                                 theta=val[1][2], phi=val[1][1])
-                    else:
-                        # last digit of capture id as camera key
-                        self.objects[key]=CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
-                                                z=val[1][0], theta=val[1][2], phi=val[1][1])
+            id = tuple(key for (key,value) in self.robot.world.light_cubes.items() if value == cube)[0]
+            wmobject = LightCubeObj(cube, id)
+            self.objects[cube] = wmobject
+            if not cube.pose.is_comparable(self.robot.pose):
+                wmobject.update_from_sdk = False
+                wmobject.pose_confidence = -1
+        if cube.is_visible:
+            wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
+            wmobject.pose_confidence = +1
+        if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
+            self.update_coords(wmobject, cube)
+        return wmobject
 
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
@@ -260,26 +269,6 @@ class WorldMap():
                                                 door_ids=wall_spec.door_ids,
                                                 is_foreign=False)
         
-    def update_cube(self, cube):
-        if cube in self.objects:
-            if "LightCubeForeignObj-"+str(cube.cube_id) in self.objects:
-                # remove foreign cube when local cube seen
-                del self.objects["LightCubeForeignObj-"+str(cube.cube_id)]
-            world_obj = self.objects[cube]
-            if self.robot.carrying is world_obj:
-                self.update_carried_object(world_obj)
-                return
-        elif cube.pose is None or not cube.pose.is_comparable(self.robot.pose):
-            return
-        else:
-            id = tuple(key for (key,value) in self.robot.world.light_cubes.items() if value == cube)[0]
-            world_obj = LightCubeObj(cube, id)
-            self.objects[cube] = world_obj
-        if cube.is_visible:
-            world_obj.update_from_sdk = True  # In case we've dropped it; now we see it
-        if world_obj.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
-            self.update_coords(world_obj, cube)
-
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
         for (key,value) in self.robot.world.world_map.objects.items():
@@ -312,40 +301,65 @@ class WorldMap():
         if not sdk_obj.pose.is_comparable(self.robot.pose):
             return
         if sdk_obj in self.objects:
-            world_obj = self.objects[sdk_obj]
+            wmobject = self.objects[sdk_obj]
         else:
             id = sdk_obj.object_type
-            world_obj = CustomCubeObj(sdk_obj,id)
-            self.objects[sdk_obj] = world_obj
-        self.update_coords(world_obj, sdk_obj)
+            wmobject = CustomCubeObj(sdk_obj,id)
+            self.objects[sdk_obj] = wmobject
+        self.update_coords(wmobject, sdk_obj)
 
-    def update_carried_object(self, world_obj):
-        #print('Updating carried object ',world_obj)
+    def update_carried_object(self, wmobject):
+        #print('Updating carried object ',wmobject)
         # set x,y based on robot's pose
         # need to cache initial orientation relative to robot:
-        #   grasped_orient = world_obj.theta - robot.pose.rotation.angle_z
+        #   grasped_orient = wmobject.theta - robot.pose.rotation.angle_z
         world_frame = self.robot.kine.joints['world']
         lift_attach_frame = self.robot.kine.joints['lift_attach']
         tmat = self.robot.kine.base_to_link(world_frame).dot(self.robot.kine.joint_to_base(lift_attach_frame))
         # *** HACK *** : width calculation only works for cubes; need to handle custom obj, chips
-        half_width = 22 # world_obj.size[0] / 2
+        half_width = 22 # wmobject.size[0] / 2
         new_pose = tmat.dot(transform.point(half_width,0))
         theta = self.robot.world.particle_filter.pose[2]
-        world_obj.x = new_pose[0,0]
-        world_obj.y = new_pose[1,0]
-        world_obj.theta = theta
+        wmobject.x = new_pose[0,0]
+        wmobject.y = new_pose[1,0]
+        wmobject.z = new_pose[2,0]
+        wmobject.theta = theta
 
-    def update_coords(self, world_obj, sdk_obj):
+    def update_coords(self, wmobject, sdk_obj):
         dx = sdk_obj.pose.position.x - self.robot.pose.position.x
         dy = sdk_obj.pose.position.y - self.robot.pose.position.y
         alpha = atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians
         r = sqrt(dx*dx + dy*dy)
         (rob_x,rob_y,rob_theta) = self.robot.world.particle_filter.pose
-        world_obj.x = rob_x + r * cos(alpha + rob_theta)
-        world_obj.y = rob_y + r * sin(alpha + rob_theta)
-        world_obj.z = sdk_obj.pose.position.z
+        wmobject.x = rob_x + r * cos(alpha + rob_theta)
+        wmobject.y = rob_y + r * sin(alpha + rob_theta)
+        wmobject.z = sdk_obj.pose.position.z
         orient_diff = wrap_angle(rob_theta - self.robot.pose.rotation.angle_z.radians)
-        world_obj.theta = wrap_angle(sdk_obj.pose.rotation.angle_z.radians + orient_diff)
+        wmobject.theta = wrap_angle(sdk_obj.pose.rotation.angle_z.radians + orient_diff)
+
+    def update_perched_cameras(self):
+        if self.robot.world.server.started:
+            for key, val in self.robot.world.server.camera_landmark_pool.get(self.robot.aruco_id,{}).items():
+                if isinstance(key,str) and 'Video' in key:
+                    if key in self.objects:
+                        self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
+                                                 theta=val[1][2], phi=val[1][1])
+                    else:
+                        # last digit of capture id as camera key
+                        self.objects[key]=CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
+                                                z=val[1][0], theta=val[1][2], phi=val[1][1])
+        else:
+            for key, val in self.robot.world.particle_filter.sensor_model.landmarks.items():
+                if isinstance(key,str) and 'Video' in key:
+                    if key in self.objects:
+                        self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
+                                                 theta=val[1][2], phi=val[1][1])
+                    else:
+                        # last digit of capture id as camera key
+                        self.objects[key]=CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
+                                                z=val[1][0], theta=val[1][2], phi=val[1][1])
+
+#================ Event Handlers ================
 
     def handle_object_observed(self, evt, **kwargs):
         if isinstance(evt.obj, LightCube):
@@ -354,6 +368,24 @@ class WorldMap():
             self.update_custom_object(evt.obj)
         elif isinstance(evt.obj, Face):
             self.update_face(evt.obj)
+
+    def handle_object_moved(self, evt, **kwargs):
+        cube = evt.obj
+        if self.robot.carrying and self.robot.carrying.sdk_obj is cube:
+            pass
+        else:
+            # print(evt, kwargs)
+            if cube in self.robot.world.world_map.objects:
+                wmobject = self.robot.world.world_map.objects[cube]
+                if cube.is_visible:
+                    wmobject.pose_confidence = +1
+                else:
+                    if isinstance(evt, EvtObjectMovingStopped) and \
+                       evt.move_duration > 0.25:
+                        wmobject.pose_confidence = -1
+                    else:
+                        wmobject.pose_confidence = min(0, wmobject.pose_confidence)
+
 
 #================ Wall Specification  ================
 

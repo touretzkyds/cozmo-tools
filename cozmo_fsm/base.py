@@ -129,6 +129,9 @@ class StateNode(EventListener):
         """Use now() to execute this node from the command line instead of as part of a state machine."""
         if not self.robot:
             raise ValueError('Node %s has no robot designated.' % self)
+        # 'program' is inserted into this module by __init__ to avoid circular importing
+        program.running_fsm.children = dict()
+        program.running_fsm.children[self.name] = self
         self.robot.loop.call_soon(self.start)
         return self
 

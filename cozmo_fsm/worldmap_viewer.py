@@ -206,7 +206,8 @@ class WorldMapViewer():
         cube_number = cube_obst.id
         pos = (cube_obst.x, cube_obst.y, cube_obst.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
-        valid_pose = (lcube.pose.origin_id == self.robot.pose.origin_id)
+        valid_pose = (lcube.pose.origin_id == self.robot.pose.origin_id) and \
+                     cube_obst.pose_confidence >= 0
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
@@ -216,7 +217,7 @@ class WorldMapViewer():
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
         s = light_cube_size_mm
-        if lcube.pose.is_comparable(self.robot.pose):
+        if valid_pose:
             # make solid cube and highlight if visible
             self.make_cube((s,s,s), highlight=lcube.is_visible, color=color)
         else:

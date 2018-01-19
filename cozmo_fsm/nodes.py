@@ -72,6 +72,7 @@ class Iterate(StateNode):
         self.post_data(value)
 
 class MoveLift(StateNode):
+    "Move lift at specified speed."
     def __init__(self,speed):
         super().__init__()
         self.speed = speed
@@ -265,6 +266,7 @@ class DriveContinuous(StateNode):
         self.robot.drive_wheel_motors(lspeed, rspeed, 200, 200)
 
 class LookAtObject(StateNode):
+    "Continuously adjust head angle to fixate object."
     def __init__(self):
         super().__init__()
         self.object = None
@@ -755,6 +757,7 @@ class Turn(ActionNode):
         return self.robot.turn_in_place(self.angle, **self.action_kwargs)
 
 class GoToPose(ActionNode):
+    "Uses SDK's go_to_pose method."
     def __init__(self, pose, abort_on_stop=True, **action_kwargs):
         self.pose = pose
         self.action_kwargs = action_kwargs
@@ -802,6 +805,7 @@ class SetLiftAngle(SetLiftHeight):
 
 
 class PickUpObject(ActionNode):
+    "Uses SDK's pick_up_object method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
         self.action_kwargs = action_kwargs
@@ -820,6 +824,7 @@ class PickUpObject(ActionNode):
         return self.robot.pickup_object(self.object, **self.action_kwargs)
 
 class PlaceObjectOnGroundHere(ActionNode):
+    "Uses SDK's place_object_on_ground_here method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
         self.action_kwargs = action_kwargs
@@ -838,6 +843,7 @@ class PlaceObjectOnGroundHere(ActionNode):
         return self.robot.place_object_on_ground_here(self.object, **self.action_kwargs)
 
 class PlaceOnObject(ActionNode):
+    "Uses SDK's place_on_object method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
         self.action_kwargs = action_kwargs
@@ -855,7 +861,7 @@ class PlaceOnObject(ActionNode):
             raise ValueError('No object to place')
         return self.robot.place_on_object(self.object, **self.action_kwargs)
 
-
+# Note: additional nodes for object manipulation are in pickup.fsm.
 
 #________________ Animations ________________
 

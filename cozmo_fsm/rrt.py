@@ -420,6 +420,7 @@ class RRT():
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
             if not obj.obstacle: continue
+            if obj.pose_confidence < 0: continue
             if isinstance(obj, WallObj):
                 obstacles = obstacles + self.generate_wall_obstacles(obj)
             elif isinstance(obj, (LightCubeObj,CustomCubeObj)):
