@@ -343,6 +343,9 @@ def cli_loop(robot):
                 print(ans,end='\n\n')
         except KeyboardInterrupt:
             print('Keyboard interrupt!')
+        except SystemExit:
+            print('Type exit() again to exit Python.')
+            RUNNING = False
         except Exception:
             traceback.print_exc()
             print()
