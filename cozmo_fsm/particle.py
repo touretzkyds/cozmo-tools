@@ -11,7 +11,7 @@ import cozmo
 from .transform import wrap_angle, wrap_selected_angles
 from .aruco import ArucoMarker
 from .cozmo_kin import center_of_rotation_offset
-from .worldmap import WallObj, wall_marker_dict, MarkerObj
+from .worldmap import WallObj, wall_marker_dict, ArucoMarkerObj
 from .perched import Cam
 
 class Particle():
@@ -757,12 +757,19 @@ class SLAMSensorModel(SensorModel):
                 if "Marker-"+str(id) in self.robot.world.world_map.objects:
                     del self.robot.world.world_map.objects["Marker-"+str(id)]
 
-            elif len(markers)==1 and ("Wall-"+str(id) not in self.robot.world.world_map.objects) and (markers[0][0] in self.landmarks):
-                # Only one marker seen. Estimation of wall is inaccurate due to low perspective effects in low resolution camera
-                # Adding MarkerObj at stimated location. Can later be used to direct robot to investigate the unknown Marker
-                # Permanently removed when atleast two markers of a wall are seen simultaneously
+            elif len(markers)==1 and \
+                 ("Wall-"+str(id) not in self.robot.world.world_map.objects) and \
+                 (markers[0][0] in self.landmarks):
+                # Only one marker seen. Estimation of wall is
+                # inaccurate due to low perspective effects in low
+                # resolution camera Adding ArucoMarkerObj at stimated
+                # location. Can later be used to direct robot to
+                # investigate the unknown Marker. Permanently removed
+                # when at least two markers of a wall are seen
+                # simultaneously.
                 m = self.landmarks[markers[0][0]]
-                self.robot.world.world_map.objects["Marker-"+str(id)] = MarkerObj(id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
+                self.robot.world.world_map.objects["ArucoMarker-"+str(id)] = \
+                    ArucoMarkerObj(id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
 
 
         return walls

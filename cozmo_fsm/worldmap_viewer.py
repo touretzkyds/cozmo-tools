@@ -430,9 +430,12 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
-    def make_marker(self,marker):
+    def make_custom_marker(self,marker):
+        self.make_aruco_marker(marker)
+
+    def make_aruco_marker(self,marker):
         global gl_lists
-        marker_number = marker.id
+        marker_number = marker.id if isinstance(marker.id,int) else marker.id.object_id
         s = light_cube_size_mm
         pos = (marker.x, marker.y, s)
         color = (color_red, color_green, color_blue)[marker_number%3]
@@ -440,11 +443,16 @@ class WorldMapViewer():
         glNewList(c, GL_COMPILE)
         glPushMatrix()
         glTranslatef(*pos)
-        self.make_cube((1,s,s), color=color)
+        glRotatef(marker.theta*180/pi, 0., 0., 1.)
+        highlight = marker.is_visible
+        self.make_cube((1,s,s), color=color, highlight=highlight)
         glRotatef(-90, 0., 0., 1.)
-        glTranslatef(-s/4, -s/4, s/2+0.5)
+        glRotatef(90, 1., 0., 0.)
+        length = len(ascii(marker_number)) + 0.5
+        glTranslatef(-s/4*length, -s/4, 1.0)
         glScalef(0.25, 0.2, 0.25)
-        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(marker_number%9)))
+        #glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(marker_number%9)))
+        glutStrokeString(GLUT_STROKE_MONO_ROMAN, c_char_p(bytes(ascii(marker_number),'utf8')))
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -730,8 +738,10 @@ class WorldMapViewer():
                 self.make_foreign_robot(obj)
             elif isinstance(obj, worldmap.LightCubeForeignObj):
                 self.make_foreign_cube(obj)
-            elif isinstance(obj, worldmap.MarkerObj):
-                self.make_marker(obj)
+            elif isinstance(obj, worldmap.CustomMarkerObj):
+                self.make_custom_marker(obj)
+            elif isinstance(obj, worldmap.ArucoMarkerObj):
+                self.make_aruco_marker(obj)
 
     def make_memory(self):
         global gl_lists

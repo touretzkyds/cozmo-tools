@@ -3,6 +3,7 @@ from cozmo.faces import Face
 from cozmo.objects import LightCube, CustomObject, EvtObjectMovingStopped
 
 from . import transform
+from . import custom_objs
 from .transform import wrap_angle
 
 class WorldObject():
@@ -46,18 +47,28 @@ class WallObj(WorldObject):
         return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
                (self.id, self.x, self.y, self.theta*180/pi, self.length)
 
-class MarkerObj(WorldObject):
-    def __init__(self, id=None, x=0, y=0, theta=0):
-        super().__init__(id,x,y)
+class CustomMarkerObj(WorldObject):
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+        super().__init__(id,x,y,z)
         self.theta = theta
+        self.sdk_obj = id
 
-    def update(self,x=0, y=0):
-        # Used instead of making new object for efficiency
-        self.x = x
-        self.y = y
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
 
     def __repr__(self):
-        return '<MarkerObj %d: (%.1f,%.1f)' % \
+        return '<CustomMarkerObj %d: (%.1f,%.1f)>' % \
+               (self.id.object_id, self.x, self.y)
+
+class ArucoMarkerObj(WorldObject):
+    # *** TODO: is_visible should be computed dynamically
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0, is_visible=True):
+        super().__init__(id,x,y,z)
+        self.theta = theta
+
+    def __repr__(self):
+        return '<ArucoMarkerObj %d: (%.1f,%.1f)>' % \
                (self.id, self.x, self.y)
 
 class CameraObj(WorldObject):
@@ -299,12 +310,16 @@ class WorldMap():
 
     def update_custom_object(self, sdk_obj):
         if not sdk_obj.pose.is_comparable(self.robot.pose):
+            print('Should never get here:',sdk_obj.pose,self.robot.pose)
             return
         if sdk_obj in self.objects:
             wmobject = self.objects[sdk_obj]
         else:
             id = sdk_obj.object_type
-            wmobject = CustomCubeObj(sdk_obj,id)
+            if id in custom_objs.custom_marker_types:
+                wmobject = CustomMarkerObj(sdk_obj,id)
+            elif id in custom_objs.custom_cube_types:
+                wmobject = CustomCubeObj(sdk_obj,id)
             self.objects[sdk_obj] = wmobject
         self.update_coords(wmobject, sdk_obj)
 

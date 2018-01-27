@@ -1,6 +1,9 @@
 import cozmo
 from cozmo.objects import CustomObject, CustomObjectMarkers, CustomObjectTypes
 
+custom_marker_types = []
+custom_cube_types = []
+
 async def declare_objects(robot):
 
     """
@@ -18,22 +21,61 @@ async def declare_objects(robot):
     return
     """
 
-    decl = robot.world.define_custom_cube
-    await decl(CustomObjectTypes.CustomType00,
-               CustomObjectMarkers.Circles2,
-               50, 40, 40, True)
-    await decl(CustomObjectTypes.CustomType01,
-               CustomObjectMarkers.Diamonds3,
-               50, 40, 40, True)
-    await decl(CustomObjectTypes.CustomType02,
-               CustomObjectMarkers.Hexagons4,
-               50, 40, 40, True)
-    await decl(CustomObjectTypes.CustomType03,
-               CustomObjectMarkers.Triangles5,
-               50, 40, 40, True)
-    await decl(CustomObjectTypes.CustomType04,
-               CustomObjectMarkers.Circles4,
-               50, 40, 40, True)
-    await decl(CustomObjectTypes.CustomType05,
-               CustomObjectMarkers.Diamonds5,
-               50, 40, 40, True)
+    global custom_marker_types, custom_cube_types
+    
+    decl_marker = robot.world.define_custom_wall
+    custom_marker_types = [
+        CustomObjectTypes.CustomType00,
+        CustomObjectTypes.CustomType01,
+        CustomObjectTypes.CustomType02,
+        CustomObjectTypes.CustomType03
+        ]
+
+    await decl_marker(CustomObjectTypes.CustomType00,
+                      CustomObjectMarkers.Circles3,
+                      40, 40, 40, 40, True)
+
+    await decl_marker(CustomObjectTypes.CustomType01,
+                      CustomObjectMarkers.Triangles5,
+                      40, 40, 40, 40, True)
+
+    await decl_marker(CustomObjectTypes.CustomType02,
+                      CustomObjectMarkers.Diamonds3,
+                      40, 40, 40, 40, True)
+
+    await decl_marker(CustomObjectTypes.CustomType03,
+                      CustomObjectMarkers.Hexagons3,
+                      40, 40, 40, 40, True)
+
+
+
+
+    decl_cube = robot.world.define_custom_cube
+
+    custom_cube_types = [
+        CustomObjectTypes.CustomType10,
+        CustomObjectTypes.CustomType11,
+        CustomObjectTypes.CustomType12,
+        CustomObjectTypes.CustomType13,
+        CustomObjectTypes.CustomType14,
+        CustomObjectTypes.CustomType15
+        ]
+
+    await decl_cube(CustomObjectTypes.CustomType10,
+                    CustomObjectMarkers.Circles5,
+                    50, 40, 40, True)
+    await decl_cube(CustomObjectTypes.CustomType11,
+                    CustomObjectMarkers.Diamonds5,
+                    50, 40, 40, True)
+    await decl_cube(CustomObjectTypes.CustomType12,
+                    CustomObjectMarkers.Hexagons5,
+                    50, 40, 40, True)
+    await decl_cube(CustomObjectTypes.CustomType13,
+                    CustomObjectMarkers.Triangles4,
+                    50, 40, 40, True)
+    await decl_cube(CustomObjectTypes.CustomType14,
+                    CustomObjectMarkers.Circles4,
+                    50, 40, 40, True)
+    await decl_cube(CustomObjectTypes.CustomType15,
+                    CustomObjectMarkers.Diamonds4,
+                    50, 40, 40, True)
