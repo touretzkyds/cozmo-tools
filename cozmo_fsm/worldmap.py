@@ -23,6 +23,92 @@ class WorldObject():
         else:
             self.pose_confidence = -1
 
+class LightCubeObj(WorldObject):
+    light_cube_size = (44., 44., 44.)
+    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+        super().__init__(id,x,y,z)
+        self.sdk_obj = sdk_obj
+        self.update_from_sdk = True
+        self.theta = theta
+        self.size = self.light_cube_size
+
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
+
+    def __repr__(self):
+        if self.pose_confidence >= 0:
+            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
+                (self.id, self.x, self.y, self.z, self.theta*180/pi)
+        else:
+            return '<LightCubeObj %d: position unknown>' % self.id
+
+
+class ChargerObj(WorldObject):
+    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+        super().__init__(id,x,y,z)
+        self.sdk_obj = sdk_obj
+        self.update_from_sdk = True
+        self.theta = theta
+        self.size = (104, 98, 10)
+
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
+
+    def __repr__(self):
+        if self.pose_confidence >= 0:
+            return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.>' % \
+                (self.x, self.y, self.z, self.theta*180/pi)
+        else:
+            return '<ChargerObj: position unknown>' % self.id
+
+class CustomMarkerObj(WorldObject):
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+        super().__init__(id,x,y,z)
+        self.theta = theta
+        self.sdk_obj = id
+
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
+
+    def __repr__(self):
+        return '<CustomMarkerObj %d: (%.1f,%.1f)>' % \
+               (self.id.object_id, self.x, self.y)
+
+class CustomCubeObj(WorldObject):
+    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
+        # id is a CustomObjecType
+        super().__init__(id,x,y,z)
+        self.sdk_obj = sdk_obj
+        self.update_from_sdk = True
+        self.theta = theta
+        if (size is None) and isinstance(id, CustomObject):
+            self.size = (id.x_size_mm, id.y_size_mm, id.z_size_mm)
+        elif size:
+            self.size = size
+        else:
+            self.size = (50., 50., 50.)
+
+    @property
+    def is_visible(self):
+        return self.sdk_obj.is_visible
+
+    def __repr__(self):
+        return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
+               (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi)
+
+class ArucoMarkerObj(WorldObject):
+    # *** TODO: is_visible should be computed dynamically
+    def __init__(self, id=None, x=0, y=0, z=0, theta=0, is_visible=True):
+        super().__init__(id,x,y,z)
+        self.theta = theta
+
+    def __repr__(self):
+        return '<ArucoMarkerObj %d: (%.1f,%.1f)>' % \
+               (self.id, self.x, self.y)
+
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
                  door_width=75, door_height=105, markers=[], door_ids=[], is_foreign=False):
@@ -47,29 +133,34 @@ class WallObj(WorldObject):
         return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
                (self.id, self.x, self.y, self.theta*180/pi, self.length)
 
-class CustomMarkerObj(WorldObject):
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+class ChipObj(WorldObject):
+    def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
         super().__init__(id,x,y,z)
-        self.theta = theta
-        self.sdk_obj = id
+        self.radius = radius
+        self.thickness = thickness
+
+    def __repr__(self):
+        return '<ChipObj (%.1f,%.1f) radius %.1f>' % \
+               (self.x, self.y, self.radius)
+
+class FaceObj(WorldObject):
+    def __init__(self, sdk_obj, id, x, y, z, name):
+        super().__init__(id, x, y, z)
+        self.sdk_obj = sdk_obj
+        self.obstacle = False
+
+    @property
+    def name(self):
+        return self.sdk_obj.name
 
     @property
     def is_visible(self):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        return '<CustomMarkerObj %d: (%.1f,%.1f)>' % \
-               (self.id.object_id, self.x, self.y)
+        return "<FaceObj name:'%s' expr:%s (%.1f, %.1f, %.1f) vis:%s>" % \
+               (self.name, self.expression, self.x, self.y, self.z, self.is_visible)
 
-class ArucoMarkerObj(WorldObject):
-    # *** TODO: is_visible should be computed dynamically
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0, is_visible=True):
-        super().__init__(id,x,y,z)
-        self.theta = theta
-
-    def __repr__(self):
-        return '<ArucoMarkerObj %d: (%.1f,%.1f)>' % \
-               (self.id, self.x, self.y)
 
 class CameraObj(WorldObject):
     camera_size = (44., 44., 44.)
@@ -118,6 +209,7 @@ class RobotForeignObj(WorldObject):
         self.theta = theta
         self.camera_id = camera_id
 
+
 class LightCubeForeignObj(WorldObject):
     light_cube_size = (44., 44., 44.)
     def __init__(self, id=None, cozmo_id=None, x=0, y=0, z=0, theta=0, is_visible=False):
@@ -138,75 +230,6 @@ class LightCubeForeignObj(WorldObject):
         self.z = z
         self.theta = theta
 
-class LightCubeObj(WorldObject):
-    light_cube_size = (44., 44., 44.)
-    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
-        super().__init__(id,x,y,z)
-        self.sdk_obj = sdk_obj
-        self.update_from_sdk = True
-        self.theta = theta
-        self.size = self.light_cube_size
-
-    @property
-    def is_visible(self):
-        return self.sdk_obj.is_visible
-
-    def __repr__(self):
-        if self.pose_confidence >= 0:
-            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
-                (self.id, self.x, self.y, self.z, self.theta*180/pi)
-        else:
-            return '<LightCubeObj %d: position unknown>' % self.id
-
-class CustomCubeObj(WorldObject):
-    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
-        # id is a CustomObjecType
-        super().__init__(id,x,y,z)
-        self.sdk_obj = sdk_obj
-        self.update_from_sdk = True
-        self.theta = theta
-        if (size is None) and isinstance(id, CustomObject):
-            self.size = (id.x_size_mm, id.y_size_mm, id.z_size_mm)
-        elif size:
-            self.size = size
-        else:
-            self.size = (50., 50., 50.)
-
-    @property
-    def is_visible(self):
-        return self.sdk_obj.is_visible
-
-    def __repr__(self):
-        return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
-               (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi)
-
-class ChipObj(WorldObject):
-    def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
-        super().__init__(id,x,y,z)
-        self.radius = radius
-        self.thickness = thickness
-
-    def __repr__(self):
-        return '<ChipObj (%.1f,%.1f) radius %.1f>' % \
-               (self.x, self.y, self.radius)
-
-class FaceObj(WorldObject):
-    def __init__(self, sdk_obj, id, x, y, z, name):
-        super().__init__(id, x, y, z)
-        self.sdk_obj = sdk_obj
-        self.obstacle = False
-
-    @property
-    def name(self):
-        return self.sdk_obj.name
-
-    @property
-    def is_visible(self):
-        return self.sdk_obj.is_visible
-
-    def __repr__(self):
-        return "<FaceObj name:'%s' expr:%s (%.1f, %.1f, %.1f) vis:%s>" % \
-               (self.name, self.expression, self.x, self.y, self.z, self.is_visible)
 
 #================ WorldMap ================
 
@@ -226,6 +249,7 @@ class WorldMap():
         landmarks."""
         self.update_walls()
         self.update_perched_cameras()
+        self.update_charger()
         for (id,cube) in self.robot.world.light_cubes.items():
             self.update_cube(cube)
         for face in self.robot.world._faces.values():
@@ -257,6 +281,23 @@ class WorldMap():
             wmobject.pose_confidence = +1
         if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
             self.update_coords(wmobject, cube)
+        return wmobject
+
+    def update_charger(self):
+        charger = self.robot.world.charger
+        if charger in self.objects:
+            wmobject = self.objects[charger]
+        else:
+            wmobject = ChargerObj(charger)
+            self.objects[charger] = wmobject
+            if not charger.pose.is_comparable(self.robot.pose):
+                wmobject.update_from_sdk = False
+                wmobject.pose_confidence = -1
+        if charger.is_visible:
+            wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
+            wmobject.pose_confidence = +1
+        if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
+            self.update_coords(wmobject, charger)
         return wmobject
 
     def update_walls(self):
