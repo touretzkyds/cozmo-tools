@@ -61,7 +61,7 @@ class ChargerObj(WorldObject):
             return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.>' % \
                 (self.x, self.y, self.z, self.theta*180/pi)
         else:
-            return '<ChargerObj: position unknown>' % self.id
+            return '<ChargerObj: position unknown>'
 
 class CustomMarkerObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, z=0, theta=0):
@@ -249,7 +249,7 @@ class WorldMap():
         landmarks."""
         self.update_walls()
         self.update_perched_cameras()
-        self.update_charger()
+        if self.robot.world.charger: self.update_charger()
         for (id,cube) in self.robot.world.light_cubes.items():
             self.update_cube(cube)
         for face in self.robot.world._faces.values():
