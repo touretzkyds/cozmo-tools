@@ -317,7 +317,7 @@ class LookAtObject(StateNode):
 
 class Print(StateNode):
     "Argument can be a string, or a function to be evaluated at print time."
-    def __init__(self,spec=""):
+    def __init__(self,spec=None):
         super().__init__()
         self.spec = spec
 
@@ -327,6 +327,8 @@ class Print(StateNode):
             text = self.spec()
         else:
             text = self.spec
+        if text is None and isinstance(event, DataEvent):
+            text = repr(event.data)
         print(text)
         self.post_completion()
 

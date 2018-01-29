@@ -69,7 +69,7 @@ class CNextTrans(CSFEventBase):
 class NextTrans(Transition):
     """Transition sends a NextEvent to its target nodes to advance an iterator."""
     def start(self, event=None):
-        super().start(event)
+        super().start()
         self.fire(Iterate.NextEvent())
 
 
