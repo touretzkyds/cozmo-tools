@@ -32,19 +32,19 @@ async def declare_objects(robot):
         ]
 
     await decl_marker(CustomObjectTypes.CustomType00,
-                      CustomObjectMarkers.Circles3,
+                      CustomObjectMarkers.Circles2,
                       40, 40, 40, 40, True)
 
     await decl_marker(CustomObjectTypes.CustomType01,
-                      CustomObjectMarkers.Triangles5,
+                      CustomObjectMarkers.Triangles2,
                       40, 40, 40, 40, True)
 
     await decl_marker(CustomObjectTypes.CustomType02,
-                      CustomObjectMarkers.Diamonds3,
+                      CustomObjectMarkers.Diamonds2,
                       40, 40, 40, 40, True)
 
     await decl_marker(CustomObjectTypes.CustomType03,
-                      CustomObjectMarkers.Hexagons3,
+                      CustomObjectMarkers.Hexagons2,
                       40, 40, 40, 40, True)
 
 
