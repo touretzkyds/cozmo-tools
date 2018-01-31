@@ -339,7 +339,7 @@ class ParticleViewer():
         elif key == b'D':     # right
             self.robot.loop.create_task(self.turn(-rotate_WASD))
         elif key == b'z':     # randomize
-            pf.initializer.initialize(pf.particles)
+            pf.initializer.initialize(self.robot)
         elif key == b'c':     # clear landmarks
             pf.clear_landmarks()
             print('Landmarks cleared.')
