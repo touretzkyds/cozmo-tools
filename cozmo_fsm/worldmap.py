@@ -101,9 +101,14 @@ class CustomCubeObj(WorldObject):
 
 class ArucoMarkerObj(WorldObject):
     # *** TODO: is_visible should be computed dynamically
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0, is_visible=True):
+    def __init__(self, aruco_parent, id=None, x=0, y=0, z=0, theta=0):
         super().__init__(id,x,y,z)
+        self.aruco_parent = aruco_parent
         self.theta = theta
+
+    @property
+    def is_visible(self):
+        return self.id in self.aruco_parent.seen_marker_ids
 
     def __repr__(self):
         return '<ArucoMarkerObj %d: (%.1f,%.1f)>' % \

@@ -768,8 +768,9 @@ class SLAMSensorModel(SensorModel):
                 # when at least two markers of a wall are seen
                 # simultaneously.
                 m = self.landmarks[markers[0][0]]
+                aruco_parent = self.robot.world.aruco
                 self.robot.world.world_map.objects["ArucoMarker-"+str(id)] = \
-                    ArucoMarkerObj(id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
+                    ArucoMarkerObj(aruco_parent, id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
 
 
         return walls

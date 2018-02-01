@@ -2,9 +2,10 @@ import cv2, math
 from numpy import sqrt, arctan2, array, multiply
 
 class ArucoMarker(object):
-    def __init__(self,marker_id,bbox,translation,rotation):
+    def __init__(self, aruco_parent, marker_id, bbox, translation, rotation):
         self.id = marker_id
         self.bbox = bbox
+        self.aruco_parent = aruco_parent
 
         # OpenCV Pose information
         self.opencv_translation = translation
@@ -77,7 +78,9 @@ class Aruco(object):
         self.rvecs = estimate[0]
         self.tvecs = estimate[1]
         for i in range(len(self.ids)):
-            marker = ArucoMarker(self.ids[i][0], self.corners[i],self.tvecs[i][0],self.rvecs[i][0])
+            id = int(self.ids[i][0])
+            marker = ArucoMarker(self, id,
+                                 self.corners[i], self.tvecs[i][0], self.rvecs[i][0])
             self.seen_marker_ids.append(marker.id)
             self.seen_marker_objects[marker.id] = marker
 
