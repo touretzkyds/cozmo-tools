@@ -800,7 +800,7 @@ class WorldMapViewer():
     def window_creator(self):
         global WINDOW
         WINDOW = opengl.create_window(self.windowName, (self.width,self.height))        
-        #glutDisplayFunc(self.display)
+        glutDisplayFunc(self.display)
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
         glutSpecialFunc(self.specialKeyPressed)
