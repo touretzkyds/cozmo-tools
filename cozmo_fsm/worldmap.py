@@ -275,6 +275,7 @@ class WorldMap():
         elif cube.pose is None:  # not in contact with cube
             return None
         else:
+            # Cube is not in the worldmap, so add it.
             id = tuple(key for (key,value) in self.robot.world.light_cubes.items() if value == cube)[0]
             wmobject = LightCubeObj(cube, id)
             self.objects[cube] = wmobject
@@ -438,6 +439,7 @@ class WorldMap():
             # print(evt, kwargs)
             if cube in self.robot.world.world_map.objects:
                 wmobject = self.robot.world.world_map.objects[cube]
+                if self.robot.carrying is wmobject: return
                 if cube.is_visible:
                     wmobject.pose_confidence = +1
                 else:

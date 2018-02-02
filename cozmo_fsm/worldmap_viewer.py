@@ -212,8 +212,11 @@ class WorldMapViewer():
         glNewList(c, GL_COMPILE)
         glPushMatrix()
         glTranslatef(*pos)
-        # Transpose the matrix for sending to OpenCV
-        t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3).transpose()
+        if lcube.is_visible:
+            t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)
+        else:
+            t = transform.aboutZ(cube_obst.theta)
+        t = t.transpose()   # Transpose the matrix for sending to OpenGL
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
         s = light_cube_size_mm

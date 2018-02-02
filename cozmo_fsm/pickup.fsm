@@ -223,6 +223,7 @@ class SetCarrying(StateNode):
             raise ValueError(self.object)
         self.robot.carrying = self.wmobject
         self.wmobject.update_from_sdk = False
+        self.wmobject.pose_confidence = +1
         super().start(event)
         self.post_completion()
 
@@ -397,7 +398,7 @@ class PickUpCube(StateNode):
         goto_cube: GoToCube()
         goto_cube =F=> ParentFails()
         goto_cube =C=> AbortAllActions() # clear head and lift tracks
-          =C=> SetCarrying() =C=> {raise_lift, raise_head}
+          =C=> {raise_lift, raise_head}
 
         raise_lift: SetLiftHeight(0.7)
         raise_head: SetHeadAngle(25)
@@ -422,7 +423,7 @@ class PickUpCube(StateNode):
 
         final_raise: SetLiftHeight(1.0)
         drop_head: SetHeadAngle(0)
-        {final_raise, drop_head} =C=> ParentCompletes()
+        {final_raise, drop_head} =C=> SetCarrying() =N=> ParentCompletes()
 
         frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
                                          ignore_body_track=True,
