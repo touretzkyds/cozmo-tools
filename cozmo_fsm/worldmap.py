@@ -444,7 +444,7 @@ class WorldMap():
                     wmobject.pose_confidence = +1
                 else:
                     if isinstance(evt, EvtObjectMovingStopped) and \
-                       evt.move_duration > 0.25:
+                       evt.move_duration > 1:
                         wmobject.pose_confidence = -1
                     else:
                         wmobject.pose_confidence = min(0, wmobject.pose_confidence)

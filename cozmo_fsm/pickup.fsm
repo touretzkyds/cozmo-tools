@@ -12,13 +12,12 @@ from .trace import tracefsm
 from math import sin, cos, atan2, pi, sqrt
 
 class GoToCube(StateNode):
-
     def __init__(self, cube=None):
         self.object = cube
         super().__init__()
 
     def start(self, event=None):
-        # self.object will be set up by the parent of this node
+        # self.object will normally be set up by the parent of this node
         if isinstance(self.object, LightCube):
             self.wmobject = self.robot.world.world_map.objects[self.object]
         elif isinstance(self.object, LightCubeObj):
@@ -31,13 +30,13 @@ class GoToCube(StateNode):
         super().start(event)
 
     def pick_side(self, dist, use_world_map):
-        "NOTE: This code is only correct for upright cubes"
+        "*** NOTE: This code is only correct for upright cubes"
         cube = self.object
         if use_world_map:
-            cobj = self.robot.world.world_map.objects[cube]
-            x = cobj.x
-            y = cobj.y
-            ang = cobj.theta
+            wobj = self.robot.world.world_map.objects[cube]
+            x = wobj.x
+            y = wobj.y
+            ang = wobj.theta
             rx = self.robot.world.particle_filter.pose[0]
             ry = self.robot.world.particle_filter.pose[1]
         else:
@@ -229,17 +228,14 @@ class SetCarrying(StateNode):
 
 class SetNotCarrying(StateNode):
     def start(self,event=None):
-        # Don't resume SDK updating until cube is visible again
-        if self.robot.carrying:
-            wmobject = self.robot.carrying
-            if isinstance(wmobject, LightCubeObj) and wmobject.is_visible:
-                wmobject.update_from_sdk = True
         self.robot.carrying = None
+        self.parent.object = None
         super().start(event)
         self.post_completion()
 
 class PickUpCube(StateNode):
-    "Pick up a cube using our own dock and verify routines."
+    """Pick up a cube using our own dock and verify routines.
+    Set self.object to indicate the cube to be picked up."""
     
     class VerifyPickup(StateNode):
         def probe_column(self, im, col, row_start, row_end):
@@ -373,8 +369,10 @@ class PickUpCube(StateNode):
             else:
                 self.post_failure()                
 
+    # PickUpCube methods
+
     def __init__(self, cube=None):
-        self.object = cube
+        self.cube = cube
         super().__init__()
 
     def picked_up_handler(self):
@@ -382,9 +380,14 @@ class PickUpCube(StateNode):
         self.post_failure()
         self.stop()
 
-    # PickUpCube start:
     def start(self, event=None):
-        if isinstance(self.object, LightCube):
+        if isinstance(self.cube, LightCube):
+            self.object = self.cube
+            self.wmobject = self.robot.world.world_map.objects[self.object]
+        elif isinstance(self.cube, LightCubeObj):
+            self.wmobject = self.cube
+            self.object = self.cube.sdk_obj
+        elif isinstance(self.object, LightCube):
             self.wmobject = self.robot.world.world_map.objects[self.object]
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
@@ -392,6 +395,7 @@ class PickUpCube(StateNode):
         else:
             raise ValueError(self.object)
         self.children['goto_cube'].object = self.object
+        print('Picking up',self.wmobject)
         super().start(event)
 
     $setup{  # PickUpCube machine
@@ -439,23 +443,10 @@ class PickUpCube(StateNode):
 
 class DropObject(StateNode):
     def __init__(self):
-        self.wmobject = None
         super().__init__()
 
-    class RememberCarriedObject(StateNode):
-        def start(self,event=None):
-            super().start(event)
-            self.parent.wmobject = self.robot.carrying
-
-    class SetPosition(StateNode):
-        def start(self,event=None):
-            super().start(event)
-            if self.parent.wmobject:
-                self.parent.wmobject.pose_confidence = +1
-
     $setup {
-        self.RememberCarriedObject() =N=> SetLiftHeight(0) =C=>
-          SetNotCarrying() =N=> self.SetPosition() =N=> Forward(-10) =C=> ParentCompletes()
+        SetLiftHeight(0) =C=> SetNotCarrying() =N=> Forward(-10) =C=> ParentCompletes()
     }
 
 
@@ -474,10 +465,10 @@ class PickUpCubeForeign(StateNode):
     def pick_side(self, dist, use_world_map):
         "NOTE: This code is only correct for upright cubes"
         cube = self.foreign_cube_id
-        cobj = self.robot.world.world_map.objects[cube]
-        x = cobj.x
-        y = cobj.y
-        ang = cobj.theta
+        wobj = self.robot.world.world_map.objects[cube]
+        x = wobj.x
+        y = wobj.y
+        ang = wobj.theta
         rx = self.robot.world.particle_filter.pose[0]
         ry = self.robot.world.particle_filter.pose[1]
 
