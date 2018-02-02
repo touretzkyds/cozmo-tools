@@ -428,12 +428,12 @@ class PickUpCube(StateNode):
         frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
                                          ignore_body_track=True,
                                          ignore_head_track=True,
-                                         ignore_lift_track=True) =TM=>  # =C=>
+                                         ignore_lift_track=True) =C=>
         missed_cube: SetNotCarrying() =C=> Forward(-5) =C=> {drop_lift, drop_head_low}
 
-        drop_lift: SetLiftHeight(0)
+        drop_lift: SetLiftHeight(0) =C=> backupmore: Forward(-5)
         drop_head_low: SetHeadAngle(-20)
-        {drop_lift, drop_head_low} =C=> ParentFails()
+        {backupmore, drop_head_low} =C=> ParentFails()
 
         }
 
