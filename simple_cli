@@ -111,11 +111,12 @@ ans = None
 RUNNING = True
 
 
-def simple_cli_callback(wc1, wc2, wc3):
-    global wcube1, wcube2, wcube3
+def simple_cli_callback(wc1, wc2, wc3, wchg):
+    global wcube1, wcube2, wcube3, wcharger
     wcube1 = wc1
     wcube2 = wc2
     wcube3 = wc3
+    wcharger = wchg
 
 def runfsm(module_name, running_modules=dict()):
     """runfsm('modname') reloads that module and expects it to contain

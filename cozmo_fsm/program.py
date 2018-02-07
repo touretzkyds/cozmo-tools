@@ -129,16 +129,18 @@ class StateMachineProgram(StateNode):
         self.robot.world.rrt = self.rrt or RRT(self.robot)
 
         if self.simple_cli_callback:
-            # Make worldmap cubes accessible to simple_cli
+            # Make worldmap cubes and charger accessible to simple_cli
             cubes = self.robot.world.light_cubes
-            wc1 = wc2 = wc3 = None
+            wc1 = wc2 = wc3 = wcharger = None
             if 1 in cubes:
                 wc1 = self.robot.world.world_map.update_cube(cubes[1])
             if 2 in cubes:
                 wc2 = self.robot.world.world_map.update_cube(cubes[2])
             if 3 in cubes:
                 wc3 = self.robot.world.world_map.update_cube(cubes[3])
-            self.simple_cli_callback(wc1, wc2, wc3)
+            if self.robot.world.charger is not None:
+                wcharger = self.robot.world.world_map.update_charger()
+            self.simple_cli_callback(wc1, wc2, wc3, wcharger)
 
         # Polling
         self.set_polling_interval(0.025)  # for kine and motion model update
