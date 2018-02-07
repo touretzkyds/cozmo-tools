@@ -192,8 +192,9 @@ def text_message(msg):
         print()
 
 
-def show_stuff(spec):
+def show_stuff(args):
     running_fsm = cozmo_fsm.program.running_fsm
+    spec = args[0] if len(args) > 0 else ""
     if spec == 'active':
         if not running_fsm:
             print('No state machine present.')
@@ -201,6 +202,8 @@ def show_stuff(spec):
             print("State machine '%s' is not running." % running_fsm.name)
         else:
             show_active(running_fsm,0)
+    elif spec == "kine":
+        show_kine(args[1:])
     elif spec == 'cam_viewer' or spec=='viewer':
         if running_fsm:
             running_fsm.stop()
@@ -224,11 +227,12 @@ def show_stuff(spec):
             robot.world.worldmap_viewer.start()
     else:
         print("""Invalid option. Try one of:
-  show active
   show viewer
   show worldmap_viewer
   show particle_viewer
   show path_viewer
+  show active
+  show kine [joint]
   """)
 
 
@@ -239,6 +243,72 @@ def show_active(node,depth):
     for trans in node.transitions:
         if trans.running: print('  '*(depth+1), trans)
 
+
+def show_kine(args):
+    if len(args) == 0:
+        show_kine_tree(0, robot.kine.joints['base'])
+        print()
+    elif len(args) == 1:
+        show_kine_joint(args[0])
+    else:
+        print('Usage:  show kine [joint]')
+
+
+def show_kine_tree(level, joint):
+    qstring = ''
+    if joint.type != 'fixed':
+        if isinstance(joint.q, (float,int)):
+            qval = ('%9.5g' % joint.q).strip()
+        else:
+            qval = '(' + (', '.join([('%9.5g' % v).strip() for v in joint.q])) + ')'
+        qstring = ' q=' + qval
+    print('  '*level, joint.name, ': ', joint.type, qstring, sep='')
+    for child in joint.children:
+        show_kine_tree(level+1, child)
+
+def show_kine_joint(name):
+    if name not in robot.kine.joints:
+        print("'"+repr(name)+"' is not the name of a joint.  Try 'show kine'.")
+        return
+    joint = robot.kine.joints[name]
+    fmt = '%10s'
+
+    def formatq(type,val):
+        if type == 'revolute':
+            if val == inf:
+                return 'inf'
+            elif val == -inf:
+                return '-inf'
+            jrad = ('%9.5g' % val).strip() + ' radians'
+            jdeg = '(' + ('%9.5g' % (val * 180/pi)).strip() + ' degrees)' if val != 0 else ''
+            return jrad + ' ' + jdeg
+        elif type == 'prismatic':
+            return ('%9.5g' % val).strip() + ' mm'
+        elif type == 'fixed':
+            return ''
+        elif type == 'world':
+            if val is None:
+                return ''
+            else:
+                return '(' + (', '.join(['%9.5g' % x for x in val])) + ')'
+        else:
+            raise ValueError(type)
+        
+    print(fmt % 'Name:', name)
+    print(fmt % 'Type:', joint.type)
+    print(fmt % 'Parent:', joint.parent.name if joint.parent else '')
+    print(fmt % 'q:', formatq(joint.type, joint.q))
+    print(fmt % 'qmin:', formatq(joint.type, joint.qmin))
+    print(fmt % 'qmax:', formatq(joint.type, joint.qmax))
+    print(fmt % 'DH d:', formatq('prismatic',joint.d))
+    print(fmt % 'DH theta:', formatq('revolute',joint.theta))
+    print(fmt % 'DH alpha:', formatq('revolute',joint.alpha))
+    print(fmt % 'DH r:', formatq('prismatic',joint.r))
+    print(fmt % 'Link in base frame:')
+    tprint(robot.kine.link_to_base(name))
+    print()
+    
+    
 
 def do_shell_command(cmd):
     try:
@@ -312,7 +382,8 @@ def cli_loop(robot):
             text_message(cli_loop._line[3:])
             continue
         elif cli_loop._line[0:5] == 'show ' or cli_loop._line == 'show':
-            show_stuff(cli_loop._line[5:])
+            show_args = cli_loop._line[5:].split(' ')
+            show_stuff(show_args)
             continue
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \

@@ -1,5 +1,7 @@
 from math import pi
 
+import cozmo
+
 from .kine import *
 from cozmo_fsm import transform
 from .transform import tprint
@@ -22,7 +24,8 @@ class CozmoKinematics(Kinematics):
         cor_frame = Joint('cor', parent=base_frame, r=-19.)
 
         # Use link instead of joint for world_frame
-        world_frame = Joint('world', parent=base_frame, type='world', getter=self.get_world)
+        world_frame = Joint('world', parent=base_frame, type='world', getter=self.get_world,
+                            qmin=None, qmax=None)
 
         front_axle_frame = Joint('front_axle', parent=base_frame, alpha=pi/2)
         back_axle_frame = Joint('back_axle', parent=base_frame, r=-46., alpha=pi/2)
@@ -32,6 +35,8 @@ class CozmoKinematics(Kinematics):
         # x is forward, y points up.
         shoulder_frame = Joint('shoulder', parent=base_frame,
                                type='revolute', getter=self.get_shoulder,
+                               qmin=cozmo.robot.MIN_LIFT_ANGLE.radians,
+                               qmax=cozmo.robot.MAX_LIFT_ANGLE.radians,
                                d=21., r=-39., alpha=pi/2)
         lift_attach_frame = \
             Joint('lift_attach', parent=shoulder_frame, type='revolute',
@@ -42,6 +47,8 @@ class CozmoKinematics(Kinematics):
         # With x pointing forward, y must point up.
         head_frame = Joint('head', parent=base_frame, type='revolute',
                            getter=self.get_head,
+                           qmin=cozmo.robot.MIN_HEAD_ANGLE.radians,
+                           qmax=cozmo.robot.MAX_HEAD_ANGLE.radians,
                            d=35., r=-10., alpha=pi/2)
 
         # Dummy joint located below head joint at level of the camera frame,

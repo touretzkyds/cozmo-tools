@@ -6,6 +6,7 @@ from . import rrt_shapes
 
 class Joint():
     def __init__(self, name, parent=None, type='fixed', getter=(lambda:0),
+                 qmin=-math.inf, qmax=math.inf,
                  d=0, theta=0, r=0, alpha=0,
                  collision_model=None, ctransform=transform.identity()):
         self.name = name
@@ -30,8 +31,8 @@ class Joint():
         self.children = []
         self.collision_model = collision_model
         self.q = 0
-        self.qmin = -math.inf
-        self.qmax = math.inf
+        self.qmin = qmin
+        self.qmax = qmax
         self.parent_link_to_this_joint = transform.dh_matrix(-d,-theta,-r,-alpha)
         self.this_joint_to_parent_link = np.linalg.inv(self.parent_link_to_this_joint)
 
