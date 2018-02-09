@@ -6,6 +6,7 @@ from . import rrt_shapes
 
 class Joint():
     def __init__(self, name, parent=None, type='fixed', getter=(lambda:0),
+                 description='A kinematic joint',
                  qmin=-math.inf, qmax=math.inf,
                  d=0, theta=0, r=0, alpha=0,
                  collision_model=None, ctransform=transform.identity()):
@@ -21,8 +22,9 @@ class Joint():
         elif type == 'world':
             self.apply_q = self.world_joint
         else:
-            raise ValueError("Type must be 'fixed', 'revolute', or 'prismatic'.")
+            raise ValueError("Type must be 'fixed', 'revolute', 'prismatic', or 'world'.")
         self.getter = getter
+        self.description = description
         self.children = []
         self.d = d
         self.theta = theta

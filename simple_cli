@@ -298,6 +298,7 @@ def show_kine_joint(name):
     print(fmt % 'Name:', name)
     print(fmt % 'Type:', joint.type)
     print(fmt % 'Parent:', joint.parent.name if joint.parent else '')
+    print(fmt % 'Descr.:', joint.description)
     print(fmt % 'q:', formatq(joint.type, joint.q))
     print(fmt % 'qmin:', formatq(joint.type, joint.qmin))
     print(fmt % 'qmax:', formatq(joint.type, joint.qmax))
