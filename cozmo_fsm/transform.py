@@ -83,6 +83,17 @@ def wrap_selected_angles(angle_rads, index):
 
 def tprint(t):
     number_format = "%7.3f"
+    def tprint_vector(t):
+        for i in range(t.shape[0]):
+            if i == 0:
+                print('[ ',end='')
+            else:
+                print('  ',end='')
+            print(number_format % t[i],end='')
+            if i+1 == t.shape[0]:
+                print(' ]')
+            else:
+                print()
     def tprint_matrix(t):
         for i in range(t.shape[0]):
             if i == 0:
@@ -96,7 +107,9 @@ def tprint(t):
                 print(' ]')
             else:
                 print()
-    if isinstance(t, np.ndarray):
+    if isinstance(t, np.ndarray) and t.ndim == 1:
+        tprint_vector(t)
+    elif isinstance(t, np.ndarray) and t.ndim == 2:
         tprint_matrix(t)
     elif isinstance(t, (int,float)):
         print(number_format % t)
