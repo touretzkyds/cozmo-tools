@@ -47,9 +47,11 @@ class CozmoKinematics(Kinematics):
                                d=21., r=-39., alpha=pi/2)
 
         lift_attach_frame = \
-            Joint('lift_attach', parent=shoulder_frame, type='fixed',
-                  description='Tip of the lift, where cubes attach',
+            Joint('lift_attach', parent=shoulder_frame, type='revolute',
+                  description='Tip of the lift, where cubes attach; distal end of four-bar linkage',
                   getter=self.get_lift_attach, r=66.,
+                  qmax = - cozmo.robot.MIN_LIFT_ANGLE.radians,
+                  qmin = - cozmo.robot.MAX_LIFT_ANGLE.radians,
                   collision_model=Circle(transform.point(), radius=10))
 
         # Positive head angle is up, so z must point to the right.
