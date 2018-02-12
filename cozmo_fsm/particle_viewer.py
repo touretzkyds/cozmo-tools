@@ -207,7 +207,7 @@ class ParticleViewer():
             glTranslatef(*coords,0)
             glRotatef(lm_orient[1]*(180/pi)-90, 0., 0., 1.)
         else:
-            self.draw_rectangle(coords, size=size, angle=lm_orient, color=color)
+            self.draw_rectangle(coords, size=size, angle=lm_orient*(180/pi), color=color)
             glColor4f(0., 0., 0., 1.)
             glTranslatef(*coords,0)
             glRotatef(lm_orient*(180/pi)-90, 0., 0., 1.)
