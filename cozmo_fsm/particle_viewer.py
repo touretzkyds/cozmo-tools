@@ -221,7 +221,7 @@ class ParticleViewer():
         self.draw_particle_landmark_ellipse(lm_mu, lm_sigma, ellipse_color)
 
     def draw_particle_landmark_ellipse(self,coords,sigma,color):
-        (w,v) = np.linalg.eigh(sigma)
+        (w,v) = np.linalg.eigh(sigma[0:2,0:2])
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse(coords, abs(w)**0.5, alpha*(180/pi), color=color)
 
