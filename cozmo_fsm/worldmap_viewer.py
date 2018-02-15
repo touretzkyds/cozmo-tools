@@ -350,7 +350,7 @@ class WorldMapViewer():
         edges = transform.translate(wall_obst.x,wall_obst.y).dot(edges)
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
-        if wall_obst.foreign:
+        if wall_obst.is_foreign:
             color = color_white
         else:
             color = color_red
@@ -454,7 +454,6 @@ class WorldMapViewer():
         length = len(ascii(marker_number)) + 0.5
         glTranslatef(-s/4*length, -s/4, 1.0)
         glScalef(0.25, 0.2, 0.25)
-        #glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(marker_number%9)))
         glutStrokeString(GLUT_STROKE_MONO_ROMAN, c_char_p(bytes(ascii(marker_number),'utf8')))
         glPopMatrix()
         glEndList()
