@@ -17,14 +17,14 @@ center_of_rotation_offset = -19 # millimeters
 class CozmoKinematics(Kinematics):
     def __init__(self,robot):
         base_frame = Joint('base',
-                           description='Base frame: the root of the kinematic tree',
-                           collision_model=Rectangle(transform.point(),
-                                                     dimensions=(95,60)))
+                           description='Base frame: the root of the kinematic tree')
 
         # cor is center of rotation
         cor_frame = Joint('cor', parent=base_frame,
                           description='Center of rotation',
-                          r=-19.)
+                          r=-19.,
+                          collision_model=Rectangle(transform.point(),
+                                                    dimensions=(95,60)))
 
         # Use link instead of joint for world_frame
         world_frame = Joint('world', parent=base_frame, type='world', getter=self.get_world,

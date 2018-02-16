@@ -35,6 +35,7 @@ class StateMachineProgram(StateNode):
                  annotated_scale_factor = 2, # set to 1 to avoid cost of resizing images
 
                  particle_filter = True,
+                 landmark_test = SLAMSensorModel.is_aruco,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
 
@@ -78,6 +79,7 @@ class StateMachineProgram(StateNode):
         self.annotated_scale_factor = annotated_scale_factor
 
         self.particle_filter = particle_filter
+        self.landmark_test = landmark_test
         self.particle_viewer = particle_viewer
         self.particle_viewer_scale = particle_viewer_scale
         self.picked_up_callback = self.robot_picked_up
@@ -112,7 +114,7 @@ class StateMachineProgram(StateNode):
         running_fsm = self
         # Create a particle filter
         if not isinstance(self.particle_filter,ParticleFilter):
-            self.particle_filter = SLAMParticleFilter(self.robot)
+            self.particle_filter = SLAMParticleFilter(self.robot, landmark_test=self.landmark_test)
         pf = self.particle_filter
         pf.primed = False  # haven't processed a camera image yet
         self.robot.world.particle_filter = pf
@@ -166,7 +168,7 @@ class StateMachineProgram(StateNode):
 
         if self.path_viewer:
             if self.path_viewer is True:
-                self.path_viewer = PathViewer(self.robot.world.rrt)
+                self.path_viewer = PathViewer(self.robot, self.robot.world.rrt)
             else:
                 self.path_viewer.set_rrt(self.robot.world.rrt)
             self.path_viewer.start()

@@ -220,7 +220,7 @@ def show_stuff(args):
             robot.world.particle_viewer.start()
     elif spec == "path_viewer":
         if not robot.world.path_viewer:
-            robot.world.path_viewer = PathViewer(world.rrt)
+            robot.world.path_viewer = PathViewer(robot,world.rrt)
             robot.world.path_viewer.start()
     elif spec == "worldmap_viewer":
         if not robot.world.worldmap_viewer:

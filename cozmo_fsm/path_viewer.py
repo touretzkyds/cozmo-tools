@@ -17,6 +17,7 @@ import numpy as np
 WINDOW = None
 
 from . import opengl
+from .rrt import RRTNode
 from .rrt_shapes import *
 from . import transform
 from .transform import wrap_angle
@@ -25,13 +26,14 @@ the_rrt = None
 the_items = []  # each item is a tuple (tree,color)
 
 class PathViewer():
-    def __init__(self, rrt,
+    def __init__(self, robot, rrt,
                  width=512, height=512,
                  windowName = "path viewer",
                  bgcolor = (0,0,0)):
         global the_rrt, the_items
         the_rrt = rrt
         the_items = []
+        self.robot = robot
         self.width = width
         self.height = height
         self.bgcolor = bgcolor
@@ -172,8 +174,8 @@ class PathViewer():
                     self.draw_line((init_x,init_y), (cur_x,cur_y), color=color)
                     (init_x,init_y) = (cur_x,cur_y)
 
-    def draw_robot(self,start_node):
-        parts = the_rrt.robot_parts_to_node(start_node)
+    def draw_robot(self,node):
+        parts = the_rrt.robot_parts_to_node(node)
         for part in parts:
             if isinstance(part,Circle):
                 self.draw_circle(center=(part.center[0,0],part.center[1,0]),
@@ -226,8 +228,10 @@ class PathViewer():
         for obst in the_rrt.obstacles:
             self.draw_obstacle(obst)
 
-        if the_rrt.start:
-            self.draw_robot(the_rrt.start)
+        #if the_rrt.start:
+        #    self.draw_robot(the_rrt.start)
+        pose = self.robot.world.particle_filter.pose
+        self.draw_robot(RRTNode(x=pose[0], y=pose[1], q=pose[2]))
 
         glutSwapBuffers()
 
