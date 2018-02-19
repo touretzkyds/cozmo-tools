@@ -630,6 +630,10 @@ class ActionNode(StateNode):
             return
         if isinstance(result, cozmo.action.Action):
             self.cozmo_action_handle = result
+        elif result is None: # Aborted
+            self.post_failure()
+            self.post_completion()
+            return
         else:
             raise ValueError("Result of %s launch_action() is %s, not a cozmo.action.Action." %
                              (self,result))
@@ -743,6 +747,8 @@ class Turn(ActionNode):
     def __init__(self, angle=degrees(90), abort_on_stop=True, **action_kwargs):
         if isinstance(angle, (int,float)):
             angle = degrees(angle)
+        elif angle is None:
+            pass
         elif not isinstance(angle, cozmo.util.Angle):
             raise ValueError('%s angle must be a number or a cozmo.util.Angle' % self)
         self.angle = angle
@@ -756,7 +762,10 @@ class Turn(ActionNode):
         super().start(event)
 
     def action_launcher(self):
-        return self.robot.turn_in_place(self.angle, **self.action_kwargs)
+        if self.angle is None:
+            return None
+        else:
+            return self.robot.turn_in_place(self.angle, **self.action_kwargs)
 
 class GoToPose(ActionNode):
     "Uses SDK's go_to_pose method."

@@ -106,7 +106,8 @@ class GoToCube(StateNode):
             print('%scube %s at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  brg=%5.1f' %
                   (self.id_string, vis, cx, cy, rx, ry, dist, bearing))
 
-    class TurnToCube(SmallTurn):
+
+    class TurnToCube(Turn):
         def __init__(self, offset=0, check_vis=False):
             self.offset = offset
             self.check_vis = check_vis
@@ -117,7 +118,7 @@ class GoToCube(StateNode):
             cube = self.parent.object
             if self.check_vis and not cube.is_visible:
                 print('** TurnToCube could not see the cube.')
-                self.angle = None # Angle(0)
+                self.angle = None
                 super().start(event)
                 self.post_failure()
             else:
@@ -127,12 +128,12 @@ class GoToCube(StateNode):
                 dx = cx - rx
                 dy = cy - ry
                 dist = math.sqrt(dx*dx + dy*dy)
-                self.angle = wrap_angle(atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians) \
-                             * 180/pi
-                if abs(self.angle) < 2:
-                    self.angle = 0
+                self.angle = degrees(wrap_angle(atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians) \
+                                     * 180/pi)
+                if abs(self.angle.degrees) <= 2:
+                    self.angle = degrees(0)
                 print('TurnToCube: cube at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  angle=%5.1f' %
-                      (cx, cy, rx, ry, dist, self.angle))
+                      (cx, cy, rx, ry, dist, self.angle.degrees))
                 super().start(event)
 
     class CheckAlmostDocked(StateNode):
