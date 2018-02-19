@@ -9,7 +9,7 @@ from cozmo_fsm import *
 
 class CV_GoodFeatures(StateMachineProgram):
     def __init__(self):
-        super().__init__(aruco=False, cam_viewer=True, annotate_sdk = False)
+        super().__init__(aruco=False, cam_viewer=True, annotate_sdk=False)
 
     def start(self):
         cv2.namedWindow('features')
@@ -17,9 +17,7 @@ class CV_GoodFeatures(StateMachineProgram):
         cv2.imshow('features',dummy)
 
         cv2.createTrackbar('maxFeatures','features',50,100,lambda self: None)
-
         cv2.createTrackbar('qualityLevel','features',10,1000,lambda self: None)
-
         cv2.createTrackbar('minDistance','features',5,50,lambda self: None)
 
         self.colors = np.random.randint(0,255,(101,3),dtype=np.int)
@@ -37,12 +35,13 @@ class CV_GoodFeatures(StateMachineProgram):
 
     def user_annotate(self,image):
         if self.corners is None: return image
+        scale = self.annotated_scale_factor
         i = 0
         for corner in self.corners:
             x,y = corner.ravel()
             x = int(x); y = int(y)
             color_index = (x+y) % self.colors.shape[0]
             color = self.colors[color_index].tolist()
-            cv2.circle(image, (2*x,2*y), 3, color, -1)
+            cv2.circle(image, (scale*x, scale*y), 3, color, -1)
             i += 1
         return image

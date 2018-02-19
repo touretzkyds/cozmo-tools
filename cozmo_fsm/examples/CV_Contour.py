@@ -41,8 +41,9 @@ class CV_Contour(StateMachineProgram):
         self.contours = contours
         self.hierarchy = hierarchy
 
-    def user_annotate(self,image):
+    def user_annotate(self,annotated_image):
         minArea = cv2.getTrackbarPos('minArea','contour')
+        scale = self.annotated_scale_factor
         for area_entry in self.areas:
             if area_entry[1] < minArea:
                 break
@@ -51,6 +52,6 @@ class CV_Contour(StateMachineProgram):
             while temp != -1 and depth < len(self.colors)-1:
                 depth += 1
                 temp = self.hierarchy[0,temp,3]
-            contour = 2 * self.contours[index]
-            cv2.drawContours(image, [contour], 0, self.colors[depth], 1)
-        return image
+            contour = scale * self.contours[index]
+            cv2.drawContours(annotated_image, [contour], 0, self.colors[depth], 1)
+        return annotated_image

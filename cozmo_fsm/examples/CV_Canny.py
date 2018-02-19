@@ -1,5 +1,5 @@
 """
-  CV_Thresh demonstrates image thresholding in OpenCV, and
+  CV_Canny demonstrates image thresholding in OpenCV, and
   independently, the Canny edge detector.
 """
 
@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 from cozmo_fsm import *
 
-class CV_Thresh(StateMachineProgram):
+class CV_Canny(StateMachineProgram):
     def __init__(self):
         super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
                          annotate_sdk = False)
