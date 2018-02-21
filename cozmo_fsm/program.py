@@ -285,6 +285,7 @@ class StateMachineProgram(StateNode):
             # Other annotators can run here if the user supplies them.
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
+            annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
             if self.windowName:
                 if os.name == 'nt':
                     cv2.waitKey(1)
