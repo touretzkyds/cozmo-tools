@@ -176,6 +176,8 @@ def runfsm(module_name, running_modules=dict()):
     # Class's __init__ method will call setup, which can reference the above variables.
     running_fsm = cozmo_fsm.program.running_fsm = the_class()
     running_fsm.simple_cli_callback = simple_cli_callback
+    cli_globals = globals()
+    cli_globals['running_fsm'] = running_fsm
     robot.loop.call_soon(running_fsm.start)
     return running_fsm
 
@@ -347,6 +349,7 @@ def cli_loop(robot):
 
     running_fsm = cozmo_fsm.program.running_fsm = \
         StateMachineProgram(cam_viewer=False, simple_cli_callback=simple_cli_callback)
+    cli_globals['running_fsm'] = running_fsm
     running_fsm.start()
 
     cli_loop._console = code.InteractiveConsole()
