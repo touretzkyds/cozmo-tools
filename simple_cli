@@ -228,6 +228,8 @@ def show_stuff(args):
         if not robot.world.worldmap_viewer:
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
+    elif spec == "pose":
+        show_pose()
     elif spec == "landmarks":
         show_landmarks()
     else:
@@ -238,6 +240,7 @@ def show_stuff(args):
   show path_viewer
   show active
   show kine [joint]
+  show pose
   show landmarks
   """)
 
@@ -315,6 +318,14 @@ def show_kine_joint(name):
     tprint(robot.kine.link_to_base(name))
     print()
     
+def show_pose():
+    print('robot.pose is:   %6.1f %6.1f @ %6.1f deg.' %
+          (robot.pose.position.x, robot.pose.position.y, robot.pose_angle.degrees))
+    print('particle filter: %6.1f %6.1f @ %6.1f deg.' %
+          (*robot.world.particle_filter.pose[0:2],
+           robot.world.particle_filter.pose[2]*180/pi))
+    print()
+
 def show_landmarks():
     landmarks = robot.world.particle_filter.best_particle.landmarks
     print('The particle filter has %d landmark%s:' %
