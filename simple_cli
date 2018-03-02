@@ -228,6 +228,8 @@ def show_stuff(args):
         if not robot.world.worldmap_viewer:
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
+    elif spec == "landmarks":
+        show_landmarks()
     else:
         print("""Invalid option. Try one of:
   show viewer
@@ -236,6 +238,7 @@ def show_stuff(args):
   show path_viewer
   show active
   show kine [joint]
+  show landmarks
   """)
 
 
@@ -312,6 +315,22 @@ def show_kine_joint(name):
     tprint(robot.kine.link_to_base(name))
     print()
     
+def show_landmarks():
+    landmarks = robot.world.particle_filter.best_particle.landmarks
+    print('The particle filter has %d landmark%s:' %
+          (len(landmarks), '' if (len(landmarks) == 1) else 's'))
+    for (key,value) in landmarks.items():
+        x = value[0][0,0]
+        y = value[0][1,0]
+        theta = value[1] * 180/pi
+        if isinstance(key, int):
+            print('  ArUco marker %d' % key, end='')
+        elif isinstance(key, LightCube):
+            print('  Cube %d' % key.cube_id, end='')
+        else:
+            print('  %r' % key, end='')
+        print(' at (%.1f, %.1f) @ %.1f deg' % (x, y, theta))
+    print()
     
 
 def do_shell_command(cmd):
