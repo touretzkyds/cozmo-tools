@@ -4,7 +4,10 @@ import inspect
 import os
 import time
 
-import numpy, cv2
+import numpy
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
 
 import cozmo
 
