@@ -339,6 +339,25 @@ class AbortAllActions(StateNode):
         self.robot.abort_all_actions()
         self.post_completion()
 
+class ColorImageEnabled(StateNode):
+    def __init__(self,enabled=True):
+        self.enabled = enabled
+        super().__init__()
+
+    def start(self,event=None):
+        super().start(event)
+        if self.robot.camera.color_image_enabled == self.enabled:
+            self.post_completion()
+        else:
+            self.robot.camera.color_image_enabled = self.enabled
+            self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+
+    def new_image(self,event,**kwargs):
+        if self.robot.camera.color_image_enabled:
+            self.robot.world.latest_color_image = event.image
+        self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+        self.post_completion()
+
 #________________ Coroutine Nodes ________________
 
 class CoroutineNode(StateNode):
