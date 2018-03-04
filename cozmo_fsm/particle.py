@@ -102,10 +102,12 @@ class DefaultMotionModel(MotionModel):
         old_hdg = old_pose.rotation.angle_z.radians
         new_hdg = new_pose.rotation.angle_z.radians
         turn_angle = wrap_angle(new_hdg - old_hdg)
-        dx = new_xyz[0] - old_xyz[0]
-        dy = new_xyz[1] - old_xyz[1]
         cor = center_of_rotation_offset
-        dist = max(0, sqrt(dx*dx + dy*dy) + cor * abs(turn_angle))
+        old_rx = old_xyz[0] + cor * cos(old_hdg)
+        old_ry = old_xyz[1] + cor * sin(old_hdg)
+        new_rx = new_xyz[0] + cor * cos(new_hdg)
+        new_ry = new_xyz[1] + cor * sin(new_hdg)
+        dist = sqrt((new_rx-old_rx)**2 + (new_ry-old_ry)**2)
         # Did we drive forward, or was it backward?
         fwd_xy = (old_xyz[0] + dist * cos(old_hdg+turn_angle/2),
                   old_xyz[1] + dist * sin(old_hdg+turn_angle/2))
@@ -122,10 +124,12 @@ class DefaultMotionModel(MotionModel):
             pdist = dist * (1 + random.gauss(0, self.sigma_trans))
             pturn = random.gauss(turn_angle, rot_var)
             # Correct for the center of rotation being behind the base frame
+            # (xc,yc) is vector from initial center of rotation to base frame
             xc = -cor * cos(p.theta)
             yc = -cor * sin(p.theta)
             cost = cos(turn_angle)
             sint = sin(turn_angle)
+            # (xcor,ycor) is the translation of the base frame due to rotation about c.o.r.
             xcor = xc * cost + yc * -sint - xc
             ycor = xc * sint + yc *  cost - yc
             # Make half the turn, translate, then complete the turn
