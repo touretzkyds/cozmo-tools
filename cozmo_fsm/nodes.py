@@ -171,15 +171,15 @@ class DriveContinuous(StateNode):
         # Advance to next waypoint if indicated
         if reached_waypoint:
             self.path_index += 1
-            print('DriveContinuous: path index advanced to',self.path_index)
+            print('DriveContinuous: path index advanced to %d' % self.path_index, end='')
             if self.path_index == len(self.path):
-                print('DriveContinous: path complete.  Stopping.')
+                print('\nDriveContinous: path complete.  Stopping.')
                 self.robot.stop_all_motors()
                 self.post_completion()
                 return
             elif self.path_index > len(self.path):
                 # uncaught completion event
-                print('DriveContinuous: uncaught completion! Stopping.')
+                print('\nDriveContinuous: uncaught completion! Stopping.')
                 self.stop()
                 return
             self.prev = self.cur
@@ -187,12 +187,18 @@ class DriveContinuous(StateNode):
             self.last_dist = math.inf
             self.reached_dist = False
             self.target_q = math.atan2(self.cur[1]-self.prev[1], self.cur[0]-self.prev[0])
+            print(': [%.1f, %.1f] tgtQ is %.1f deg' % (*self.cur, self.target_q*180/pi))
 
             # Is the target behind us?
-            delta_q = wrap_angle(q - self.target_q)
+            delta_q = wrap_angle(self.target_q - q)
             delta_dist = math.sqrt((self.cur[0]-x)**2 + (self.cur[1]-y)**2)
-            if abs(delta_q) > pi/2:
-                print('DriveCont--> delta_q =',delta_q*180/pi,'degrees   delta_dist=',delta_dist)
+            if abs(delta_q) > 3*pi/4:
+                self.target_q = wrap_angle(self.target_q + pi)
+                self.drive_direction = -1
+                print('DriveCont--> delta_q = %.1f deg., new target_q = %.1f deg., dist = %.1f' %
+                      (delta_q*180/pi, self.target_q*180/pi, delta_dist))
+            else:
+                self.drive_direction = +1
 
             # Heading determines whether we're solving y=f(x) or x=f(y)
             if abs(self.target_q) < pi/4 or abs(abs(self.target_q)-pi) < pi/4:
@@ -255,14 +261,15 @@ class DriveContinuous(StateNode):
             qscale = 150
             flag = "  "
         speedinc = qscale * correcting_q
-        lspeed = speed - speedinc
-        rspeed = speed + speedinc
+        lspeed = self.drive_direction * (speed - self.drive_direction*speedinc)
+        rspeed = self.drive_direction * (speed + self.drive_direction*speedinc)
+
         """
         print('%s x: %5.1f  y: %5.1f  q:%6.1f     derr: %5.1f  qerr:%6.1f  corq: %5.1f  inc: %5.1f  dist: %5.1f' %
               (self.mode+flag, x, y, q*180/pi, d_error, q_error*180/pi,
                correcting_q*180/pi, speedinc, dist))
-               """
-        #self.handle = asyncio.ensure_future(self.robot.drive_wheels(lspeed, rspeed, 200, 200))
+        """
+
         self.robot.drive_wheel_motors(lspeed, rspeed, 200, 200)
 
 class LookAtObject(StateNode):
@@ -338,6 +345,26 @@ class AbortAllActions(StateNode):
         super().start(event)
         self.robot.abort_all_actions()
         self.post_completion()
+
+class ColorImageEnabled(StateNode):
+    def __init__(self,enabled=True):
+        self.enabled = enabled
+        super().__init__()
+
+    def start(self,event=None):
+        super().start(event)
+        if self.robot.camera.color_image_enabled == self.enabled:
+            self.post_completion()
+        else:
+            self.robot.camera.color_image_enabled = self.enabled
+            self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+
+    def new_image(self,event,**kwargs):
+        if self.robot.camera.color_image_enabled:
+            self.robot.world.latest_color_image = event.image
+        self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+        self.post_completion()
+
 
 #________________ Coroutine Nodes ________________
 
@@ -815,6 +842,26 @@ class SetLiftAngle(SetLiftHeight):
         super().__init__(height_pct, abort_on_stop=abort_on_stop, **action_kwargs)
 
 
+class DockWithCube(ActionNode):
+    "Uses SDK's dock_with_cube method."
+    def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
+        self.object = object
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop=abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and \
+                isinstance(event.data,cozmo.objects.LightCube):
+            self.object = event.data
+        super().start(event)
+
+    def action_launcher(self):
+        if self.object is None:
+            raise ValueError('No cube to dock with')
+        return self.robot.dock_with_cube(self.object, **self.action_kwargs)
+
+
 class PickUpObject(ActionNode):
     "Uses SDK's pick_up_object method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
@@ -833,6 +880,7 @@ class PickUpObject(ActionNode):
         if self.object is None:
             raise ValueError('No object to pick up')
         return self.robot.pickup_object(self.object, **self.action_kwargs)
+
 
 class PlaceObjectOnGroundHere(ActionNode):
     "Uses SDK's place_object_on_ground_here method."
