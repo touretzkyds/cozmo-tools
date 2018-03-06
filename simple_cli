@@ -232,6 +232,8 @@ def show_stuff(args):
         show_pose()
     elif spec == "landmarks":
         show_landmarks()
+    elif spec == "objects":
+        show_objects()
     else:
         print("""Invalid option. Try one of:
   show viewer
@@ -242,6 +244,7 @@ def show_stuff(args):
   show kine [joint]
   show pose
   show landmarks
+  show objects
   """)
 
 
@@ -343,6 +346,14 @@ def show_landmarks():
         print(' at (%.1f, %.1f) @ %.1f deg' % (x, y, theta))
     print()
     
+
+def show_objects():
+    objs = robot.world.world_map.objects
+    print('%d object%s in the world map:' %
+          (len(objs), '' if len(objs) == 1 else 's'))
+    for (key,value) in objs.items():
+        print('  ', value)
+    print()
 
 def do_shell_command(cmd):
     try:
