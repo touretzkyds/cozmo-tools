@@ -10,7 +10,7 @@ from .rrt_shapes import *
 # ================ Constants ================
 
 wheelbase = 45 # millimeters
-center_of_rotation_offset = -19 # millimeters
+center_of_rotation_offset = -19.7 # millimeters
 
 # ================================================================
 
