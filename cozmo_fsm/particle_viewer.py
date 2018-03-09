@@ -39,7 +39,7 @@ class ParticleViewer():
 
     def window_creator(self):
         global WINDOW
-        WINDOW = opengl.create_window(self.windowName, (self.width,self.height))        
+        WINDOW = opengl.create_window(bytes(self.windowName, 'utf-8'), (self.width,self.height))
         glutDisplayFunc(self.display)
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
@@ -172,7 +172,7 @@ class ParticleViewer():
                 self.draw_landmark_from_particle(id, specs, label, color)
 
     def draw_landmark_from_pose(self, id, specs, label, color):
-        coords = (specs.position.x, specs.position.y, 0.)
+        coords = (specs.position.x, specs.position.y)
         angle = specs.rotation.angle_z.degrees
         if isinstance(id, cozmo.objects.LightCube):
             size = (44,44)
@@ -182,7 +182,7 @@ class ParticleViewer():
         glColor4f(*color)
         self.draw_rectangle(coords, size=size, angle=angle, color=color)
         glColor4f(0., 0., 0., 1.)
-        glTranslatef(*coords)
+        glTranslatef(*coords,0)
         glRotatef(angle-90, 0., 0., 1.)
         label_str = ascii(label)
         glTranslatef(3.-7*len(label_str), -5., 0.)
