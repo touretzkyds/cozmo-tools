@@ -67,7 +67,7 @@ class CozmoKinematics(Kinematics):
         # and x axis points down, z points forward, y points left
         camera_dummy = Joint('camera_dummy', parent=head_frame,
                              description='Dummy joint below the head, at the level of the camera frame',
-                             theta=-pi/2, r=-7.5, alpha=-pi/2)
+                             theta=-pi/2, r=7.5, alpha=-pi/2)
         # x axis points right, y points down, z points forward
         camera_frame = Joint('camera', parent=camera_dummy,
                              description='Camera reference frame; y is down and z is outward',
