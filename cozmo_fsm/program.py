@@ -28,6 +28,7 @@ from .perched import *
 from .sharedmap import *
 
 running_fsm = None
+charger_warned = False
 
 class StateMachineProgram(StateNode):
     def __init__(self,
@@ -36,6 +37,7 @@ class StateMachineProgram(StateNode):
                  force_annotation = False,   # set to True for annotation even without cam_viewer
                  annotate_sdk = True,        # include SDK's own image annotations
                  annotated_scale_factor = 2, # set to 1 to avoid cost of resizing images
+                 viewer_crosshairs = False,  # set to True to draw viewer crosshairs
 
                  particle_filter = True,
                  landmark_test = SLAMSensorModel.is_aruco,
@@ -80,6 +82,7 @@ class StateMachineProgram(StateNode):
         self.annotate_sdk = annotate_sdk
         self.force_annotation = force_annotation
         self.annotated_scale_factor = annotated_scale_factor
+        self.viewer_crosshairs = viewer_crosshairs
 
         self.particle_filter = particle_filter
         self.landmark_test = landmark_test
@@ -236,6 +239,7 @@ class StateMachineProgram(StateNode):
         #    cv2.destroyWindow(self.windowName)
 
     def poll(self):
+        global charger_warned
         self.robot.kine.get_pose()
         if self.robot.is_picked_up:
             # robot is in the air
@@ -251,6 +255,12 @@ class StateMachineProgram(StateNode):
                 else:
                     pf.move()
         self.robot.was_picked_up = self.robot.is_picked_up
+        if self.robot.is_on_charger:
+            if not charger_warned:
+                print("\n** On charger. Type robot.drive_off_charger_contacts() to enable motion.")
+                charger_warned = True
+        else:
+            charger_warned = False
 
     def user_image(self,image,gray): pass
 
@@ -271,7 +281,7 @@ class StateMachineProgram(StateNode):
         # Annotate and display image if requested
         if self.force_annotation or self.windowName is not None:
             scale = self.annotated_scale_factor
-            # Apply Cozmo SDK annotations.
+            # Apply Cozmo SDK annotations and rescale.
             if self.annotate_sdk:
                 coz_ann = event.image.annotate_image(scale=scale)
                 annotated_im = numpy.array(coz_ann)
@@ -281,6 +291,11 @@ class StateMachineProgram(StateNode):
                 annotated_im = cv2.resize(curim, dsize)
             else:
                 annotated_im = curim
+            # Yellow viewer crosshairs
+            if self.viewer_crosshairs:
+                shape = annotated_im.shape
+                cv2.line(annotated_im, (int(shape[1]/2),0), (int(shape[1]/2),shape[0]), (255,255,0), 1)
+                cv2.line(annotated_im, (0,int(shape[0]/2)), (shape[1],int(shape[0]/2)), (255,255,0), 1)
             # Aruco annotation
             if self.aruco and \
                    len(self.robot.world.aruco.seen_marker_ids) > 0:
