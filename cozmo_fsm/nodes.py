@@ -346,7 +346,21 @@ class AbortAllActions(StateNode):
         self.robot.abort_all_actions()
         self.post_completion()
 
-class ColorImageEnabled(StateNode):
+#________________ Color Images ________________
+
+class ColorImageBase(StateNode):
+
+    def is_color(self,image):
+        raw = image.raw_image
+        for i in range(0, raw.height, 15):
+            pixel = raw.getpixel((i,i))
+            if pixel[0] != pixel[1]:
+                return True
+        return False
+
+
+class ColorImageEnabled(ColorImageBase):
+    """Turn color images on or off and post completion when setting has taken effect."""
     def __init__(self,enabled=True):
         self.enabled = enabled
         super().__init__()
@@ -360,10 +374,30 @@ class ColorImageEnabled(StateNode):
             self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
 
     def new_image(self,event,**kwargs):
-        if self.robot.camera.color_image_enabled:
+        is_color = self.is_color(event.image)
+        if is_color:
             self.robot.world.latest_color_image = event.image
-        self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
-        self.post_completion()
+        if is_color == self.enabled:
+            self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+            self.post_completion()
+
+
+class GetColorImage(ColorImageBase):
+    """Post one color image as a data event; leave color mode unchanged."""
+
+    def start(self,event=None):
+        super().start(event)
+        self.save_enabled = self.robot.camera.color_image_enabled
+        if not self.save_enabled:
+            self.robot.camera.color_image_enabled = True
+        self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+
+    def new_image(self,event,**kwargs):
+        if self.is_color(event.image):
+            self.robot.world.latest_color_image = event.image
+            self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+            self.robot.camera.color_image_enabled = self.save_enabled
+            self.post_data(event.image)
 
 
 #________________ Coroutine Nodes ________________
