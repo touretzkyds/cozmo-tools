@@ -271,6 +271,8 @@ def show_kine_tree(level, joint):
     if joint.type != 'fixed':
         if isinstance(joint.q, (float,int)):
             qval = ('%9.5g' % joint.q).strip()
+            if joint.type == 'revolute':
+                qval = qval + (' (%.1f deg.)' % (joint.q*180/pi))
         else:
             qval = '(' + (', '.join([('%9.5g' % v).strip() for v in joint.q])) + ')'
         qstring = ' q=' + qval
@@ -377,7 +379,6 @@ def run(sdk_conn):
 
 def cli_loop(robot):
     global ans, RUNNING
-    cli_loop.charger_warned = False
 
     cli_globals = globals()
     cli_globals['world'] = robot.world
@@ -399,12 +400,6 @@ def cli_loop(robot):
             return
         cli_loop._line = ''
         while cli_loop._line == '':
-            if robot.is_on_charger:
-                if not cli_loop.charger_warned:
-                    print("** On charger. Type robot.drive_off_charger_contacts() to enable motion.\n")
-                    cli_loop.charger_warned = True
-            else:
-                cli_loop.charger_warned = False
             readline.write_history_file(histfile)
             try:
                 if os_version == 'Darwin':   # Tkinter breaks console on Macs
@@ -452,6 +447,7 @@ def cli_loop(robot):
         else:
             cli_loop._line = 'ans=' + cli_loop._line
         try:
+            cli_globals['charger'] = robot.world.charger  # charger may have appeared
             exec(cli_loop._line, cli_globals)
             if cli_loop._do_await:
                 print("Can't use await outside of an async def.")
