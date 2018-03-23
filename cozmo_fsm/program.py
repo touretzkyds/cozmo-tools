@@ -122,7 +122,6 @@ class StateMachineProgram(StateNode):
         if not isinstance(self.particle_filter,ParticleFilter):
             self.particle_filter = SLAMParticleFilter(self.robot, landmark_test=self.landmark_test)
         pf = self.particle_filter
-        pf.primed = False  # haven't processed a camera image yet
         self.robot.world.particle_filter = pf
 
         # Set up kinematics
@@ -309,9 +308,9 @@ class StateMachineProgram(StateNode):
                     cv2.waitKey(1)
                 cv2.imshow(self.windowName, annotated_im)
 
-        # Use this heartbeat signal to look for new landmarks on startup
+        # Use this heartbeat signal to look for new landmarks
         pf = self.robot.world.particle_filter
-        if pf and not pf.primed:
+        if pf and not self.robot.is_picked_up:
             pf.look_for_new_landmarks()
 
         # Finally update the world map

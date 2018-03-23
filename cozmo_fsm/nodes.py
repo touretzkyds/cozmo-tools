@@ -6,6 +6,7 @@ import random
 import numpy as np
 import math
 from math import pi
+import cv2
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
@@ -398,6 +399,27 @@ class GetColorImage(ColorImageBase):
             self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
             self.robot.camera.color_image_enabled = self.save_enabled
             self.post_data(event.image)
+
+class SaveImage(StateNode):
+    "Save an image to a file."
+
+    def __init__(self, filename="image", filetype="jpg", counter=0, verbose=True):
+        super().__init__()
+        self.filename = filename
+        self.filetype = filetype
+        self.counter = counter
+        self.verbose = verbose
+
+    def start(self,event=None):
+        fname = self.filename
+        if isinstance(self.counter, int):
+            fname = fname + str(self.counter)
+            self.counter = self.counter + 1
+        fname = fname + "." + self.filetype
+        image = np.array(self.robot.world.latest_image.raw_image)
+        cv2.imwrite(fname, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        if self.verbose:
+            print('Wrote',fname)
 
 
 #________________ Coroutine Nodes ________________
