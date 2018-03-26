@@ -185,10 +185,11 @@ class StateMachineProgram(StateNode):
             self.worldmap_viewer.start()
         self.robot.world.worldmap_viewer = self.worldmap_viewer
 
-        # Request camera image and object streams
+        # Request camera image and object motion streams
         self.robot.camera.image_stream_enabled = True
         self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                            self.process_image)
+
         self.robot.world.add_event_handler(
             cozmo.objects.EvtObjectObserved,
             self.robot.world.world_map.handle_object_observed)

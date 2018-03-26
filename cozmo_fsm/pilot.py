@@ -130,6 +130,11 @@ class PilotCheckStart(StateNode):
             self.post_event(PilotEvent(StartCollides, e.args))
             self.post_failure()
             return
+        except GoalCollides as e:
+            print('PilotCheckStart: Start as goal collides!',e)
+            self.post_event(PilotEvent(GoalCollides, e.args))
+            self.post_failure()
+            return
         except Exception as e:
             print('PilotCheckStart: Unexpected planner exception',e)
             self.post_failure()

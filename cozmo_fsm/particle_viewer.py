@@ -152,20 +152,36 @@ class ParticleViewer():
         id_list = list(landmarks.keys())
         specs_list = list(landmarks.values())
         for (id,specs) in zip(id_list,specs_list):
+            color = None
             if isinstance(id, cozmo.objects.LightCube):
-                seen = id.is_visible
-                label = next(k for k,v in self.robot.world.light_cubes.items() if v==id)
-            elif isinstance(id, str) and 'Video' in id:
-                seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
-                                    id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
-                label = id
+                label = id.cube_id
+                if id.is_visible:
+                    color = (0.5, 0.3, 1, 0.75)
+                else:
+                    color = (0, 0, 0.5, 0.75)
+            elif isinstance(id, str):
+                if 'Video' in id:
+                    seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
+                           id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
+                    label = id
+                elif 'Wall' in id:
+                    label = 'W' + id[id.find('-')+1:]
+                    try:
+                        seen = self.robot.world.world_map.objects[id].is_visible
+                    except:
+                        seen = False
+                    if seen:
+                        color = (1, 0.5, 0.3, 0.75)
+                    else:
+                        color = (0.5, 0, 0, 0.75)
             else:
                 seen = id in self.robot.world.aruco.seen_marker_ids
                 label = id
-            if seen:
-                color = (0.5, 1, 0.3, 0.75)
-            else:
-                color = (0, 0.5, 0, 0.75)
+            if color is None:
+                if seen:
+                    color = (0.5, 1, 0.3, 0.75)
+                else:
+                    color = (0, 0.5, 0, 0.75)
             if isinstance(specs, cozmo.util.Pose):
                 self.draw_landmark_from_pose(id, specs, label, color)
             else:
@@ -198,7 +214,10 @@ class ParticleViewer():
         glColor4f(*color)
         if isinstance(id, cozmo.objects.LightCube):
             size = (44,44)
-        else:
+        elif isinstance(id,str) and 'Wall' in id:
+            wall = self.robot.world.world_map.objects[id]
+            size = (20, wall.length)
+        else: # Aruco
             size = (20,50)
         if isinstance(id,str) and 'Video' in id:
             self.draw_triangle(coords, height=75, angle=lm_orient[1]*(180/pi),

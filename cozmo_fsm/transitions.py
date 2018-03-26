@@ -125,6 +125,20 @@ class TapTrans(Transition):
             self.handle = \
                 self.robot.loop.call_later(Transition.default_value_delay, self.fire, event)
 
+
+class ObservedMotionTrans(Transition):
+    """Transition fires when motion is observed in the camera image."""
+    def start(self):
+        if self.running: return
+        super().start()
+        self.robot.erouter.add_listener(self,ObservedMotionEvent,None)
+
+    def handle_event(self,event):
+        if not self.running: return
+        super().handle_event(event)
+        self.fire(event)
+
+
 class DataTrans(Transition):
     """Transition fires when data matches."""
     def __init__(self, data=None):

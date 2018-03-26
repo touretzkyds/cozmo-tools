@@ -118,25 +118,23 @@ class DefaultMotionModel(MotionModel):
         rev_dx = rev_xy[0] - new_xyz[0]
         rev_dy = rev_xy[1] - new_xyz[1]
         if (fwd_dx*fwd_dx + fwd_dy*fwd_dy) >  (rev_dx*rev_dx + rev_dy*rev_dy):
-            dist = - dist
+            dist = - dist    # we drove backward
         rot_var = 0 if abs(turn_angle) < 0.001 else self.sigma_rot
         for p in particles:
             pdist = dist * (1 + random.gauss(0, self.sigma_trans))
             pturn = random.gauss(turn_angle, rot_var)
             # Correct for the center of rotation being behind the base frame
-            # (xc,yc) is vector from initial center of rotation to base frame
-            xc = -cor * cos(p.theta)
-            yc = -cor * sin(p.theta)
-            cost = cos(turn_angle)
-            sint = sin(turn_angle)
-            # (xcor,ycor) is the translation of the base frame due to rotation about c.o.r.
-            xcor = xc * cost + yc * -sint - xc
-            ycor = xc * sint + yc *  cost - yc
+            # (xc,yc) is the center of rotation
+            xc = p.x + cor * cos(p.theta)
+            yc = p.y + cor * sin(p.theta)
             # Make half the turn, translate, then complete the turn
+            p.theta = p.theta + pturn/2
+            p.x = xc + cos(p.theta) * pdist
+            p.y = yc + sin(p.theta) * pdist
             p.theta = wrap_angle(p.theta + pturn/2)
-            p.x = p.x + cos(p.theta)*pdist + xcor
-            p.y = p.y + sin(p.theta)*pdist + ycor
-            p.theta = wrap_angle(p.theta + pturn/2)
+            # Move from center of rotation back to (rotated) base frame
+            p.x = p.x - cor * cos(p.theta)
+            p.y = p.y - cor * sin(p.theta)
 
 #================ Sensor Model ================
 
@@ -708,23 +706,26 @@ class SLAMSensorModel(SensorModel):
         # Find rotation and translation vector from camera frame using SolvePnP
         world_points = []
         image_points = []
-        marker_size=50 #mm
-        wall_spec = wall_marker_dict.get(markers[0][0],None)
+        marker_size = 50 #mm
+        wall_spec = wall_marker_dict.get(markers[0][0], None)
         if wall_spec is None: return  # spurious marker
         for key, value in markers:
             (s, (cx, cy)) = wall_spec.markers[key]
 
-            world_points.append((cx-s*marker_size/2, cy+marker_size/2,s))
-            world_points.append((cx+s*marker_size/2, cy+marker_size/2,s))
-            world_points.append((cx+s*marker_size/2, cy-marker_size/2,s))
-            world_points.append((cx-s*marker_size/2, cy-marker_size/2,s))
+            world_points.append((cx-s*marker_size/2, cy+marker_size/2, s))
+            world_points.append((cx+s*marker_size/2, cy+marker_size/2, s))
+            world_points.append((cx+s*marker_size/2, cy-marker_size/2, s))
+            world_points.append((cx-s*marker_size/2, cy-marker_size/2, s))
 
             image_points.append(value[0])
             image_points.append(value[1])
             image_points.append(value[2])
             image_points.append(value[3])
 
-        (success,rvecs, tvecs) = cv2.solvePnP(np.array(world_points), np.array(image_points), self.robot.world.aruco.camera_matrix, self.robot.world.aruco.distortion_array)
+        (success,rvecs, tvecs) = cv2.solvePnP(np.array(world_points),
+                                              np.array(image_points),
+                                              self.robot.world.aruco.camera_matrix,
+                                              self.robot.world.aruco.distortion_array)
         rotationm, jcob = cv2.Rodrigues(rvecs)
         # Change to marker frame
         transformed = np.matrix(rotationm).T*(-np.matrix(tvecs))
@@ -740,7 +741,8 @@ class SLAMSensorModel(SensorModel):
         wall_x = -transformed[2]*cos(wall_orient) + (transformed[0]-wall_spec.length/2)*sin(wall_orient)
         wall_y = (transformed[0]-wall_spec.length/2)*cos(wall_orient) - -transformed[2]*sin(wall_orient)
 
-        return WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=-wall_orient)
+        wall = WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=-wall_orient)
+        return wall
 
     def generate_walls_from_markers(self, objects):
         walls = []
@@ -758,23 +760,23 @@ class SLAMSensorModel(SensorModel):
             if len(markers)>1:
                 walls.append(self.infer_wall(id,markers))
                 # Delete old Marker object
-                if "Marker-"+str(id) in self.robot.world.world_map.objects:
-                    del self.robot.world.world_map.objects["Marker-"+str(id)]
+                #if "Marker-"+str(id) in self.robot.world.world_map.objects:
+                #    del self.robot.world.world_map.objects["Marker-"+str(id)]
 
             elif len(markers)==1 and \
                  ("Wall-"+str(id) not in self.robot.world.world_map.objects) and \
                  (markers[0][0] in self.landmarks):
                 # Only one marker seen. Estimation of wall is
                 # inaccurate due to low perspective effects in low
-                # resolution camera Adding ArucoMarkerObj at stimated
+                # resolution camera. Adding ArucoMarkerObj at estimated
                 # location. Can later be used to direct robot to
                 # investigate the unknown Marker. Permanently removed
                 # when at least two markers of a wall are seen
                 # simultaneously.
                 m = self.landmarks[markers[0][0]]
                 aruco_parent = self.robot.world.aruco
-                self.robot.world.world_map.objects["ArucoMarker-"+str(id)] = \
-                    ArucoMarkerObj(aruco_parent, id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
+                #self.robot.world.world_map.objects["ArucoMarker-"+str(id)] = \
+                #    ArucoMarkerObj(aruco_parent, id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
 
 
         return walls
@@ -801,7 +803,8 @@ class SLAMSensorModel(SensorModel):
             [cube for cube in self.robot.world.light_cubes.values()
                  if cube.is_visible and self.landmark_test(cube)] + \
             [marker.id for marker in seen_marker_objects.values()
-                 if self.landmark_test(marker)] + self.generate_walls_from_markers(seen_marker_objects)
+                 if self.landmark_test(marker)] + \
+            self.generate_walls_from_markers(seen_marker_objects)
         if self.use_perched_cameras:
             # add cammeras that can see the robot as landmarks
             seen_landmarks = seen_landmarks +  \
@@ -844,8 +847,9 @@ class SLAMSensorModel(SensorModel):
                                        marker.camera_coords[2])
                 # Rotation about Y axis of marker. Fix sign
                 sensor_orient = - marker.euler_rotation[1] * (pi/180)
-            if id not in particles[0].landmarks:
-                # Not checking for spurious wall as it is very unlikely to see two or more spurious makers simultaneously
+            if id not in self.landmarks:
+                # Not checking for spurious wall as it is very unlikely to see
+                # two or more spurious markers simultaneously
                 if not (isinstance(id, str) or isinstance(id, WallObj) ):
                     seen_count = self.candidate_landmarks.get(id,0)
                     if seen_count < 5:
@@ -859,7 +863,7 @@ class SLAMSensorModel(SensorModel):
                         p.add_landmark_cam(id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta)
                     else:
                         p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
-                if not (isinstance(id, str) or isinstance(id, WallObj) ):
+                if not ( isinstance(id, str) or isinstance(id, WallObj) ):
                     del self.candidate_landmarks[id]
                 continue
             if just_looking:
@@ -907,6 +911,7 @@ class SLAMSensorModel(SensorModel):
         for id in tuple(self.candidate_landmarks.keys()):
             self.candidate_landmarks[id] -= 1
             if self.candidate_landmarks[id] <= 0:
+                # print('*** DELETING CANDIDATE LANDMARK', id)
                 del self.candidate_landmarks[id]
 
         self.robot.world.particle_filter.variance_estimate()
@@ -952,6 +957,6 @@ class SLAMParticleFilter(ParticleFilter):
             particles[i].landmarks = new_landmarks[i]
 
     def look_for_new_landmarks(self):
-        """Calls evaluate() to find landmarks and add them to the maps."""
+        """Calls evaluate() to find landmarks and add them to the maps on startup."""
         self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
         self.sensor_model.landmarks = self.best_particle.landmarks

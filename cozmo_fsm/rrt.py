@@ -42,9 +42,13 @@ class RRTNode():
 
 #---------------- RRT Path Planner ----------------
 
-class StartCollides(Exception): pass
-class GoalCollides(Exception): pass
-class MaxIterations(Exception): pass
+class RRTException(Exception):
+    def __str__(self):
+        return self.__repr__()
+
+class StartCollides(RRTException): pass
+class GoalCollides(RRTException): pass
+class MaxIterations(RRTException): pass
 
 class RRT():
     def __init__(self, robot, max_iter=1000, step_size=10, arc_radius=40,
@@ -459,6 +463,7 @@ class RRT():
                           orient=wall.theta )
             r.obstacle = wall
             obst.append(r)
+        print('wall obst:',obst)
         return obst
 
     def generate_cube_obstacle(self,obj):

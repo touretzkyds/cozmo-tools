@@ -80,6 +80,7 @@ from event_monitor import monitor, unmonitor
 
 import cozmo_fsm
 from cozmo_fsm import *
+from cozmo_fsm.worldmap import ArucoMarkerObj, CustomMarkerObj, WallObj
 
 # tab completion
 readline.parse_and_bind('tab: complete') 
@@ -234,6 +235,8 @@ def show_stuff(args):
         show_landmarks()
     elif spec == "objects":
         show_objects()
+    elif spec == "particle":
+        show_particle(args[1:])
     else:
         print("""Invalid option. Try one of:
   show viewer
@@ -245,6 +248,7 @@ def show_stuff(args):
   show pose
   show landmarks
   show objects
+  show particle [n]
   """)
 
 
@@ -264,7 +268,6 @@ def show_kine(args):
         show_kine_joint(args[0])
     else:
         print('Usage:  show kine [joint]')
-
 
 def show_kine_tree(level, joint):
     qstring = ''
@@ -332,15 +335,19 @@ def show_pose():
     print()
 
 def show_landmarks():
-    landmarks = robot.world.particle_filter.best_particle.landmarks
+    particle = robot.world.particle_filter.best_particle
+    landmarks = particle.landmarks
     print('The particle filter has %d landmark%s:' %
           (len(landmarks), '' if (len(landmarks) == 1) else 's'))
-    for (key,value) in landmarks.items():
+    show_particle_landmarks(particle)
+
+def show_particle_landmarks(particle):
+    for (key,value) in particle.landmarks.items():
         x = value[0][0,0]
         y = value[0][1,0]
         theta = value[1] * 180/pi
         if isinstance(key, int):
-            print('  ArUco marker %d' % key, end='')
+            print('  Aruco marker %d' % key, end='')
         elif isinstance(key, LightCube):
             print('  Cube %d' % key.cube_id, end='')
         else:
@@ -353,9 +360,58 @@ def show_objects():
     objs = robot.world.world_map.objects
     print('%d object%s in the world map:' %
           (len(objs), '' if len(objs) == 1 else 's'))
+    basics = [charger, cube1, cube2, cube3]
+    ordered_keys = []
+    for key in basics:
+        if key in objs:
+            ordered_keys.append(key)
+    customs = []
+    arucos = []
+    walls = []
+    misc = []
     for (key,value) in objs.items():
-        print('  ', value)
+        if key in basics:
+            pass
+        elif isinstance(value, CustomMarkerObj):
+            customs.append(key)
+        elif isinstance(value, ArucoMarkerObj):
+            arucos.append(key)
+        elif isinstance(value, WallObj):
+            walls.append(key)
+        else:
+            misc.append(key)
+    arucos.sort()
+    walls.sort()
+    ordered_keys = ordered_keys + customs + arucos + walls + misc
+    for key in ordered_keys:
+        print('  ', objs[key])
     print()
+
+def show_particle(args):
+    if len(args) == 0:
+        particle_number = '(best)'
+        particle = robot.world.particle_filter.best_particle
+    elif len(args) > 1:
+        print('Usage:  show particle [number]')
+        return
+    else:
+        try:
+            particle_number = int(args[0])
+            particle = robot.world.particle_filter.particles[particle_number]
+        except ValueError:
+            print('Usage:  show particle [number]')
+            return
+        except IndexError:
+            print('Particle number must be between 0 and',
+                  len(robot.world.particle_filter.particles)-1)
+            return
+    print ('Particle %s:  x=%6.1f  y=%6.1f  theta=%6.1f deg   w=%.7f' %
+           (particle_number, particle.x, particle.y, particle.theta*180/pi, particle.weight))
+    if len(particle.landmarks) > 0:
+        print('Landmarks:')
+        show_particle_landmarks(particle)
+    else:
+        print()
 
 def do_shell_command(cmd):
     try:

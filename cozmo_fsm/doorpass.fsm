@@ -26,20 +26,19 @@ class GoToWall(StateNode):
             self.wobj = -1
             self.post_failure()
 
-
-        if self.wobj!= -1:
-            if self.door_id==-1:
+        if self.wobj != -1:
+            if self.door_id == -1:
                 self.door_coordinates = -1
                 print("Going to closest door")
                 super().start(event)
+            elif self.door_id in self.wobj.door_ids:
+                self.door_coordinates = self.wobj.markers[self.door_id][1]
+                print(self.door_coordinates)
+                super().start(event)
             else:
-                if self.door_id in self.wobj.door_ids:
-                    self.door_coordinates = self.wobj.markers[self.door_id][1]
-                    print(self.door_coordinates)
-                    super().start(event)
-                else:
-                    print(self.door_id,"is not a door")
-                    self.post_failure()
+                print(self.door_id,"is not a door")
+                super().start(event)
+                self.post_failure()
 
     def pick_side(self, dist):
         wall = self.object
@@ -56,7 +55,9 @@ class GoToWall(StateNode):
             for id in door_ids:
                door_coordinates = self.wobj.markers[id][1]
                s = self.wobj.markers[id][0]
-               sides.append((x - s*cos(ang)*dist - sin(ang)*(l - door_coordinates[0]), y - s*sin(ang)*dist + cos(ang)*( l - door_coordinates[0]), wrap_angle(ang+(1-s)*pi/2), id))
+               sides.append((x - s*cos(ang)*dist - sin(ang)*(l - door_coordinates[0]),
+                             y - s*sin(ang)*dist + cos(ang)*( l - door_coordinates[0]),
+                             wrap_angle(ang+(1-s)*pi/2), id))
 
             sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
             self.door_id = sorted_sides[0][3]
@@ -64,8 +65,12 @@ class GoToWall(StateNode):
             print("Going to door", self.door_id )
             shortest = sorted_sides[0][0:3]
         else:
-            side1 = (x + cos(ang)*dist - sin(ang)*(self.wobj.length/2 - door_coordinates[0]), y + sin(ang)*dist + cos(ang)*( self.wobj.length/2 - door_coordinates[0]), wrap_angle(ang+pi))
-            side2 = (x - cos(ang)*dist - sin(ang)*(self.wobj.length/2 - door_coordinates[0]), y - sin(ang)*dist + cos(ang)*( self.wobj.length/2 - door_coordinates[0]), wrap_angle(ang))
+            side1 = (x + cos(ang)*dist - sin(ang)*(self.wobj.length/2 - door_coordinates[0]),
+                     y + sin(ang)*dist + cos(ang)*( self.wobj.length/2 - door_coordinates[0]),
+                     wrap_angle(ang+pi))
+            side2 = (x - cos(ang)*dist - sin(ang)*(self.wobj.length/2 - door_coordinates[0]),
+                     y - sin(ang)*dist + cos(ang)*( self.wobj.length/2 - door_coordinates[0]),
+                     wrap_angle(ang))
             sides = [side1, side2]
             sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
             shortest = sorted_sides[0]

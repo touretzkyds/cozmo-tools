@@ -163,7 +163,7 @@ class GoToCube(StateNode):
             super().start(event)
 
     $setup{
-        droplift: SetLiftHeight(0) =T(0.5)=>    # allow time for vision to set up world map
+        droplift: SetLiftHeight(0) =C=> StateNode() =T(0.5)=>    # allow time for vision to set up world map
            {looker, check_almost_docked_0}
 
         looker: LookAtObject()
@@ -360,11 +360,11 @@ class PickUpCube(StateNode):
                   ' lheight=', self.robot.lift_height.distance_mm,
                   '  Run widths: ',end='')
             for col in range(100,220,20):
-                run_length = self.probe_column(im, col, 10, 70)
+                run_length = self.probe_column(im, col, 0, 100)
                 print(run_length,' ',end='')
                 if run_length < min_length or run_length > max_length:
                     bad_runs += 1
-            print('  bad_runs:', bad_runs)
+            print('  num bad_runs:', bad_runs)
             if bad_runs < 2:
                 self.post_success()
             else:
@@ -406,16 +406,16 @@ class PickUpCube(StateNode):
           =C=> {raise_lift, raise_head}
 
         raise_lift: SetLiftHeight(0.7)
-        raise_head: SetHeadAngle(25)
+        raise_head: SetHeadAngle(28)
 
         {raise_lift, raise_head} =C=> verify
 
         verify: self.VerifyPickup()
         verify =S=> satisfied
-        verify =F=> StateNode() =T(0.2)=> verify2
+        verify =F=> StateNode() =T(0.5)=> verify2
         verify2: self.VerifyPickup()
         verify2 =S=> satisfied
-        verify2 =F=> StateNode() =T(0.2)=> verify3
+        verify2 =F=> StateNode() =T(0.5)=> verify3
         verify3: self.VerifyPickup()
         verify3 =S=> satisfied
         verify3 =F=> frustrated
@@ -430,7 +430,7 @@ class PickUpCube(StateNode):
         drop_head: SetHeadAngle(0)
         {final_raise, drop_head} =C=> SetCarrying() =N=> ParentCompletes()
 
-        frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
+        frustrated: StateNode() =N=> AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
                                          ignore_body_track=True,
                                          ignore_head_track=True,
                                          ignore_lift_track=True) =C=>

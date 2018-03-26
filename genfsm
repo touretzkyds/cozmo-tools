@@ -400,6 +400,7 @@ transition_names = dict(
     RND = 'RandomTrans',
     PILOT = 'PilotTrans',
     Tap = 'TapTrans',
+    ObsMot = 'ObservedMotionTrans',
     Aruco = 'ArucoTrans',
     Next = 'NextTrans',
     CNext = 'CNextTrans',

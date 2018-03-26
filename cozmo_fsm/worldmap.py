@@ -114,6 +114,7 @@ class ArucoMarkerObj(WorldObject):
         return '<ArucoMarkerObj %d: (%.1f,%.1f)>' % \
                (self.id, self.x, self.y)
 
+
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
                  door_width=75, door_height=105, markers=[], door_ids=[], is_foreign=False):
@@ -247,24 +248,25 @@ class WorldMap():
         self.shared_objects = dict()
         
     def update_map(self):
-        """Called to update the map just before the path planner runs.  Cubes,
-        custom objects, and faces are updated automatically in reponse
-        to observation events, but we update them here to get the
-        freshest possible value.  Walls and Cameras are updated from
-        landmarks."""
-        self.update_walls()
-        self.update_perched_cameras()
-        if self.robot.world.charger: self.update_charger()
+        """Called to update the map after every camera image, after
+        object_observed and object_moved events, and just before the
+        path planner runs.
+        """
         for (id,cube) in self.robot.world.light_cubes.items():
             self.update_cube(cube)
+        if self.robot.world.charger: self.update_charger()
         for face in self.robot.world._faces.values():
             self.update_face(face)
+        self.update_arucos()
+        self.update_walls()
+        self.update_perched_cameras()
 
     def update_cube(self, cube):
         if cube in self.objects:
-            if "LightCubeForeignObj-"+str(cube.cube_id) in self.objects:
+            foreign_id = "LightCubeForeignObj-"+str(cube.cube_id)
+            if foreign_id in self.objects:
                 # remove foreign cube when local cube seen
-                del self.objects["LightCubeForeignObj-"+str(cube.cube_id)]
+                del self.objects[foreign_id]
             wmobject = self.objects[cube]
             if self.robot.carrying is wmobject:
                 if cube.is_visible: # we thought we were carrying it, but we're wrong
@@ -286,7 +288,7 @@ class WorldMap():
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1
         if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
-            self.update_coords(wmobject, cube)
+            self.update_coords_from_sdk(wmobject, cube)
         return wmobject
 
     def update_charger(self):
@@ -299,19 +301,43 @@ class WorldMap():
             if not charger.pose.is_comparable(self.robot.pose):
                 wmobject.update_from_sdk = False
                 wmobject.pose_confidence = -1
-        if charger.is_visible:
-            wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
+        if charger.is_visible or self.robot.is_on_charger:
+            wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
-        if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
-            self.update_coords(wmobject, charger)
+        if wmobject.update_from_sdk:  # True unless pose isn't comparable
+            self.update_coords_from_sdk(wmobject, charger)
         return wmobject
+
+    def update_arucos(self):
+        try:
+            seen_marker_objects = self.robot.world.aruco.seen_marker_objects
+        except:
+            seen_marker_objects = dict()
+        aruco_parent = self.robot.world.aruco
+        for (id,value) in seen_marker_objects.items():
+            wmobject = self.objects.get(id, None)
+            if wmobject is None:
+                wmobject = ArucoMarkerObj(aruco_parent,id)
+                self.objects[id] = wmobject
+                pftuple = None
+            else:
+                pftuple = self.robot.world.particle_filter.best_particle.landmarks.get(id, None)
+            if pftuple:  # Particle filter is tracking this marker
+                wmobject.x = pftuple[0][0][0]
+                wmobject.y = pftuple[0][1][0]
+                wmobject.theta = pftuple[1]
+            else:
+                # convert aruco sensor values to pf coordinates and update
+                pass
+                
+                    
 
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
             if isinstance(key,str) and 'Wall' in key:
-                if key in self.objects and isinstance(self.objects[key], WallObj) and \
-                        (not self.objects[key].is_foreign):
-                    self.objects[key].update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
+                if key in self.objects and isinstance(self.objects[key], WallObj):
+                    if not self.objects[key].is_foreign:
+                        self.objects[key].update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
                     id = int(key[-(len(key)-5):])
                     wall_spec = wall_marker_dict[id]
@@ -353,7 +379,7 @@ class WorldMap():
             face_obj.y = pos.y
             face_obj.z = pos.z
             face_obj.expression = face.expression
-            self.update_coords(face_obj, face)
+            self.update_coords_from_sdk(face_obj, face)
 
     def update_custom_object(self, sdk_obj):
         if not sdk_obj.pose.is_comparable(self.robot.pose):
@@ -387,7 +413,7 @@ class WorldMap():
         wmobject.z = new_pose[2,0]
         wmobject.theta = theta
 
-    def update_coords(self, wmobject, sdk_obj):
+    def update_coords_from_sdk(self, wmobject, sdk_obj):
         dx = sdk_obj.pose.position.x - self.robot.pose.position.x
         dy = sdk_obj.pose.position.y - self.robot.pose.position.y
         alpha = atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians
@@ -401,15 +427,17 @@ class WorldMap():
 
     def update_perched_cameras(self):
         if self.robot.world.server.started:
-            for key, val in self.robot.world.server.camera_landmark_pool.get(self.robot.aruco_id,{}).items():
+            pool = self.robot.world.server.camera_landmark_pool
+            for key, val in pool.get(self.robot.aruco_id,{}).items():
                 if isinstance(key,str) and 'Video' in key:
                     if key in self.objects:
                         self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
                                                  theta=val[1][2], phi=val[1][1])
                     else:
                         # last digit of capture id as camera key
-                        self.objects[key]=CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
-                                                z=val[1][0], theta=val[1][2], phi=val[1][1])
+                        self.objects[key] = \
+                            CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
+                                      z=val[1][0], theta=val[1][2], phi=val[1][1])
         else:
             for key, val in self.robot.world.particle_filter.sensor_model.landmarks.items():
                 if isinstance(key,str) and 'Video' in key:
@@ -418,8 +446,9 @@ class WorldMap():
                                                  theta=val[1][2], phi=val[1][1])
                     else:
                         # last digit of capture id as camera key
-                        self.objects[key]=CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
-                                                z=val[1][0], theta=val[1][2], phi=val[1][1])
+                        self.objects[key] = \
+                            CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
+                                      z=val[1][0], theta=val[1][2], phi=val[1][1])
 
 #================ Event Handlers ================
 
