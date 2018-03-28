@@ -139,6 +139,19 @@ class ObservedMotionTrans(Transition):
         self.fire(event)
 
 
+class UnexpectedMovementTrans(Transition):
+    """Transition fires when unexpected movement is detected."""
+    def start(self):
+        if self.running: return
+        super().start()
+        self.robot.erouter.add_listener(self,UnexpectedMovementEvent,None)
+
+    def handle_event(self,event):
+        if not self.running: return
+        super().handle_event(event)
+        self.fire(event)
+
+
 class DataTrans(Transition):
     """Transition fires when data matches."""
     def __init__(self, data=None):

@@ -106,3 +106,17 @@ class ObservedMotionEvent(CozmoGeneratedEvent):
             movement = movement + ('' if (movement=='') else ' ') + \
                        ('broad:(%d,%d)' % (pos.x,pos.y))
         return '<%s %s>' % (self.__class__.__name__, movement)
+
+
+class UnexpectedMovementEvent(CozmoGeneratedEvent):
+    cozmo_evt_type = cozmo.robot.EvtUnexpectedMovement
+
+    def __repr__(self):
+        side = self.params['movement_side']
+        # side.id == 0 means the movement_side is "unknown"
+        # Occurs when reaction triggers are disabled (as is normally the case).
+        side_string = ' '+side.name if side.id > 0 else ''
+        return '<%s %s%s>' % (self.__class__.__name__,
+                              self.params['movement_type'].name,
+                              side_string)
+

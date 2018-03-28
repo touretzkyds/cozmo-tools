@@ -598,7 +598,7 @@ class DriveArc(DriveWheels):
     containing any of the arguments accepted by __init__: radius,
     angle, distance, speed, and angspeed.  Values must already be in
     the appropriate units (degrees, mm, deg/sec, or mm/sec)."""
-    def __init__(self, radius=0, angle=0, distance=None,
+    def __init__(self, radius=0, angle=None, distance=None,
                  speed=None, angspeed=None, **kwargs):
         if isinstance(radius, cozmo.util.Distance):
             radius = radius.distance_mm

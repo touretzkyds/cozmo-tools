@@ -401,6 +401,7 @@ transition_names = dict(
     PILOT = 'PilotTrans',
     Tap = 'TapTrans',
     ObsMot = 'ObservedMotionTrans',
+    UnexMov = 'UnexpectedMovementTrans',
     Aruco = 'ArucoTrans',
     Next = 'NextTrans',
     CNext = 'CNextTrans',
