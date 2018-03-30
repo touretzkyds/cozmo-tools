@@ -196,6 +196,33 @@ def text_message(msg):
         print()
 
 
+def start_stuff(args):
+    spec = args[0] if len(args) > 0 else ""
+    if spec == 'perched':
+        try:
+            cams = [int(x) for x in args[1:]]
+        except:
+            print('Usage: start perched [camera_number...]')
+            return
+        robot.world.perched.start_perched_camera_thread(cams)
+    elif spec == 'server':
+        robot.world.server.start_server_thread()
+    elif spec == 'client':
+        if len(args) != 2:
+            print('Usage: start client IP_address')
+            return
+        robot.world.server.start_client(args[1])
+    elif spec == 'shared_map':
+        robot.world.client.use_shared_map()
+        print('Now using shared map.')
+    else:
+        print("""Usage:
+  start perched
+  start server
+  start client [IP_Address]
+  start shared_map
+""")
+
 def show_stuff(args):
     running_fsm = cozmo_fsm.program.running_fsm
     spec = args[0] if len(args) > 0 else ""
@@ -237,6 +264,8 @@ def show_stuff(args):
         show_objects()
     elif spec == "particle":
         show_particle(args[1:])
+    elif spec == "camera":
+        show_camera(args[1:])
     else:
         print("""Invalid option. Try one of:
   show viewer
@@ -249,6 +278,7 @@ def show_stuff(args):
   show landmarks
   show objects
   show particle [n]
+  show camera n
   """)
 
 
@@ -258,7 +288,6 @@ def show_active(node,depth):
         show_active(child, depth+1)
     for trans in node.transitions:
         if trans.running: print('  '*(depth+1), trans)
-
 
 def show_kine(args):
     if len(args) == 0:
@@ -413,6 +442,16 @@ def show_particle(args):
     else:
         print()
 
+def show_camera(args):
+    if len(args) != 1:
+        print('Usage:  show camera n, where n is a camera number, typically 0 or 1.')
+        return
+    try:
+        cam = int(args[0])
+    except ValueError:
+        show_camera()
+    robot.world.perched.check_camera(cam)
+
 def do_shell_command(cmd):
     try:
         subprocess.call(cmd, shell=True)
@@ -475,12 +514,16 @@ def cli_loop(robot):
         if cli_loop._line[0] == '!':
             do_shell_command(cli_loop._line[1:])
             continue
-        if cli_loop._line[0:3] == 'tm ' or cli_loop._line == 'tm':
+        elif cli_loop._line[0:3] == 'tm ' or cli_loop._line == 'tm':
             text_message(cli_loop._line[3:])
             continue
         elif cli_loop._line[0:5] == 'show ' or cli_loop._line == 'show':
             show_args = cli_loop._line[5:].split(' ')
             show_stuff(show_args)
+            continue
+        elif cli_loop._line[0:6] == 'start ' or cli_loop._line == 'start':
+            start_args = cli_loop._line[6:].split(' ')
+            start_stuff(start_args)
             continue
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \

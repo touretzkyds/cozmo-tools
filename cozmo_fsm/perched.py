@@ -31,9 +31,9 @@ class PerchedCameraThread(threading.Thread):
     def __init__(self, robot):
         threading.Thread.__init__(self)
         self.robot = robot
-        self.use_perched_cameras=False
+        self.use_perched_cameras = False
         self.perched_cameras = []
-        # Set camera paramaters ( Current code assumes same parameters for all cameras connected to a computer)
+        # Set camera parameters. (Current code assumes same parameters for all cameras connected to a computer.)
         self.cameraMatrix = microsoft_HD_webcam_cameraMatrix
         self.distCoeffs = microsoft_HD_webcam_distCoeffs
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_250)
@@ -91,7 +91,8 @@ class PerchedCameraThread(threading.Thread):
                 cap.grab()
             ret, frame = cap.read()
             if not ret:
-                raise ValueError('Failed to get camera frame from %s.' % repr(cap))
+                print('Failed to get camera frame from camera %s.' % camera )
+                return
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
             corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.aruco_dict, parameters=self.parameters)
             gray = cv2.aruco.drawDetectedMarkers(gray, corners, ids)
