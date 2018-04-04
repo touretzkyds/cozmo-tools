@@ -156,7 +156,7 @@ class WorldMapViewer():
         self.show_axes = True
         self.show_memory_map = False
 
-    def make_cube(self, size=(1,1,1), highlight=False, color=None, body=True, edges=True):
+    def make_cube(self, size=(1,1,1), highlight=False, color=None, alpha=1.0, body=True, edges=True):
         """Make a cube centered on the origin"""
         glEnableClientState(GL_VERTEX_ARRAY)
         if color is None:
@@ -169,7 +169,7 @@ class WorldMapViewer():
             if not highlight:
                 s = 0.5   # scale down the brightness if necessary
                 color = (color[0]*s, color[1]*s, color[2]*s)
-            glColor4f(*color,1)
+            glColor4f(*color,alpha)
         verts = cube_vertices * 1; # copy the array
         for i in range(0,24,3):
             verts[i  ] *= size[0]
@@ -353,7 +353,7 @@ class WorldMapViewer():
         if wall_obst.is_foreign:
             color = color_white
         else:
-            color = color_red
+            color = color_yellow
         for i in range(0,len(widths)):
             center = edges[:, 2*i : 2*i+2].mean(1).reshape(4,1)
             dimensions=(4.0, widths[i], wall_obst.door_height)
@@ -370,6 +370,21 @@ class WorldMapViewer():
         glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
         self.make_cube(size=(4.0, wall_obst.length, transom_height),
                        edges=False, color=color)
+        glPopMatrix()
+        glEndList()
+        gl_lists.append(c)
+
+    def make_doorway(self,doorway):
+        global gl_lists
+        wall = doorway.wall
+        spec = wall.doorways[doorway.index]
+        c = glGenLists(1)
+        glNewList(c, GL_COMPILE)
+        glPushMatrix()
+        glTranslatef(doorway.x, doorway.y, wall.door_height/2)
+        glRotatef(doorway.theta*180/pi, 0, 0, 1)
+        self.make_cube(size=(1, spec[1]-20, wall.door_height-20), edges=False,
+                       color=color_cyan, alpha=0.5, highlight=True)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -448,11 +463,12 @@ class WorldMapViewer():
         glTranslatef(*pos)
         glRotatef(marker.theta*180/pi, 0., 0., 1.)
         highlight = marker.is_visible
-        self.make_cube((1,s,s), color=color, highlight=highlight)
+        marker_thickness = 5 # must be thicker than wall
+        self.make_cube((marker_thickness,s,s), color=color, highlight=highlight)
         glRotatef(-90, 0., 0., 1.)
         glRotatef(90, 1., 0., 0.)
         length = len(ascii(marker_number)) + 0.5
-        glTranslatef(-s/4*length, -s/4, 1.0)
+        glTranslatef(-s/4*length, -s/4, marker_thickness)
         glScalef(0.25, 0.2, 0.25)
         glutStrokeString(GLUT_STROKE_MONO_ROMAN, c_char_p(bytes(ascii(marker_number),'utf8')))
         glPopMatrix()
@@ -730,6 +746,8 @@ class WorldMapViewer():
                 self.make_custom_cube(key,obj)
             elif isinstance(obj, worldmap.WallObj):
                 self.make_wall(obj)
+            elif isinstance(obj, worldmap.DoorwayObj):
+                self.make_doorway(obj)
             elif isinstance(obj, worldmap.ChipObj):
                 self.make_chip(obj)
             elif isinstance(obj, worldmap.FaceObj):

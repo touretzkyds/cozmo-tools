@@ -3,7 +3,7 @@ Transformation matrices for kinematics calculations.
 """
 
 import numpy as np
-from math import sin, cos, pi
+from math import sin, cos, tan, pi
 
 def point(x=0,y=0,z=0):
     return np.array([ [x], [y], [z], [1.] ])
@@ -130,3 +130,20 @@ def quat2rot(q0,q1,q2,q3):
         [ t_q1q2+t_q0q3,           q0_sq-q1_sq+q2_sq-q3_sq, t_q2q3-t_q0q1,           0. ],
         [ t_q1q3-t_q0q2,           t_q2q3+t_q0q1,           q0_sq-q1_sq-q2_sq+q3_sq, 0. ],
         [             0.,                     0.,                      0.,           1.  ]])
+
+
+#---------------- General Geometric Calculations ----------------
+
+def project_to_line(x0,y0,theta0,x1,y1):
+    """Returns the projection of the point (x1,y1) onto the
+    line through (x0,y0) with orientation theta0."""
+    bigvalue = 1e6
+    m0 = max(-bigvalue, min(bigvalue, tan(theta0)))
+    if abs(m0) < 1/bigvalue:
+        return (x1,y0)
+    m1 = -1 / m0
+    b0 = y0 - m0*x0
+    b1 = y1 - m1*x1
+    x2 = (b0-b1) / (m1-m0)
+    y2 = m0 * x2 + b0
+    return (x2,y2)

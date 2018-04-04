@@ -1,4 +1,4 @@
-from math import pi, inf, sin, cos, atan2, sqrt
+from math import pi, inf, sin, cos, tan, atan2, sqrt
 from cozmo.faces import Face
 from cozmo.objects import LightCube, CustomObject, EvtObjectMovingStopped
 
@@ -96,11 +96,11 @@ class CustomCubeObj(WorldObject):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.>' % \
-               (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi)
+        vis = ' visible' if self.is_visible else ''
+        return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
+               (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi, vis)
 
 class ArucoMarkerObj(WorldObject):
-    # *** TODO: is_visible should be computed dynamically
     def __init__(self, aruco_parent, id=None, x=0, y=0, z=0, theta=0):
         super().__init__(id,x,y,z)
         self.aruco_parent = aruco_parent
@@ -111,13 +111,15 @@ class ArucoMarkerObj(WorldObject):
         return self.id in self.aruco_parent.seen_marker_ids
 
     def __repr__(self):
-        return '<ArucoMarkerObj %d: (%.1f,%.1f)>' % \
-               (self.id, self.x, self.y)
+        vis = ' visible' if self.is_visible else ''
+        return '<ArucoMarkerObj %d: (%.1f,%.1f) @ %d deg.%s>' % \
+               (self.id, self.x, self.y, self.theta*180/pi, vis)
 
 
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
-                 door_width=75, door_height=105, markers=[], door_ids=[], is_foreign=False):
+                 door_width=75, door_height=105, markers=[],
+                 doorways=[], door_ids=[], is_foreign=False):
         super().__init__(id,x,y,is_visible=False)
         self.z = height/2
         self.theta = theta
@@ -126,10 +128,11 @@ class WallObj(WorldObject):
         self.door_width = door_width
         self.door_height = door_height
         self.markers = markers
+        self.doorways = doorways
         self.door_ids = door_ids
         self.is_foreign = is_foreign
 
-    def update(self,x=0, y=0, theta=0):
+    def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
         self.x = x
         self.y = y
@@ -138,6 +141,29 @@ class WallObj(WorldObject):
     def __repr__(self):
         return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
                (self.id, self.x, self.y, self.theta*180/pi, self.length)
+
+class DoorwayObj(WorldObject):
+    def __init__(self, index, wall):
+        id = 'Doorway-%d-%d' % (wall.id, index)
+        super().__init__(id,0,0)
+        self.theta = wall.theta
+        self.wall = wall
+        self.index = index
+        self.update()
+
+    def update(self):
+        bignum = 1e6
+        self.theta = self.wall.theta
+        m = max(-bignum, min(bignum, tan(self.theta+pi/2)))
+        b = self.wall.y - m*self.wall.x
+        dy =  self.wall.length/2 - self.wall.doorways[self.index][0]
+        self.y = self.wall.y + dy
+        self.x = (self.wall.y - b) / m
+
+    def __repr__(self):
+        return '<DoorwayObj %s: (%.1f,%.1f) @ %d deg.>' % \
+               (self.id[8:], self.x, self.y, self.theta*180/pi)
+
 
 class ChipObj(WorldObject):
     def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
@@ -312,7 +338,7 @@ class WorldMap():
         try:
             seen_marker_objects = self.robot.world.aruco.seen_marker_objects
         except:
-            seen_marker_objects = dict()
+            return
         aruco_parent = self.robot.world.aruco
         for (id,value) in seen_marker_objects.items():
             wmobject = self.objects.get(id, None)
@@ -336,8 +362,9 @@ class WorldMap():
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
             if isinstance(key,str) and 'Wall' in key:
                 if key in self.objects and isinstance(self.objects[key], WallObj):
-                    if not self.objects[key].is_foreign:
-                        self.objects[key].update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
+                    wall = self.objects[key]
+                    if not wall.is_foreign:
+                        wall.update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
                     id = int(key[-(len(key)-5):])
                     wall_spec = wall_marker_dict[id]
@@ -350,9 +377,32 @@ class WorldMap():
                                                 door_width=wall_spec.door_width,
                                                 door_height=wall_spec.door_height,
                                                 markers=wall_spec.markers,
+                                                doorways=wall_spec.doorways,
                                                 door_ids=wall_spec.door_ids,
                                                 is_foreign=False)
+                    wall = self.objects[key]
+                    self.create_doors(wall)
+                # Make marker orientation match the wall
+                theta = wall.theta
+                id = wall.id
+                spec = wall_marker_dict[id]
+                for key,value in spec.markers.items():
+                    if key in self.robot.world.world_map.objects:
+                        aruco_marker = self.robot.world.world_map.objects[key]
+                        s = 0 if value[0] == +1 else pi
+                        aruco_marker.theta = wrap_angle(theta+s)
+                        (xn,yn) = transform.project_to_line(wall.x, wall.y, theta+pi/2,
+                                                            aruco_marker.x, aruco_marker.y)
+                        aruco_marker.x = xn
+                        aruco_marker.y = yn
         
+    def create_doors(self,wall):
+        index = 0
+        for (door_x,door_w) in wall.doorways:
+            door = DoorwayObj(index, wall)
+            self.robot.world.world_map.objects[door.id] = door
+            index = index + 1
+
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
         for (key,value) in self.robot.world.world_map.objects.items():
@@ -394,7 +444,7 @@ class WorldMap():
             elif id in custom_objs.custom_cube_types:
                 wmobject = CustomCubeObj(sdk_obj,id)
             self.objects[sdk_obj] = wmobject
-        self.update_coords(wmobject, sdk_obj)
+        self.update_coords_from_sdk(wmobject, sdk_obj)
 
     def update_carried_object(self, wmobject):
         #print('Updating carried object ',wmobject)

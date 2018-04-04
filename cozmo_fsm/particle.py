@@ -706,7 +706,7 @@ class SLAMSensorModel(SensorModel):
         # Find rotation and translation vector from camera frame using SolvePnP
         world_points = []
         image_points = []
-        marker_size = 50 #mm
+        marker_size = self.robot.world.aruco.marker_size
         wall_spec = wall_marker_dict.get(markers[0][0], None)
         if wall_spec is None: return  # spurious marker
         for key, value in markers:
@@ -744,11 +744,11 @@ class SLAMSensorModel(SensorModel):
         wall = WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=-wall_orient)
         return wall
 
-    def generate_walls_from_markers(self, objects):
+    def generate_walls_from_markers(self, marker_objects):
         walls = []
         seen_markers = dict()
 
-        for id, value in objects.items():
+        for id, value in marker_objects.items():
             wall_spec = wall_marker_dict.get(id,None)
             if wall_spec is None: continue  # marker not part of a known wall
             wall_id = wall_spec.id
@@ -757,13 +757,13 @@ class SLAMSensorModel(SensorModel):
             seen_markers[wall_id] = markers
             # Now infer the walls from the markers
         for (id,markers) in seen_markers.items():
-            if len(markers)>1:
+            if len(markers) > 1:
                 walls.append(self.infer_wall(id,markers))
                 # Delete old Marker object
                 #if "Marker-"+str(id) in self.robot.world.world_map.objects:
                 #    del self.robot.world.world_map.objects["Marker-"+str(id)]
 
-            elif len(markers)==1 and \
+            elif len(markers) == 1 and \
                  ("Wall-"+str(id) not in self.robot.world.world_map.objects) and \
                  (markers[0][0] in self.landmarks):
                 # Only one marker seen. Estimation of wall is
@@ -777,8 +777,6 @@ class SLAMSensorModel(SensorModel):
                 aruco_parent = self.robot.world.aruco
                 #self.robot.world.world_map.objects["ArucoMarker-"+str(id)] = \
                 #    ArucoMarkerObj(aruco_parent, id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
-
-
         return walls
 
     def evaluate(self, particles, force=False, just_looking=False):

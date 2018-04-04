@@ -277,94 +277,39 @@ class PickUpCube(StateNode):
                     wsum += val
                     wcnt +=1
                     wmin = min(wmin,val)
-            black_thresh = bmean + (bmax-bmean)/4;
-            index = 0
+            black_thresh = bmax
+            index = row_start
+            nrows = im.shape[0]
             black_run_length = 0
             # initial white run
-            while index < npix and pixels[index] > black_thresh:
+            while index < nrows and im[index,col,0] > black_thresh:
                 index += 1
-            if index == npix: return -1
-            while index < npix and pixels[index] <= black_thresh:
+            if index == nrows: return -1
+            while index < nrows and im[index,col,0] <= black_thresh:
                 black_run_length += 1
                 index +=1
-            if index >= npix-5:
-                return -1
+            if index >= nrows-5:
+                retval = -1
             else:
-                return black_run_length
+                retval = black_run_length
+            print('  col=%3d wmin=%5.1f wmean=%5.1f bmean=%5.1f black_thresh=%5.1f run_length=%d' %
+                  (col, wmin, wmean, bmean, black_thresh, black_run_length))
+            return retval
 
-        def old_probe_column(self, im, col, row_start, row_end):
-            """
-            Probe one column of the image, looking for the top horizontal
-            black bar of the cube marker.  This bar should be 22-24 pixels
-            thick.  Use adaptive thresholding by sorting the pixels and
-            finding the darkest ones to set the black threshold.
-            """
-            pixels = [im[r,col,0] for r in range(row_start,row_end)]
-            #print('Column ',col,':',sep='')
-            #[print('%4d' % i,end='') for i in pixels]
-            pixels.sort()
-            black_index = 10  # start with the 10th darkest pixel
-            black_thresh = pixels[black_index] + 4
-            last_pixel = len(pixels) - 1
-            while black_index < last_pixel and pixels[black_index+1] <= black_thresh:
-                black_index += 1
-                black_thresh = pixels[black_index] + 4
-            white_thresh = pixels[black_index] + 20
-            print('\nblack_thresh=',black_thresh,'  black_index=',black_index, '  white_thresh=',white_thresh)
-            # initial white segment
-            row = row_start
-            while row <= row_end:
-                if im[row,col,0] < white_thresh: break
-                row += 1
-            # gray transition
-            for i in range(5):
-                if im[row,col,0] <= black_thresh: break
-                row += 1
-            # black segment
-            black_start = row
-            run_length = 0
-            while row <= row_end:
-                if im[row,col,0] > black_thresh: break
-                run_length += 1
-                row += 1
-            if row > row_end:  # black to the end; no final white
-                return -1
-            run_length = row - black_start
-            # gray transition
-            for i in range(min(5,row_end-row+1)):
-                if im[row,col,0] >= white_thresh: break
-                row += 1
-            # final white segment
-            final_whites = 0
-            while row <= row_end:
-                if im[row,col,0] < white_thresh:
-                    #print('col=',col,'  row=',row,'  im =',im[row,col],
-                    #      ' white_thresh=',white_thresh,' black_thresh=',black_thresh,'  run_length=',run_length)
-                    if final_whites >= 2:
-                        break
-                    else:
-                        return -2
-                row += 1
-                final_whites += 1
-            return run_length
-                    
         def start(self,event=None):
             super().start(event)
             im = np.array(self.robot.world.latest_image.raw_image)
-            min_length = 14
+            min_length = 16
             max_length = 24
             bad_runs = 0
-            print('Verifying pickup. ',
-                  ' hangle=', self.robot.head_angle.degrees,
-                  ' langle=', self.robot.lift_angle.degrees,
-                  ' lheight=', self.robot.lift_height.distance_mm,
-                  '  Run widths: ',end='')
+            print('Verifying pickup.  hangle=%4.1f langle=%4.1f lheight=%4.1f' %
+                  (self.robot.head_angle.degrees, self.robot.lift_angle.degrees,
+                   self.robot.lift_height.distance_mm))
             for col in range(100,220,20):
                 run_length = self.probe_column(im, col, 0, 100)
-                print(run_length,' ',end='')
                 if run_length < min_length or run_length > max_length:
                     bad_runs += 1
-            print('  num bad_runs:', bad_runs)
+            print('  Number of bad_runs:', bad_runs)
             if bad_runs < 2:
                 self.post_success()
             else:
