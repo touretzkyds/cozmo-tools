@@ -188,7 +188,7 @@ class GoToCube(StateNode):
         go_cube1: self.TurnToCube(0,True) =C=>
             self.ReportPosition('go_cube1') =T(0.75)=> self.ReportPosition('go_cube1')
             =T(0.75)=> self.ReportPosition('go_cube1') =N=> approach
-        go_cube1 =F=> Forward(-80) =C=> StateNode() =T(1)=> go_cube2
+        go_cube1 =F=> Forward(-50) =C=> StateNode() =T(1)=> go_cube2
 
         approach: self.ForwardToCube(60) =C=>
             self.ReportPosition('approach') =T(0.75)=> self.ReportPosition('approach') =T(0.75)=>
@@ -299,8 +299,8 @@ class PickUpCube(StateNode):
         def start(self,event=None):
             super().start(event)
             im = np.array(self.robot.world.latest_image.raw_image)
-            min_length = 16
-            max_length = 24
+            min_length = 23
+            max_length = 32
             bad_runs = 0
             print('Verifying pickup.  hangle=%4.1f langle=%4.1f lheight=%4.1f' %
                   (self.robot.head_angle.degrees, self.robot.lift_angle.degrees,
@@ -350,8 +350,10 @@ class PickUpCube(StateNode):
         goto_cube =C=> AbortAllActions() # clear head and lift tracks
           =C=> {raise_lift, raise_head}
 
-        raise_lift: SetLiftHeight(0.7)
-        raise_head: SetHeadAngle(28)
+        #raise_lift: SetLiftHeight(0.7)
+        #raise_head: SetHeadAngle(28)
+        raise_lift: SetLiftHeight(0.4)
+        raise_head: SetHeadAngle(0)
 
         {raise_lift, raise_head} =C=> verify
 
