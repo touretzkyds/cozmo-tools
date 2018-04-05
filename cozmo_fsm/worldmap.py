@@ -159,7 +159,10 @@ class DoorwayObj(WorldObject):
         b = self.wall.y - m*self.wall.x
         dy =  (self.wall.length/2 - self.wall.doorways[self.index][0]) * cos(self.theta)
         self.y = self.wall.y + dy
-        self.x = (self.y - b) / m
+        if abs(m) > 1/bignum:
+            self.x = (self.y - b) / m
+        else:
+            self.x = self.wall.x
 
     def __repr__(self):
         return '<DoorwayObj %s: (%.1f,%.1f) @ %d deg.>' % \
