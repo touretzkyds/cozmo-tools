@@ -149,6 +149,7 @@ class DoorwayObj(WorldObject):
         self.theta = wall.theta
         self.wall = wall
         self.index = index
+        self.obstacle = False
         self.update()
 
     def update(self):
@@ -156,9 +157,9 @@ class DoorwayObj(WorldObject):
         self.theta = self.wall.theta
         m = max(-bignum, min(bignum, tan(self.theta+pi/2)))
         b = self.wall.y - m*self.wall.x
-        dy =  self.wall.length/2 - self.wall.doorways[self.index][0]
+        dy =  (self.wall.length/2 - self.wall.doorways[self.index][0]) * cos(self.theta)
         self.y = self.wall.y + dy
-        self.x = (self.wall.y - b) / m
+        self.x = (self.y - b) / m
 
     def __repr__(self):
         return '<DoorwayObj %s: (%.1f,%.1f) @ %d deg.>' % \
@@ -285,6 +286,7 @@ class WorldMap():
             self.update_face(face)
         self.update_arucos()
         self.update_walls()
+        self.update_doorways()
         self.update_perched_cameras()
 
     def update_cube(self, cube):
@@ -381,7 +383,12 @@ class WorldMap():
                                                 door_ids=wall_spec.door_ids,
                                                 is_foreign=False)
                     wall = self.objects[key]
-                    self.create_doors(wall)
+                    # Make the doorways
+                    index = 0
+                    for (door_x,door_w) in wall.doorways:
+                        doorway = DoorwayObj(index, wall)
+                        self.robot.world.world_map.objects[doorway.id] = doorway
+                        index = index + 1
                 # Make marker orientation match the wall
                 theta = wall.theta
                 id = wall.id
@@ -396,12 +403,11 @@ class WorldMap():
                         aruco_marker.x = xn
                         aruco_marker.y = yn
         
-    def create_doors(self,wall):
-        index = 0
-        for (door_x,door_w) in wall.doorways:
-            door = DoorwayObj(index, wall)
-            self.robot.world.world_map.objects[door.id] = door
-            index = index + 1
+    def update_doorways(self):
+        for key,value in self.robot.world.world_map.objects.items():
+            if isinstance(key,str) and  'Doorway' in key:
+                value.update()
+                
 
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
