@@ -12,7 +12,7 @@ from time import sleep
 from math import sin, cos, atan2, pi, sqrt
 
 class GoToWall(StateNode):
-    def __init__(self, wall=-1, door=-1):
+    def __init__(self, wall=None, door=-1):
         super().__init__()
         self.object = wall
         self.wall_name = 'Wall-'+str(wall)
@@ -22,9 +22,10 @@ class GoToWall(StateNode):
         if self.wall_name in self.robot.world.world_map.objects:
             self.wobj = self.robot.world.world_map.objects[self.wall_name]
         else:
-            print("Wall position unknown")
+            print("GoToWall: %s is not in the map." % self.wall_name)
             self.wobj = -1
             self.post_failure()
+            return
 
         if self.wobj != -1:
             if self.door_id == -1:
