@@ -15,15 +15,25 @@ class GoToWall(StateNode):
     def __init__(self, wall=None, door=-1):
         super().__init__()
         self.object = wall
-        self.wall_name = 'Wall-'+str(wall)
+        if isinstance(wall, int):
+            self.wall_name = 'Wall-'+str(wall)
+        elif isinstance(wall, str):
+            self.wall_name = wall
+        elif wall is None:
+            self.wall_name = None
+        else:
+            raise ValueError('wall should be an integer, string, or None, not %r' % wall)
         self.door_id = door
 
     def start(self,event=None):
+        if self.wall_name is None:
+            self.wall_name = self.find_closest_wall()
+
         if self.wall_name in self.robot.world.world_map.objects:
             self.wobj = self.robot.world.world_map.objects[self.wall_name]
         else:
             print("GoToWall: %s is not in the map." % self.wall_name)
-            self.wobj = -1
+            super().start(event)
             self.post_failure()
             return
 
@@ -40,6 +50,16 @@ class GoToWall(StateNode):
                 print(self.door_id,"is not a door")
                 super().start(event)
                 self.post_failure()
+
+    def find_closest_wall(self):
+        (x,y,theta) = self.robot.world.particle_filter.pose
+        walls = []
+        for obj in self.robot.world.world_map.objects.values():
+            if isinstance(obj,WallObj):
+                distsq = (x-obj.x)**2 + (y-obj.y)**2
+                walls.append((distsq,obj))
+        walls = sorted(walls, key=lambda x: x[0])
+        return 'Wall-%d' % walls[0][1].id if walls else None
 
     def pick_side(self, dist):
         wall = self.object
@@ -229,6 +249,7 @@ class GoToWall(StateNode):
                 self.angle = self.robot.head_angle
                 super().start(event)
 
+    # GoToWall state machine
     $setup{
         droplift: SetLiftHeight(0) =T(0.5)=> check_start    # time for vision to set up world map
 
@@ -294,6 +315,7 @@ class Explore(StateNode):
             self.door_id = -1
             super().start(event)
 
+    # Explore state machine
     $setup{
         look: LookAroundInPlace(stop_on_exit=False) =T(5)=> StopBehavior() =C=> think
 
@@ -326,7 +348,7 @@ class GoToRobot(StateNode):
 
     def start(self,event=None):
         if self.gname in self.robot.world.world_map.objects:
-            self.obj = self.robot.world.world_map.objects[self.gname]
+           self.obj = self.robot.world.world_map.objects[self.gname]
             super().start(event)
         else:
             print("No Foreign")
@@ -381,7 +403,7 @@ class GoToRobot(StateNode):
             print(self.distance)
             super().start(event)
 
-
+    # GoToRobot state mahine
     $setup{
         check_start: PilotCheckStart()
         check_start =S=> SetHeadAngle(0) =C=> go
@@ -478,8 +500,7 @@ class WallPilotToPose(StateNode):
             self.target_pose = self.parent.target_pose
             super().start(event)
 
-
-
+    # WallPilotToPose state machine:
     $setup{
         look: self.TurnToGoal() =C=> LookAroundInPlace(stop_on_exit=False) =T(5)=> StopBehavior() =C=> think
         think: self.Think()

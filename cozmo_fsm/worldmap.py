@@ -386,10 +386,13 @@ class WorldMap():
                                                 door_ids=wall_spec.door_ids,
                                                 is_foreign=False)
                     wall = self.objects[key]
+                    wall.is_visible = True
+                    wall.pose_confidence = +1
                     # Make the doorways
                     index = 0
                     for (door_x,door_w) in wall.doorways:
                         doorway = DoorwayObj(index, wall)
+                        doorway.pose_confidence = +1
                         self.robot.world.world_map.objects[doorway.id] = doorway
                         index = index + 1
                 # Make marker orientation match the wall

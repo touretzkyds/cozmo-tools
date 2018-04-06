@@ -206,8 +206,7 @@ class WorldMapViewer():
         cube_number = cube_obst.id
         pos = (cube_obst.x, cube_obst.y, cube_obst.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
-        valid_pose = (lcube.pose.origin_id == self.robot.pose.origin_id) and \
-                     cube_obst.pose_confidence >= 0
+        valid_pose = lcube.pose.is_valid and cube_obst.pose_confidence >= 0
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
@@ -225,7 +224,7 @@ class WorldMapViewer():
             self.make_cube((s,s,s), highlight=lcube.is_visible, color=color)
         else:
             # make wireframe cube if coords no longer comparable
-            self.make_cube((s,s,s), body=False, highlight=True, color=color)
+            pass # self.make_cube((s,s,s), body=False, highlight=True, color=color)
         glRotatef(-90, 0., 0., 1.)
         glTranslatef(-s/4, -s/4, s/2+0.5)
         glScalef(0.25, 0.2, 0.25)
@@ -384,7 +383,7 @@ class WorldMapViewer():
         glTranslatef(doorway.x, doorway.y, wall.door_height/2)
         glRotatef(doorway.theta*180/pi, 0, 0, 1)
         self.make_cube(size=(1, spec[1]-20, wall.door_height-20), edges=False,
-                       color=color_cyan, alpha=0.5, highlight=True)
+                       color=color_cyan, alpha=0.7, highlight=True)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
