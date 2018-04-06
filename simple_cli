@@ -144,11 +144,13 @@ def runfsm(module_name, running_modules=dict()):
     if not found:
         try:
             running_modules[module_name] = __import__(module_name)
-        except ImportError:
-            print("Could not find module '%s'. Check your search path.\n" %
-                  module_name)
+        except ImportError as e:
+            print("Error loading %s: %s.  Check your search path.\n" %
+                  (module_name,e))
             return
-        except: raise
+        except Exception as e:
+            print('\n===> Error loading %s:' % module_name)
+            raise
 
     py_filepath = running_modules[module_name].__file__
     fsm_filepath = py_filepath[0:-2] + 'fsm'
