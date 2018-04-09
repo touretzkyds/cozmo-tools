@@ -352,7 +352,7 @@ class WorldMap():
                 self.objects[id] = wmobject
                 pftuple = None
             else:
-                pftuple = self.robot.world.particle_filter.best_particle.landmarks.get(id, None)
+                pftuple = self.robot.world.particle_filter.sensor_model.landmarks.get(id, None)
             if pftuple:  # Particle filter is tracking this marker
                 wmobject.x = pftuple[0][0][0]
                 wmobject.y = pftuple[0][1][0]

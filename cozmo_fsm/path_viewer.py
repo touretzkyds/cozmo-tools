@@ -194,11 +194,15 @@ class PathViewer():
                              radius=obst.radius,
                              color=(1,0,0,0.5), fill=True)
         elif isinstance(obst,Rectangle):
-            self.draw_rectangle(center = (obst.center[0], obst.center[1]),
-                                angle = obst.orient*(180/pi),
-                                width = obst.max_Ex - obst.min_Ex,
-                                height = obst.max_Ey - obst.min_Ey,
-                                color=(1,0,0,0.5), fill=True)
+            width = obst.max_Ex - obst.min_Ex
+            height = obst.max_Ey - obst.min_Ey
+            if width <= 10*height:
+                color = (1, 0, 0, 0.5)
+            else:
+                color = (1, 1, 0, 0.5)
+            self.draw_rectangle(center=(obst.center[0], obst.center[1]),
+                                angle=obst.orient*(180/pi),
+                                width=width, height=height, color=color, fill=True)
 
     def add_tree(self, tree, color):
         global the_items

@@ -8,7 +8,7 @@ from math import pi, sqrt, sin, cos, atan2, exp
 import cv2
 import cozmo
 
-from .transform import wrap_angle, wrap_selected_angles
+from .transform import wrap_angle, wrap_selected_angles, tprint
 from .aruco import ArucoMarker
 from .cozmo_kin import center_of_rotation_offset
 from .worldmap import WallObj, wall_marker_dict, ArucoMarkerObj
@@ -139,8 +139,10 @@ class DefaultMotionModel(MotionModel):
 #================ Sensor Model ================
 
 class SensorModel():
-    def __init__(self, robot, landmarks=dict()):
+    def __init__(self, robot, landmarks=None):
         self.robot = robot
+        if landmarks is None:
+            landmarks = dict()
         self.set_landmarks(landmarks)
         self.last_evaluate_pose = robot.pose
 
@@ -165,7 +167,9 @@ class SensorModel():
 
 class ArucoDistanceSensorModel(SensorModel):
     """Sensor model using only landmark distances."""
-    def __init__(self, robot, landmarks=dict(), distance_variance=100):
+    def __init__(self, robot, landmarks=None, distance_variance=100):
+        if landmarks is None:
+            landmarks = dict()
         super().__init__(robot,landmarks)
         self.distance_variance = distance_variance
 
@@ -197,7 +201,9 @@ class ArucoDistanceSensorModel(SensorModel):
 
 class ArucoBearingSensorModel(SensorModel):
     """Sensor model using only landmark bearings."""
-    def __init__(self, robot, landmarks=dict(), bearing_variance=0.1):
+    def __init__(self, robot, landmarks=None, bearing_variance=0.1):
+        if landmarks is None:
+            landmarks = dict()
         super().__init__(robot,landmarks)
         self.bearing_variance = bearing_variance
 
@@ -230,7 +236,9 @@ class ArucoBearingSensorModel(SensorModel):
 
 class ArucoCombinedSensorModel(SensorModel):
     """Sensor model using combined distance and bearing information."""
-    def __init__(self, robot, landmarks=dict(), distance_variance=200):
+    def __init__(self, robot, landmarks=None, distance_variance=200):
+        if landmarks is None:
+            landmarks = dict()
         super().__init__(robot,landmarks)
         self.distance_variance = distance_variance
 
@@ -267,7 +275,9 @@ class ArucoCombinedSensorModel(SensorModel):
 
 class CubeOrientSensorModel(SensorModel):
     """Sensor model using only orientation information."""
-    def __init__(self, robot, landmarks=dict(), distance_variance=200):
+    def __init__(self, robot, landmarks=None, distance_variance=200):
+        if landmarks is None:
+            landmarks = dict()
         super().__init__(robot,landmarks)
         self.distance_variance = distance_variance
 
@@ -314,7 +324,9 @@ class CubeOrientSensorModel(SensorModel):
 
 class CubeSensorModel(SensorModel):
     """Sensor model using combined distance, bearing, and orientation information."""
-    def __init__(self, robot, landmarks=dict(), distance_variance=200):
+    def __init__(self, robot, landmarksNone, distance_variance=200):
+        if landmarks is None:
+            landmarks = dict()
         super().__init__(robot,landmarks)
         self.distance_variance = distance_variance
 
@@ -371,12 +383,14 @@ class CubeSensorModel(SensorModel):
 #================ Particle Filter ================
 
 class ParticleFilter():
-    def __init__(self, robot, num_particles=500,
+    def __init__(self, robot, num_particles=100,
                  initializer = RandomWithinRadius(),
                  motion_model = "default",
                  sensor_model = "default",
                  particle_factory = Particle,
-                 landmarks = dict()):
+                 landmarks = None):
+        if landmarks is None:
+            landmarks = dict()   # don't do this in the argument list!
         self.robot = robot
         self.num_particles = num_particles
         self.initializer = initializer
@@ -392,6 +406,7 @@ class ParticleFilter():
         self.particle_factory = particle_factory
         self.particles = [particle_factory() for i in range(num_particles)]
         self.best_particle = self.particles[0]
+        self.best_particle_index = 0
         self.min_log_weight = -300  # prevent floating point underflow in exp()
         self.initializer.initialize(robot)
         self.exp_weights = np.empty(self.num_particles)
@@ -417,11 +432,14 @@ class ParticleFilter():
         cx = 0.0; cy = 0.0
         hsin = 0.0; hcos = 0.0
         weight_sum = 0.0
+        best_particle_index = 0
         best_particle = self.particles[0]
-        for p in self.particles:
+        for i in range(len(self.particles)):
+            p = self.particles[i]
             p.weight = exp(p.log_weight)
             if p.weight > best_particle.weight:
                 best_particle = p
+                best_particle_index = i
             cx += p.weight * p.x
             cy += p.weight * p.y
             hsin += sin(p.theta) * p.weight
@@ -433,6 +451,7 @@ class ParticleFilter():
         cy /= weight_sum
         self.pose = (cx, cy, atan2(hsin,hcos))
         self.best_particle = best_particle
+        self.best_particle_index = best_particle_index
         return self.pose
 
     def variance_estimate(self):
@@ -627,10 +646,25 @@ class SLAMParticle(Particle):
         # (ex,ey) is vector from particle to MAP position of lm
         ex = old_mu[0,0] - self.x
         ey = old_mu[1,0] - self.y
-        h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)], [wrap_angle(old_orient - self.theta)] ])
-        new_mu = np.append(old_mu,[old_orient]).reshape([3,1]) + K.dot(wrap_selected_angles(z - h,[1,2]))
-        new_sigma = (I - K.dot(H)).dot(old_sigma)
-        # [ [x,y], [orient], covarience_matrix]
+        h = np.array([ [sqrt(ex**2+ey**2)],
+                       [wrap_angle(atan2(ey,ex) - self.theta)],
+                       [wrap_angle(old_orient - self.theta)] ])
+        delta_sensor = wrap_selected_angles(z-h, [1,2])
+        if abs(delta_sensor[1,0]) > 0.1 or abs(delta_sensor[0,0]) > 50:
+            # The landmark must have moved, so reset our estimate.
+            print('id=%s  dist=%5.1f  brg=%5.1f  orient=%5.1f' %
+                  (id, sensor_dist, sensor_bearing*180/pi, sensor_orient*180/pi))
+            print(delta_sensor)
+            new_mu = np.array([[self.x + sensor_dist*cos(sensor_bearing+self.theta)],
+                               [self.y + sensor_dist*sin(sensor_bearing+self.theta)],
+                               [sensor_orient]])
+            Hinv = np.linalg.inv(H)
+            Q = self.landmark_sensor_variance_Qt
+            new_sigma = Hinv.dot(Q.dot(Hinv.T))
+        else:
+            new_mu = np.append(old_mu,[old_orient]).reshape([3,1]) + K.dot(delta_sensor)
+            new_sigma = (I - K.dot(H)).dot(old_sigma)
+        # [ [x,y], [orient], covariance_matrix]
         self.landmarks[id] = (new_mu[0:2], new_mu[2], new_sigma)
 
     def add_landmark_cam(self, lm_id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta):
@@ -665,7 +699,7 @@ class SLAMParticle(Particle):
         h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)], [old_height[0]], [old_height[1]], [old_height[2]]])
         new_mu = np.append(old_mu,[old_height]).reshape([5,1]) + K.dot(wrap_selected_angles(z - h,[1,3,4]))
         new_sigma = (I - K.dot(H)).dot(old_sigma)
-        # [ [x,y], [z,orient,pitch], covarience_matrix]
+        # [ [x,y], [z,orient,pitch], covariance_matrix]
         self.landmarks[id] = (new_mu[0:2], new_mu[2:5], new_sigma)
 
 
@@ -678,8 +712,10 @@ class SLAMSensorModel(SensorModel):
     def is_aruco(x):
         return isinstance(x, ArucoMarker)
     
-    def __init__(self, robot, landmark_test=None, landmarks=dict(),
+    def __init__(self, robot, landmark_test=None, landmarks=None,
                  distance_variance=200):
+        if landmarks is None:
+            landmarks = dict()
         if landmark_test is None:
             landmark_test = self.is_cube
         self.landmark_test = landmark_test
@@ -744,39 +780,21 @@ class SLAMSensorModel(SensorModel):
         wall = WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=-wall_orient)
         return wall
 
-    def generate_walls_from_markers(self, marker_objects):
+    def generate_walls_from_markers(self, seen_marker_objects, good_markers):
         walls = []
-        seen_markers = dict()
-
-        for id, value in marker_objects.items():
+        wall_markers = dict()
+        for id in good_markers:
+            value = seen_marker_objects[id]
             wall_spec = wall_marker_dict.get(id,None)
             if wall_spec is None: continue  # marker not part of a known wall
             wall_id = wall_spec.id
-            markers = seen_markers.get(wall_id, list())
+            markers = wall_markers.get(wall_id, list())
             markers.append((id,value.bbox[0]))
-            seen_markers[wall_id] = markers
+            wall_markers[wall_id] = markers
             # Now infer the walls from the markers
-        for (id,markers) in seen_markers.items():
+        for (id,markers) in wall_markers.items():
             if len(markers) > 1:
                 walls.append(self.infer_wall(id,markers))
-                # Delete old Marker object
-                #if "Marker-"+str(id) in self.robot.world.world_map.objects:
-                #    del self.robot.world.world_map.objects["Marker-"+str(id)]
-
-            elif len(markers) == 1 and \
-                 ("Wall-"+str(id) not in self.robot.world.world_map.objects) and \
-                 (markers[0][0] in self.landmarks):
-                # Only one marker seen. Estimation of wall is
-                # inaccurate due to low perspective effects in low
-                # resolution camera. Adding ArucoMarkerObj at estimated
-                # location. Can later be used to direct robot to
-                # investigate the unknown Marker. Permanently removed
-                # when at least two markers of a wall are seen
-                # simultaneously.
-                m = self.landmarks[markers[0][0]]
-                aruco_parent = self.robot.world.aruco
-                #self.robot.world.world_map.objects["ArucoMarker-"+str(id)] = \
-                #    ArucoMarkerObj(aruco_parent, id=markers[0][0], x=m[0][0][0], y=m[0][1][0])
         return walls
 
     def evaluate(self, particles, force=False, just_looking=False):
@@ -788,8 +806,8 @@ class SLAMSensorModel(SensorModel):
         (dist,turn_angle) = self.compute_robot_motion()
         # Unless forced, only evaluate if the robot moved enough
         # for evaluation to be worthwhile.
-        if (not force) and (dist < 1) and abs(turn_angle) < math.radians(1):
-            return evaluated
+        if (not force) and (dist < 5) and abs(turn_angle) < 2*pi/180:
+            return False
         if not just_looking:
             self.last_evaluate_pose = self.robot.pose
         # Cache seen marker objects because vision is in another thread.
@@ -801,98 +819,19 @@ class SLAMSensorModel(SensorModel):
             [cube for cube in self.robot.world.light_cubes.values()
                  if cube.is_visible and self.landmark_test(cube)] + \
             [marker.id for marker in seen_marker_objects.values()
-                 if self.landmark_test(marker)] + \
-            self.generate_walls_from_markers(seen_marker_objects)
+                 if self.landmark_test(marker)]
+        for id in seen_landmarks:
+            evaluated = self.process_landmark(id, just_looking, seen_marker_objects) or evaluated
+        # Good markers have been seen consistently enough to be deemed reliable.
+        good_markers = [id for id in seen_marker_objects
+                        if id in self.landmarks]  # *** relies on landmark id being an int
+        walls = self.generate_walls_from_markers(seen_marker_objects, good_markers)
+        for id in walls: self.process_landmark(id, just_looking, seen_marker_objects)
         if self.use_perched_cameras:
             # add cammeras that can see the robot as landmarks
-            seen_landmarks = seen_landmarks +  \
-                                list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
-        # Process each seen landmark:
-        for id in seen_landmarks:
-            if isinstance(id, cozmo.objects.LightCube):
-                # sdk values are in SDK's coordinate system, not ours
-                sdk_dx = id.pose.position.x - self.robot.pose.position.x
-                sdk_dy = id.pose.position.y - self.robot.pose.position.y
-                sensor_dist = sqrt(sdk_dx**2 + sdk_dy**2)
-                sdk_bearing = atan2(sdk_dy,sdk_dx)
-                # sensor_bearing is lm bearing relative to robot centerline
-                sensor_bearing = \
-                    wrap_angle(sdk_bearing-self.robot.pose.rotation.angle_z.radians)
-                # sensor_orient is lm bearing relative to cube's North
-                sensor_orient = \
-                    wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
-            elif isinstance(id, WallObj):
-                # Turning to polar coordinates
-                sensor_dist = sqrt(id.x**2 + id.y**2)
-                sensor_bearing = atan2(id.y,id.x)
-                sensor_orient = id.theta
-                id = "Wall-"+str(id.id)
-            elif isinstance(id, Cam):
-                # turning to cylindrical coordinates
-                sensor_dist = sqrt(id.x**2 + id.y**2)
-                sensor_bearing = atan2(id.y,id.x)
-                sensor_height = id.z
-                sensor_phi = id.phi
-                sensor_theta = id.theta
-                if sensor_height<0:
-                    print("FLIP!!!")
-                # Using str instead of capture object as new object is added by perched_cam everytime
-                id = id.cap
-            else:  # lm is an AruCo marker
-                marker = seen_marker_objects[id]
-                sensor_dist = marker.camera_distance
-                sensor_bearing = atan2(marker.camera_coords[0],
-                                       marker.camera_coords[2])
-                # Rotation about Y axis of marker. Fix sign
-                sensor_orient = - marker.euler_rotation[1] * (pi/180)
-            if id not in self.landmarks:
-                # Not checking for spurious wall as it is very unlikely to see
-                # two or more spurious markers simultaneously
-                if not (isinstance(id, str) or isinstance(id, WallObj) ):
-                    seen_count = self.candidate_landmarks.get(id,0)
-                    if seen_count < 5:
-                        # add 2 because we're going to subtract 1 at the end
-                        self.candidate_landmarks[id] = seen_count + 2
-                        continue
-                print('  *** ADDING LANDMARK ', id)
-                for p in particles:
-                    if isinstance(id, str) and 'Video' in id:
-                        # special function for cameras as landmark list has more variables
-                        p.add_landmark_cam(id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta)
-                    else:
-                        p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
-                if not ( isinstance(id, str) or isinstance(id, WallObj) ):
-                    del self.candidate_landmarks[id]
-                continue
-            if just_looking:
-                continue
-            # If we reach here, we're seeing a familiar landmark, so evaluate
-            evaluated = True
-            for p in particles:
-                # Use sensed bearing and distance to get
-                # particle's prediction of landmark position in
-                # the world.  Compare to its stored map position.
-                sensor_direction = p.theta + sensor_bearing
-                dx = sensor_dist * cos(sensor_direction)
-                dy = sensor_dist * sin(sensor_direction)
-                predicted_lm_x = p.x + dx
-                predicted_lm_y = p.y + dy
-                (lm_mu, lm_orient, lm_sigma) = p.landmarks[id]
-                map_lm_x = lm_mu[0,0]
-                map_lm_y = lm_mu[1,0]
-                error_x = map_lm_x - predicted_lm_x
-                error_y = map_lm_y - predicted_lm_y
-                error1_sq = error_x**2 + error_y**2
-                error2_sq = 0 # *** (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
-                p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
-                # Update landmark in this particle's map
-                if isinstance(id, str) and 'Video' in id:
-                    # special function for cameras as landmark list has more variables
-                    p.update_landmark_cam(id, sensor_dist, sensor_bearing,
-                                          sensor_height, sensor_phi, sensor_theta, dx, dy)
-                else:
-                    p.update_landmark(id, sensor_dist, sensor_bearing,
-                                      sensor_orient, dx, dy)
+            perched = list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
+            for id in perched:
+                evaluated = self.process_landmark(id, just_looking, seen_marker_objects) or evaluated
         if evaluated:
             wmax = - np.inf
             for p in particles:
@@ -915,6 +854,104 @@ class SLAMSensorModel(SensorModel):
         self.robot.world.particle_filter.variance_estimate()
         return evaluated
     
+    def process_landmark(self, id, just_looking, seen_marker_objects):
+        particles = self.robot.world.particle_filter.particles
+        if isinstance(id, cozmo.objects.LightCube):
+            # sdk values are in SDK's coordinate system, not ours
+            sdk_dx = id.pose.position.x - self.robot.pose.position.x
+            sdk_dy = id.pose.position.y - self.robot.pose.position.y
+            sensor_dist = sqrt(sdk_dx**2 + sdk_dy**2)
+            sdk_bearing = atan2(sdk_dy,sdk_dx)
+            # sensor_bearing is lm bearing relative to robot centerline
+            sensor_bearing = \
+                wrap_angle(sdk_bearing-self.robot.pose.rotation.angle_z.radians)
+            # sensor_orient is lm bearing relative to cube's North
+            sensor_orient = \
+                wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
+        elif isinstance(id, WallObj):
+            # Turning to polar coordinates
+            sensor_dist = sqrt(id.x**2 + id.y**2)
+            sensor_bearing = atan2(id.y,id.x)
+            sensor_orient = id.theta
+            id = "Wall-"+str(id.id)
+        elif isinstance(id, Cam):
+            # turning to cylindrical coordinates
+            sensor_dist = sqrt(id.x**2 + id.y**2)
+            sensor_bearing = atan2(id.y,id.x)
+            sensor_height = id.z
+            sensor_phi = id.phi
+            sensor_theta = id.theta
+            if sensor_height<0:
+                print("FLIP!!!")
+            # Using str instead of capture object as new object is added by perched_cam everytime
+            id = id.cap
+        else:  # lm is an AruCo marker
+            marker = seen_marker_objects[id]
+            sensor_dist = marker.camera_distance
+            sensor_bearing = atan2(marker.camera_coords[0],
+                                   marker.camera_coords[2])
+            # Rotation about Y axis of marker. Fix sign.
+            sensor_orient = - marker.euler_rotation[1] * (pi/180)
+        if id not in self.landmarks:
+            # Not checking for spurious wall as it is very unlikely to see
+            # two or more spurious markers simultaneously
+            if not (isinstance(id, str) or isinstance(id, WallObj) ):
+                seen_count = self.candidate_landmarks.get(id,0)
+                if seen_count < 5:
+                    # add 2 because we're going to subtract 1 at the end
+                    self.candidate_landmarks[id] = seen_count + 2
+                    return False
+            print('  *** ADDING LANDMARK %s at:  distance=%6.1f  bearing=%5.1f deg.' %
+                  (id, sensor_dist, sensor_bearing*180/pi))
+            for p in particles:
+                if isinstance(id, str) and 'Video' in id:
+                    # special function for cameras as landmark list has more variables
+                    p.add_landmark_cam(id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta)
+                else:
+                    p.add_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
+            # Add new landmark to sensor model's landmark list so worldmap can reference it
+            self.landmarks[id] = self.robot.world.particle_filter.particles[0].landmarks[id]
+            # Delete new landmark from tentative candidate list; it's established now.
+            if not ( isinstance(id, str) or isinstance(id, WallObj) ):
+                del self.candidate_landmarks[id]
+            return False
+        # If we reach here, we're seeing a familiar landmark, so evaluate
+        if just_looking:
+            # We can't afford to update all the particles on each
+            # camera frame so we'll just update particle 0 and use
+            # that to update the sensor model.
+            pp = [particles[0]]
+            evaluated = False
+        else:
+            # We've moved a bit, so we should update every particle.
+            pp = particles
+            evaluated = True
+        for p in pp:
+            # Use sensed bearing and distance to get
+            # particle's prediction of landmark position in
+            # the world.  Compare to its stored map position.
+            sensor_direction = p.theta + sensor_bearing
+            dx = sensor_dist * cos(sensor_direction)
+            dy = sensor_dist * sin(sensor_direction)
+            predicted_lm_x = p.x + dx
+            predicted_lm_y = p.y + dy
+            (lm_mu, lm_orient, lm_sigma) = p.landmarks[id]
+            map_lm_x = lm_mu[0,0]
+            map_lm_y = lm_mu[1,0]
+            error_x = map_lm_x - predicted_lm_x
+            error_y = map_lm_y - predicted_lm_y
+            error1_sq = error_x**2 + error_y**2
+            error2_sq = 0 # *** (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
+            p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
+            # Update landmark in this particle's map
+            if isinstance(id, str) and 'Video' in id:
+                # special function for cameras as landmark list has more variables
+                p.update_landmark_cam(id, sensor_dist, sensor_bearing,
+                                      sensor_height, sensor_phi, sensor_theta, dx, dy)
+            else:
+                p.update_landmark(id, sensor_dist, sensor_bearing,
+                                  sensor_orient, dx, dy)
+            return evaluated
 
 class SLAMParticleFilter(ParticleFilter):
     def __init__(self, robot, landmark_test=SLAMSensorModel.is_aruco, **kwargs):
@@ -927,6 +964,7 @@ class SLAMParticleFilter(ParticleFilter):
         super().__init__(robot, **kwargs)
         self.initializer.pf = self
         self.new_landmarks = [None] * self.num_particles
+        if len(self.sensor_model.landmarks) > 0: screwed()
 
     def clear_landmarks(self):
         for p in self.particles:
@@ -936,7 +974,8 @@ class SLAMParticleFilter(ParticleFilter):
     def update_weights(self):
         var = super().update_weights()
         best_particle = self.particles[self.exp_weights.argmax()]
-        self.sensor_model.landmarks = best_particle.landmarks
+        #self.sensor_model.landmarks = best_particle.landmarks
+        self.sensor_model.landmarks = self.particles[0].landmarks
         return var
 
     def jitter_new_particles(self):
@@ -955,6 +994,8 @@ class SLAMParticleFilter(ParticleFilter):
             particles[i].landmarks = new_landmarks[i]
 
     def look_for_new_landmarks(self):
-        """Calls evaluate() to find landmarks and add them to the maps on startup."""
+        """Calls evaluate() to find landmarks and add them to the maps.
+        Also updates existing landmarks."""
         self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
-        self.sensor_model.landmarks = self.best_particle.landmarks
+        #self.sensor_model.landmarks = self.best_particle.landmarks
+        self.sensor_model.landmarks = self.particles[0].landmarks

@@ -49,7 +49,8 @@ class StateMachineProgram(StateNode):
                  particle_viewer_scale = 1.0,
 
                  aruco = True,
-                 arucolibname = cv2.aruco.DICT_4X4_250,
+                 arucolibname = cv2.aruco.DICT_4X4_100,
+                 aruco_marker_size = 50,
                  perched_cameras =True,
 
                  world_map = None,
@@ -96,10 +97,11 @@ class StateMachineProgram(StateNode):
         self.put_down_handler = self.robot_put_down
 
         self.aruco = aruco
-        self.perched_cameras = perched_cameras
+        self.aruco_marker_size = aruco_marker_size
         if self.aruco:
-            self.robot.world.aruco = Aruco(self.robot,arucolibname)
+            self.robot.world.aruco = Aruco(self.robot, arucolibname, aruco_marker_size)
 
+        self.perched_cameras = perched_cameras
         if self.perched_cameras:
             self.robot.world.perched = PerchedCameraThread(self.robot)
 
