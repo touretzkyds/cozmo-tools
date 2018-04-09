@@ -411,6 +411,7 @@ class SaveImage(StateNode):
         self.verbose = verbose
 
     def start(self,event=None):
+        super().start(event)
         fname = self.filename
         if isinstance(self.counter, int):
             fname = fname + str(self.counter)

@@ -1,6 +1,6 @@
 from cozmo_fsm import *
 
-class Junk(StateNode):
+class Texting(StateMachineProgram):
     $setup{
         startnode: StateNode()
         startnode =TM('1')=> do_null
