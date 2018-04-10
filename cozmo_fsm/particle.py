@@ -652,9 +652,9 @@ class SLAMParticle(Particle):
         delta_sensor = wrap_selected_angles(z-h, [1,2])
         if abs(delta_sensor[1,0]) > 0.1 or abs(delta_sensor[0,0]) > 50:
             # The landmark must have moved, so reset our estimate.
-            print('id=%s  dist=%5.1f  brg=%5.1f  orient=%5.1f' %
-                  (id, sensor_dist, sensor_bearing*180/pi, sensor_orient*180/pi))
-            print(delta_sensor)
+            #print('id=%s  dist=%5.1f  brg=%5.1f  orient=%5.1f' %
+            #      (id, sensor_dist, sensor_bearing*180/pi, sensor_orient*180/pi))
+            #print(delta_sensor)
             new_mu = np.array([[self.x + sensor_dist*cos(sensor_bearing+self.theta)],
                                [self.y + sensor_dist*sin(sensor_bearing+self.theta)],
                                [sensor_orient]])
