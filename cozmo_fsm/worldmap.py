@@ -112,8 +112,8 @@ class ArucoMarkerObj(WorldObject):
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
-        return '<ArucoMarkerObj %d: (%.1f,%.1f) @ %d deg.%s>' % \
-               (self.id, self.x, self.y, self.theta*180/pi, vis)
+        return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s>' % \
+               (self.id, self.x, self.y, self.z, self.theta*180/pi, vis)
 
 
 class WallObj(WorldObject):
@@ -357,6 +357,15 @@ class WorldMap():
                 wmobject.x = pftuple[0][0][0]
                 wmobject.y = pftuple[0][1][0]
                 wmobject.theta = pftuple[1]
+                elevation = atan2(value.camera_coords[1], value.camera_coords[2])
+                cam_pos = transform.point(0,
+                                          value.camera_distance * sin(elevation),
+                                          value.camera_distance * cos(elevation))
+                base_pos = self.robot.kine.joint_to_base('camera').dot(cam_pos)
+                wmobject.z = base_pos[2,0]
+                wmobject.elevation=elevation
+                wmobject.cam_pos = cam_pos
+                wmobject.base_pos = base_pos
             else:
                 # convert aruco sensor values to pf coordinates and update
                 pass

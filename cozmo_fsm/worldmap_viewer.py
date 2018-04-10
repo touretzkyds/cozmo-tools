@@ -332,6 +332,7 @@ class WorldMapViewer():
         half_length = wall_obst.length / 2
         half_height = wall_obst.height / 2
         door_height = wall_obst.door_height
+        wall_thickness = 4.0
         widths = []
         last_x = -half_length
         edges = [ [0, -half_length, door_height/2, 1.] ]
@@ -355,7 +356,7 @@ class WorldMapViewer():
             color = color_yellow
         for i in range(0,len(widths)):
             center = edges[:, 2*i : 2*i+2].mean(1).reshape(4,1)
-            dimensions=(4.0, widths[i], wall_obst.door_height)
+            dimensions=(wall_thickness, widths[i], wall_obst.door_height)
             glPushMatrix()
             glTranslatef(*center.flatten()[0:3])
             glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
@@ -367,7 +368,7 @@ class WorldMapViewer():
         z = wall_obst.door_height + transom_height/2
         glTranslatef(wall_obst.x, wall_obst.y, z)
         glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
-        self.make_cube(size=(4.0, wall_obst.length, transom_height),
+        self.make_cube(size=(wall_thickness, wall_obst.length, transom_height),
                        edges=False, color=color)
         glPopMatrix()
         glEndList()
@@ -454,7 +455,7 @@ class WorldMapViewer():
         global gl_lists
         marker_number = marker.id if isinstance(marker.id,int) else marker.id.object_id
         s = light_cube_size_mm
-        pos = (marker.x, marker.y, s)
+        pos = (marker.x, marker.y, marker.z)
         color = (color_red, color_green, color_blue)[marker_number%3]
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
