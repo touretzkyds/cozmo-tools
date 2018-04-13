@@ -222,13 +222,13 @@ class WorldMapViewer():
         if valid_pose:
             # make solid cube and highlight if visible
             self.make_cube((s,s,s), highlight=lcube.is_visible, color=color)
+            glRotatef(-90, 0., 0., 1.)
+            glTranslatef(-s/4, -s/4, s/2+0.5)
+            glScalef(0.25, 0.2, 0.25)
+            glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(cube_number)))
         else:
             # make wireframe cube if coords no longer comparable
             pass # self.make_cube((s,s,s), body=False, highlight=True, color=color)
-        glRotatef(-90, 0., 0., 1.)
-        glTranslatef(-s/4, -s/4, s/2+0.5)
-        glScalef(0.25, 0.2, 0.25)
-        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(ascii(cube_number)))
         glPopMatrix()
         glEndList()
         gl_lists.append(c)

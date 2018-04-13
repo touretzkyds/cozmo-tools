@@ -180,6 +180,7 @@ class RRT():
             for theta in range(0,360,10):
                 temp_goal.q = theta/180*pi
                 collider = self.collides(temp_goal)
+                # print('temp_goal=',temp_goal,collider)
                 if not collider:
                     break
         if collider:
@@ -193,12 +194,12 @@ class RRT():
         for i in range(self.max_iter):
             r = self.random_node()
             (status, new_node) = self.extend(treeA, r)
-            if status is not self.COLLISION:
+            if True: #status is not self.COLLISION:
                 (status, new_node) = self.extend(treeB, treeA[-1])
                 if status is self.REACHED:
                     break
-                (treeB, treeA) = (treeA, treeB)
-                swapped = not swapped
+            (treeB, treeA) = (treeA, treeB)
+            swapped = not swapped
         if swapped:
             (treeB, treeA) = (treeA, treeB)
         if status is self.REACHED:

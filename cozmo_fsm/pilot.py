@@ -12,6 +12,17 @@ from .cozmo_kin import wheelbase, center_of_rotation_offset
 
 from cozmo.util import distance_mm, speed_mmps
 
+#---------------- Pilot Exceptions ----------------
+
+class PilotException(Exception):
+    def __str__(self):
+        return self.__repr__()
+
+class InvalidPose(PilotException): pass
+class CollisionDetected(PilotException): pass
+
+#---------------- PilotToPose ----------------
+
 class PilotToPose(StateNode):
     def __init__(self, target_pose=None, verbose=False):
         super().__init__()
@@ -24,12 +35,15 @@ class PilotToPose(StateNode):
 
         def start(self,event=None):
             super().start(event)
-            if self.parent.target_pose is None:
+            tpose = self.parent.target_pose
+            if tpose is None or (tpose.position.x == 0 and tpose.position.y == 0 and
+                                 tpose.rotation.angle_z.radians == 0 and not tpose.is_valid):
+                print("Pilot: target pose is invalid: %s" % tpose)
+                self.parent.post_event(PilotEvent(InvalidPose, tpose))
                 self.parent.post_failure()
                 return
             (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
             start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
-            tpose = self.parent.target_pose
             goal_node = RRTNode(x=tpose.position.x, y=tpose.position.y,
                                 q=tpose.rotation.angle_z.radians)
 
