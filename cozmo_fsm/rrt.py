@@ -51,10 +51,10 @@ class GoalCollides(RRTException): pass
 class MaxIterations(RRTException): pass
 
 class RRT():
-    def __init__(self, robot, max_iter=1000, step_size=10, arc_radius=40,
+    def __init__(self, robot, max_iter=2000, step_size=10, arc_radius=40,
                  xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
-                 bounds=(range(-500,500), range(-500,500))):
+                 bounds=(range(-1000,1000), range(-1000,1000))):
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
