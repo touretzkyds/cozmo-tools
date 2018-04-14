@@ -315,6 +315,8 @@ class WorldMap():
             if not cube.pose.is_comparable(self.robot.pose):
                 wmobject.update_from_sdk = False
                 wmobject.pose_confidence = -1
+            else:
+                wmobject.pose_confidence = 0
         if cube.is_visible:
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1

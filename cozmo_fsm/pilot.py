@@ -12,7 +12,7 @@ from .cozmo_kin import wheelbase, center_of_rotation_offset
 
 from cozmo.util import distance_mm, speed_mmps
 
-#---------------- Pilot Exceptions ----------------
+#---------------- Pilot Exceptions and Events ----------------
 
 class PilotException(Exception):
     def __str__(self):
@@ -20,6 +20,17 @@ class PilotException(Exception):
 
 class InvalidPose(PilotException): pass
 class CollisionDetected(PilotException): pass
+
+# Note: StartCollides, GoalCollides, and MaxIterations exceptions are defined in rrt.py.
+
+class ParentPilotEvent(StateNode):
+    """Receive a PilotEvent and repost it from the receiver's parent. This allows
+     derived classes that use the Pilot to make its PilotEvents visible."""
+    def start(self,event):
+        super().start(event)
+        if not isinstance(event,PilotEvent):
+            raise TypeError("ParentPilotEvent must be invoked with a PilotEvent, not %s" % event)
+        self.parent.post_event(PilotEvent(event.status))
 
 #---------------- PilotToPose ----------------
 

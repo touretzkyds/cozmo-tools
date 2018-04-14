@@ -4,7 +4,7 @@ from cozmo.objects import LightCube
 from .nodes import *
 from .transitions import *
 from .transform import wrap_angle
-from .pilot import PilotToPose, PilotCheckStart
+from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent
 from .worldmap import LightCubeObj
 from .doorpass import WallPilotToPose
 from .trace import tracefsm
@@ -163,6 +163,8 @@ class GoToCube(StateNode):
             super().start(event)
 
     $setup{
+        # GoToCube machine
+        
         droplift: SetLiftHeight(0) =C=> StateNode() =T(0.5)=>    # allow time for vision to set up world map
            {looker, check_almost_docked_0}
 
@@ -179,6 +181,7 @@ class GoToCube(StateNode):
         check_start =F=> Forward(-80) =C=> StateNode() =T(0.5)=> check_start
 
         go_side: self.GoToSide()
+        go_side =PILOT=> go_side_pilot: ParentPilotEvent()
         go_side =F=> ParentFails()
         go_side =C=> self.ReportPosition('go_side')
             =T(0.75)=> self.ReportPosition('go_side')
@@ -346,6 +349,7 @@ class PickUpCube(StateNode):
 
     $setup{  # PickUpCube machine
         goto_cube: GoToCube()
+        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> ParentFails()
         goto_cube =F=> ParentFails()
         goto_cube =C=> AbortAllActions() # clear head and lift tracks
           =C=> {raise_lift, raise_head}
