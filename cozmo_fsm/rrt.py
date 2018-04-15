@@ -54,7 +54,7 @@ class RRT():
     def __init__(self, robot, max_iter=2000, step_size=10, arc_radius=40,
                  xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
-                 bounds=(range(-1000,1000), range(-1000,1000))):
+                 bounds=(range(-500,500), range(-500,500))):
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
@@ -159,42 +159,50 @@ class RRT():
         self.start = start
         self.goal = goal
         self.target_heading = goal.q
-        if isnan(self.target_heading):
-            offset_goal = goal
-        else:
-            offset_x = goal.x + center_of_rotation_offset * cos(goal.q)
-            offset_y = goal.y + center_of_rotation_offset * sin(goal.q)
-            offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
-        self.offset_goal = offset_goal
 
-        # Check if start collides
+        # Set up start node
         collider = self.collides(start)
         if collider:
             raise StartCollides(start,collider,collider.obstacle)
+        else:
+            treeA = [start.copy()]
+            self.treeA = treeA
 
-        # Check if goal collides
-        if not isnan(self.offset_goal.q):
-            collider = self.collides(self.offset_goal)
-        else:  # no goal orientation specified, so try them all
-            temp_goal = self.offset_goal.copy()
+        # Set up goal node(s)
+        if not isnan(self.target_heading):
+            offset_x = goal.x + center_of_rotation_offset * cos(goal.q)
+            offset_y = goal.y + center_of_rotation_offset * sin(goal.q)
+            offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
+            collider = self.collides(offset_goal)
+            if collider:
+                raise GoalCollides(goal,collider,collider.obstacle)
+            else:
+                treeB = [offset_goal]
+        else:  # target_heading is nan
+            treeB = [goal.copy()]
+            self.treeB = treeB
+            epsilon = 10 # mm
+            temp_goal = goal.copy()
             for theta in range(0,360,10):
-                temp_goal.q = theta/180*pi
+                q = theta/180*pi
+                temp_goal.x = goal.x + epsilon*cos(q+pi)
+                temp_goal.y = goal.y + epsilon*sin(q+pi)
+                temp_goal.q = q
                 collider = self.collides(temp_goal)
-                # print('temp_goal=',temp_goal,collider)
                 if not collider:
-                    break
-        if collider:
-            raise GoalCollides(goal,collider,collider.obstacle)
+                    treeB.append(RRTNode(parent=treeB[0], x=temp_goal.x, y=temp_goal.y, q=temp_goal.q))
+            if len(treeB) == 1:
+                raise GoalCollides(goal,collider,collider.obstacle)
 
-        treeA = [start]
-        treeB = [offset_goal]
-        self.treeA = treeA
-        self.treeB = treeB
+        # Set bounds for search area
+        self.compute_world_bounds(start,goal)
+
+        # Grow the RRT until trees meet or max_iter exceeded
         swapped = False
         for i in range(self.max_iter):
             r = self.random_node()
             (status, new_node) = self.extend(treeA, r)
-            if True: #status is not self.COLLISION:
+            if status is not self.COLLISION:
                 (status, new_node) = self.extend(treeB, treeA[-1])
                 if status is self.REACHED:
                     break
@@ -207,6 +215,22 @@ class RRT():
         else:
             raise MaxIterations(self.max_iter)
 
+    def compute_world_bounds(self,start,goal):
+        xmin = min(start.x, goal.x)
+        xmax = max(start.x, goal.x)
+        ymin = min(start.y, goal.y)
+        ymax = max(start.y, goal.y)
+        for obst in self.obstacles:
+            xmin = min(xmin, obst.min_Ex)
+            xmax = max(xmax, obst.max_Ex)
+            ymin = min(ymin, obst.min_Ey)
+            ymax = max(ymax, obst.max_Ey)
+        xmin = xmin - 500
+        xmax = xmax + 500
+        ymin = ymin - 500
+        ymax = ymax + 500
+        self.bounds = (range(int(xmin), int(xmax)), range(int(ymin), int(ymax)))        
+
     def get_path(self, treeA, treeB):
         nodeA = treeA[-1]
         pathA = [nodeA.copy()]
@@ -217,12 +241,15 @@ class RRT():
         # treeB was built backwards from the goal, so headings
         # need to be reversed
         nodeB = treeB[-1]
-        pathB = []
         prev_heading = wrap_angle(nodeB.q + pi)
-        while nodeB.parent is not None:
-            nodeB = nodeB.parent
-            (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
-            pathB.append(nodeB.copy())
+        if nodeB.parent is None:
+            pathB = [nodeB.copy()]
+        else:
+            pathB = []
+            while nodeB.parent is not None:
+                nodeB = nodeB.parent
+                (nodeB.q, prev_heading) = (prev_heading, wrap_angle(nodeB.q+pi))
+                pathB.append(nodeB.copy())
         (pathA,pathB) = self.join_paths(pathA,pathB)
         self.path = pathA + pathB
         self.smooth_path()
@@ -239,7 +266,7 @@ class RRT():
         turn_angle = wrap_angle(pathB[0].q - pathA[-1].q)
         if abs(turn_angle) <= self.max_turn:
             return (pathA,pathB)
-        print('*** JOIN PATHS: ', turn_angle*180/pi)
+        print('*** JOIN PATHS EXCEEDED MAX TURN ANGLE: ', turn_angle*180/pi)
         return (pathA,pathB)
 
     def smooth_path(self):
