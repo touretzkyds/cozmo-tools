@@ -38,8 +38,9 @@ class LightCubeObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.>' % \
-                (self.id, self.x, self.y, self.z, self.theta*180/pi)
+            vis = ' visible' if self.is_visible else ''
+            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s>' % \
+                (self.id, self.x, self.y, self.z, self.theta*180/pi, vis)
         else:
             return '<LightCubeObj %d: position unknown>' % self.id
 
@@ -58,8 +59,9 @@ class ChargerObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.>' % \
-                (self.x, self.y, self.z, self.theta*180/pi)
+            vis = ' visible' if self.is_visible else ''
+            return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.%s>' % \
+                (self.x, self.y, self.z, self.theta*180/pi, vis)
         else:
             return '<ChargerObj: position unknown>'
 
@@ -74,8 +76,9 @@ class CustomMarkerObj(WorldObject):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        return '<CustomMarkerObj %d: (%.1f,%.1f)>' % \
-               (self.id.object_id, self.x, self.y)
+        vis = ' visible' if self.is_visible else ''
+        return '<CustomMarkerObj %d: (%.1f,%.1f)%s>' % \
+               (self.id.object_id, self.x, self.y, vis)
 
 class CustomCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
@@ -119,8 +122,8 @@ class ArucoMarkerObj(WorldObject):
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
                  door_width=75, door_height=105, markers=[],
-                 doorways=[], door_ids=[], is_foreign=False):
-        super().__init__(id,x,y,is_visible=False)
+                 doorways=[], door_ids=[], is_foreign=False, world_map=None):
+        super().__init__(id,x,y)
         self.z = height/2
         self.theta = theta
         self.length = length
@@ -131,6 +134,7 @@ class WallObj(WorldObject):
         self.doorways = doorways
         self.door_ids = door_ids
         self.is_foreign = is_foreign
+        self.world_map = world_map
 
     def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
@@ -138,9 +142,20 @@ class WallObj(WorldObject):
         self.y = y
         self.theta = theta
 
+    @property
+    def is_visible(self):
+        count = 0
+        for m in self.markers.keys():
+            if m in self.world_map.objects and self.world_map.objects[m].is_visible:
+                count += 1
+                if count == 2:
+                    return True
+        return False
+
     def __repr__(self):
-        return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f>' % \
-               (self.id, self.x, self.y, self.theta*180/pi, self.length)
+        vis = ' visible' if self.is_visible else ''
+        return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f%s>' % \
+               (self.id, self.x, self.y, self.theta*180/pi, self.length, vis)
 
 class DoorwayObj(WorldObject):
     def __init__(self, index, wall):
@@ -372,8 +387,6 @@ class WorldMap():
                 # convert aruco sensor values to pf coordinates and update
                 pass
                 
-                    
-
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
             if isinstance(key,str) and 'Wall' in key:
@@ -384,20 +397,20 @@ class WorldMap():
                 else:
                     id = int(key[-(len(key)-5):])
                     wall_spec = wall_marker_dict[id]
-                    self.objects[key] = WallObj(id,
-                                                x=value[0][0][0],
-                                                y=value[0][1][0],
-                                                theta=value[1],
-                                                length=wall_spec.length,
-                                                height=wall_spec.height,
-                                                door_width=wall_spec.door_width,
-                                                door_height=wall_spec.door_height,
-                                                markers=wall_spec.markers,
-                                                doorways=wall_spec.doorways,
-                                                door_ids=wall_spec.door_ids,
-                                                is_foreign=False)
-                    wall = self.objects[key]
-                    wall.is_visible = True
+                    wall = WallObj(id,
+                                   x=value[0][0][0],
+                                   y=value[0][1][0],
+                                   theta=value[1],
+                                   length=wall_spec.length,
+                                   height=wall_spec.height,
+                                   door_width=wall_spec.door_width,
+                                   door_height=wall_spec.door_height,
+                                   markers=wall_spec.markers,
+                                   doorways=wall_spec.doorways,
+                                   door_ids=wall_spec.door_ids,
+                                   is_foreign=False,
+                                   world_map=self)
+                    self.objects[key] = wall
                     wall.pose_confidence = +1
                     # Make the doorways
                     index = 0
