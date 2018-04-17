@@ -83,9 +83,9 @@ class Rectangle(Polygon):
         self.max_Ex = max(extents[0,:])
         self.min_Ey = min(extents[1,:])
         self.max_Ey = max(extents[1,:])
-        vertices = transform.aboutZ(orient).dot(vertices)
-        vertices = transform.translate(center[0],center[1]).dot(vertices)
-        super().__init__(vertices=vertices)
+        world_vertices = transform.aboutZ(orient).dot(vertices)
+        world_vertices = transform.translate(center[0],center[1]).dot(world_vertices)
+        super().__init__(vertices=world_vertices)
 
     def __repr__(self):
         return '<Rectangle (%.1f,%.1f) %.1fx%.1f %.1f deg>' % \

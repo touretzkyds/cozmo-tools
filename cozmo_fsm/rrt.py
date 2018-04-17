@@ -173,22 +173,28 @@ class RRT():
             offset_x = goal.x + center_of_rotation_offset * cos(goal.q)
             offset_y = goal.y + center_of_rotation_offset * sin(goal.q)
             offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
+            treeB = [offset_goal]
+            self.treeB = treeB
             collider = self.collides(offset_goal)
             if collider:
                 raise GoalCollides(goal,collider,collider.obstacle)
-            else:
-                treeB = [offset_goal]
         else:  # target_heading is nan
             treeB = [goal.copy()]
             self.treeB = treeB
-            epsilon = 10 # mm
             temp_goal = goal.copy()
+            offset_goal = goal.copy()
             for theta in range(0,360,10):
                 q = theta/180*pi
-                temp_goal.x = goal.x + epsilon*cos(q+pi)
-                temp_goal.y = goal.y + epsilon*sin(q+pi)
-                temp_goal.q = q
+                step = max(self.step_size, abs(center_of_rotation_offset))
+                temp_goal.x = goal.x + step*cos(q)
+                temp_goal.y = goal.y + step*sin(q)
+                temp_goal.q = wrap_angle(q+pi)
                 collider = self.collides(temp_goal)
+                if collider: continue
+                offset_goal.x = temp_goal.x + center_of_rotation_offset * cos(q)
+                offset_goal.y = temp_goal.y + center_of_rotation_offset * sin(q)
+                offset_goal.q = temp_goal.q
+                collider = self.collides(offset_goal)
                 if not collider:
                     treeB.append(RRTNode(parent=treeB[0], x=temp_goal.x, y=temp_goal.y, q=temp_goal.q))
             if len(treeB) == 1:
@@ -206,10 +212,10 @@ class RRT():
                 (status, new_node) = self.extend(treeB, treeA[-1])
                 if status is self.REACHED:
                     break
-            (treeB, treeA) = (treeA, treeB)
+            (treeA, treeB) = (treeB, treeA)
             swapped = not swapped
         if swapped:
-            (treeB, treeA) = (treeA, treeB)
+            (treeA, treeB) = (treeB, treeA)
         if status is self.REACHED:
             return self.get_path(treeA, treeB)
         else:
@@ -221,10 +227,10 @@ class RRT():
         ymin = min(start.y, goal.y)
         ymax = max(start.y, goal.y)
         for obst in self.obstacles:
-            xmin = min(xmin, obst.min_Ex)
-            xmax = max(xmax, obst.max_Ex)
-            ymin = min(ymin, obst.min_Ey)
-            ymax = max(ymax, obst.max_Ey)
+            xmin = min(xmin, np.min(obst.vertices[0]))
+            xmax = max(xmax, np.max(obst.vertices[0]))
+            ymin = min(ymin, np.min(obst.vertices[1]))
+            ymax = max(ymax, np.max(obst.vertices[1]))
         xmin = xmin - 500
         xmax = xmax + 500
         ymin = ymin - 500

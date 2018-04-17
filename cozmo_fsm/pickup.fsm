@@ -4,7 +4,7 @@ from cozmo.objects import LightCube
 from .nodes import *
 from .transitions import *
 from .transform import wrap_angle
-from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent
+from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, InvalidPose
 from .worldmap import LightCubeObj
 from .doorpass import WallPilotToPose
 from .trace import tracefsm
@@ -26,8 +26,11 @@ class GoToCube(StateNode):
         else:
             raise ValueError(self.object)
         self.children['looker'].object = self.object
-        # tracefsm(1)
         super().start(event)
+        if self.wmobject.pose_confidence < 0 or not self.object.pose.is_valid:
+            print('GoToCube: cube has invalid pose!', self.wmobject)
+            self.post_event(PilotEvent(InvalidPose))
+            self.post_failure()
 
     def pick_side(self, dist, use_world_map):
         "*** NOTE: This code is only correct for upright cubes"
@@ -165,7 +168,10 @@ class GoToCube(StateNode):
     $setup{
         # GoToCube machine
         
-        droplift: SetLiftHeight(0) =C=> StateNode() =T(0.5)=>    # allow time for vision to set up world map
+        droplift: SetLiftHeight(0) =C=> waitlift
+        droplift =F=> waitlift   # will fail if on charger
+
+        waitlift: StateNode() =T(0.5)=>    # allow time for vision to set up world map
            {looker, check_almost_docked_0}
 
         looker: LookAtObject()
