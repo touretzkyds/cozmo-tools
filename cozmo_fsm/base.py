@@ -15,7 +15,7 @@ class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self):
         super().__init__()
-        self.parent = None
+        self.parent = b'No parent defined yet.'
         self.children = {}
         self.transitions = []
         self.start_node = None
@@ -81,7 +81,7 @@ class StateNode(EventListener):
         if not isinstance(parent, StateNode):
             raise TypeError('%s is not a StateNode' % parent)
         try:
-            if self.parent:
+            if isinstance(self.parent, StateNode):
                 raise Exception('parent already set')
         except AttributeError:
             raise Exception("It appears %s's __init__ method did not call super().__init__"
