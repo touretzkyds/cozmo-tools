@@ -73,6 +73,13 @@ except:
     def cprint(string,color=None):
         print(string)
 
+try:
+    import matplotlib
+    import matplotlib.pyplot as plt
+except:
+    pass
+
+
 import cozmo
 from cozmo.util import *
 

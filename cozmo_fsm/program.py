@@ -7,11 +7,6 @@ import time
 import numpy
 import numpy as np
 import cv2
-try:
-    import matplotlib
-    import matplotlib.pyplot as plt
-except:
-    pass
 
 import cozmo
 
