@@ -158,8 +158,8 @@ class WallObj(WorldObject):
                (self.id, self.x, self.y, self.theta*180/pi, self.length, vis)
 
 class DoorwayObj(WorldObject):
-    def __init__(self, index, wall):
-        id = 'Doorway-%d-%d' % (wall.id, index)
+    def __init__(self, wall, index):
+        id = 'Doorway-%d' % (wall.door_ids[index])
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall
@@ -414,11 +414,10 @@ class WorldMap():
                     wall.pose_confidence = +1
                     # Make the doorways
                     index = 0
-                    for (door_x,door_w) in wall.doorways:
-                        doorway = DoorwayObj(index, wall)
+                    for index in range(len(wall.doorways)):
+                        doorway = DoorwayObj(wall, index)
                         doorway.pose_confidence = +1
                         self.robot.world.world_map.objects[doorway.id] = doorway
-                        index = index + 1
                 # Make marker orientation match the wall
                 theta = wall.theta
                 id = wall.id
@@ -567,10 +566,12 @@ class WorldMap():
 
 #================ Wall Specification  ================
 
+# WallSpec is used in wall_defs.py
+
 wall_marker_dict = dict()
 
 class WallSpec():
-    def __init__(self, length=100, height=210, door_width=75, door_height=105,
+    def __init__(self, length=100, height=210, door_width=77, door_height=105,
                  markers={}, doorways=[], door_ids=[]):
         self.length = length
         self.height = height

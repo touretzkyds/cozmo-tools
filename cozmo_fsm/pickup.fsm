@@ -404,7 +404,12 @@ class DropObject(StateNode):
         super().__init__()
 
     $setup {
-        SetLiftHeight(0) =C=> SetNotCarrying() =N=> Forward(-10) =C=> ParentCompletes()
+        SetLiftHeight(0) =C=> SetNotCarrying() =N=> {backup, lookdown}
+
+        backup: Forward(-10)
+        lookdown: SetHeadAngle(-20)
+
+        {backup, lookdown} =C=> ParentCompletes()
     }
 
 

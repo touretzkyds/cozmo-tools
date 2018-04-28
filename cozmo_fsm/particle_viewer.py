@@ -327,6 +327,13 @@ class ParticleViewer():
         self.robot.loop.call_later(0.1, pf.look_for_new_landmarks)
         self.report_pose()
 
+    async def look(self,angle):
+        handle = self.robot.set_head_angle(degrees(angle), in_parallel=True)
+        await handle.wait_for_completed()
+        pf = self.robot.world.particle_filter
+        self.robot.loop.call_later(0.1, pf.look_for_new_landmarks)
+        self.report_pose()
+
     def keyPressed(self,key,mouseX,mouseY):
         pf = self.robot.world.particle_filter
         translate_wasd = 10 # millimeters
@@ -357,6 +364,12 @@ class ParticleViewer():
             self.robot.loop.create_task(self.turn(-rotate_wasd))
         elif key == b'D':     # right
             self.robot.loop.create_task(self.turn(-rotate_WASD))
+        elif key == b'i':     # head up
+            ang = self.robot.head_angle.degrees + 5
+            self.robot.loop.create_task(self.look(ang))
+        elif key == b'k':     # head down
+            ang = self.robot.head_angle.degrees - 5
+            self.robot.loop.create_task(self.look(ang))
         elif key == b'z':     # randomize
             pf.initializer.initialize(self.robot)
         elif key == b'c':     # clear landmarks
@@ -412,6 +425,7 @@ class ParticleViewer():
 Particle viewer commands:
   w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
   W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
+   i/k       Head up/down 5 degrees
     e        Evaluate particles using current sensor info
     r        Resample particles (evaluates first)
     z        Reset particle positions (randomize, or all 0 for SLAM)

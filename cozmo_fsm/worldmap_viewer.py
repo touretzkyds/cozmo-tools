@@ -206,7 +206,8 @@ class WorldMapViewer():
         cube_number = cube_obst.id
         pos = (cube_obst.x, cube_obst.y, cube_obst.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
-        valid_pose = lcube.pose.is_valid and cube_obst.pose_confidence >= 0
+        valid_pose = (lcube.pose.is_valid and cube_obst.pose_confidence >= 0) or \
+                     self.robot.carrying is cube_obst
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
