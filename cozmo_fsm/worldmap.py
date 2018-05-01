@@ -138,6 +138,11 @@ class WallObj(WorldObject):
 
     def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
+        if self.is_foreign is None: return  # *** DEBUGGING HACK
+        if abs(self.y - y) > 5:
+            print('x: %.1f / %.1f    y: %.1f / %.1f    theta: %.1f / %.1f' %
+                  (self.x, x, self.y, y, self.theta, theta))
+            # self.is_foreign = None  # *** DEBUGGING HACK
         self.x = x
         self.y = y
         self.theta = theta
@@ -418,19 +423,18 @@ class WorldMap():
                         doorway = DoorwayObj(wall, index)
                         doorway.pose_confidence = +1
                         self.robot.world.world_map.objects[doorway.id] = doorway
-                # Make marker orientation match the wall
-                theta = wall.theta
-                id = wall.id
-                spec = wall_marker_dict[id]
+                # Relocate the aruco markers to their predefined positions
+                spec = wall_marker_dict[wall.id]
                 for key,value in spec.markers.items():
                     if key in self.robot.world.world_map.objects:
                         aruco_marker = self.robot.world.world_map.objects[key]
                         s = 0 if value[0] == +1 else pi
-                        aruco_marker.theta = wrap_angle(theta+s)
-                        (xn,yn) = transform.project_to_line(wall.x, wall.y, theta+pi/2,
-                                                            aruco_marker.x, aruco_marker.y)
-                        aruco_marker.x = xn
-                        aruco_marker.y = yn
+                        aruco_marker.theta = wrap_angle(wall.theta + s)
+                        wall_xyz = transform.point(value[1][0] - wall.length/2, 0, value[1][1])
+                        rel_xyz = transform.aboutZ(aruco_marker.theta + pi/2).dot(wall_xyz)
+                        aruco_marker.x = wall.x + rel_xyz[0][0]
+                        aruco_marker.y = wall.y + rel_xyz[1][0]
+                        aruco_marker.z = rel_xyz[2][0]
         
     def update_doorways(self):
         for key,value in self.robot.world.world_map.objects.items():

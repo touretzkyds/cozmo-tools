@@ -423,7 +423,7 @@ class ParticleFilter():
         if self.sensor_model.evaluate(self.particles):  # true if log_weights changed
             var = self.update_weights()
             if var > 0:
-                # print('resample')
+                print('resample')
                 self.resample()
         if self.robot.carrying:
             self.robot.world.world_map.update_carried_object(self.robot.carrying)
@@ -498,10 +498,10 @@ class ParticleFilter():
         # Compute and normalize the cdf; make local pointers for faster access.
         exp_weights = self.exp_weights
         cdf = self.cdf
-        cdf[0] = exp_weights[0]
-        for i in range(1,self.num_particles):
-            cdf[i] = cdf[i-1] + exp_weights[i]
-        cumsum = cdf[-1]
+        cumsum = 0
+        for i in range(self.num_particles):
+            cumsum += exp_weights[i]
+            cdf[i] = cumsum
         np.divide(cdf,cumsum,cdf)
 
         # Resampling loop: choose particles to spawn
@@ -654,7 +654,7 @@ class SLAMParticle(Particle):
             # The landmark must have moved, so reset our estimate.
             #print('id=%s  dist=%5.1f  brg=%5.1f  orient=%5.1f' %
             #      (id, sensor_dist, sensor_bearing*180/pi, sensor_orient*180/pi))
-            #print(delta_sensor)
+            print('delta id=', id, delta_sensor)
             new_mu = np.array([[self.x + sensor_dist*cos(sensor_bearing+self.theta)],
                                [self.y + sensor_dist*sin(sensor_bearing+self.theta)],
                                [sensor_orient]])
@@ -781,6 +781,7 @@ class SLAMSensorModel(SensorModel):
         return wall
 
     def generate_walls_from_markers(self, seen_marker_objects, good_markers):
+        if self.robot.is_moving: return []
         walls = []
         wall_markers = dict()
         for id in good_markers:
@@ -803,11 +804,12 @@ class SLAMSensorModel(SensorModel):
         # Call with just_looking=True to just look for new landmarks; no evaluation.
         evaluated = False
 
-        (dist,turn_angle) = self.compute_robot_motion()
         # Unless forced, only evaluate if the robot moved enough
         # for evaluation to be worthwhile.
-        if (not force) and (dist < 5) and abs(turn_angle) < 2*pi/180:
-            return False
+        if not force:
+            (dist,turn_angle) = self.compute_robot_motion()
+            if (dist < 5) and abs(turn_angle) < 2*pi/180:
+                return False
         if not just_looking:
             self.last_evaluate_pose = self.robot.pose
         # Cache seen marker objects because vision is in another thread.
@@ -826,7 +828,8 @@ class SLAMSensorModel(SensorModel):
         good_markers = [id for id in seen_marker_objects
                         if id in self.landmarks]  # *** relies on landmark id being an int
         walls = self.generate_walls_from_markers(seen_marker_objects, good_markers)
-        for id in walls: self.process_landmark(id, just_looking, seen_marker_objects)
+        for id in walls:
+            self.process_landmark(id, just_looking, seen_marker_objects)
         if self.use_perched_cameras:
             # add cammeras that can see the robot as landmarks
             perched = list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
@@ -921,7 +924,8 @@ class SLAMSensorModel(SensorModel):
             # camera frame so we'll just update particle 0 and use
             # that to update the sensor model.
             pp = [particles[0]]
-            evaluated = False
+            pp = particles # *** DEBUG
+            evaluated = True # False
         else:
             # We've moved a bit, so we should update every particle.
             pp = particles
