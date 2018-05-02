@@ -22,6 +22,8 @@ import cozmo
 from cozmo.nav_memory_map import NodeContentTypes
 
 WINDOW = None
+EXCEPTION_COUNTER = 0
+DISPLAY_ENABLED = True
 
 help_text = """
 World viewer keyboard commands:
@@ -43,6 +45,7 @@ World viewer keyboard commands:
   x            Toggle axes
   z            Reset to initial view
   v            Toggle display of viewing parameters
+  #            Disable/enable automatic redisplay
   h            Print help
 """
 
@@ -843,6 +846,8 @@ class WorldMapViewer():
         print("Type 'h' in the world map window for help.")
 
     def display(self):
+        global DISPLAY_ENABLED, EXCEPTION_COUNTER
+        if not DISPLAY_ENABLED: return
         global gl_lists
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glMatrixMode(GL_PROJECTION)
@@ -872,13 +877,22 @@ class WorldMapViewer():
             camera_distance * sin(radians(pitch)) + fixation_point[2]
             ]
         gluLookAt(*camera_loc, *fixation_point, 0.0, 0.0, 1.0)
-        self.make_shapes()
-        for id in gl_lists:
-            glCallList(id)
-        glutSwapBuffers()
-        self.del_shapes()
+        try:
+            self.make_shapes()
+            for id in gl_lists:
+                glCallList(id)
+            glutSwapBuffers()
+            self.del_shapes()
+        except Exception as e:
+            print('Worldmap viewer exception:',e)
+            EXCEPTION_COUNTER += 1
+            if EXCEPTION_COUNTER >= 2:
+                print('\n\nworldmap_viewer:  Too many errors.  Stopping redisplay.') 
+                DISPLAY_ENABLED = False
+                
 
     def keyPressed(self, key, x, y):
+        global DISPLAY_ENABLED, EXCEPTION_COUNTER
         if ord(key) == 27:
             print("Use 'exit' to quit.")
             #return
@@ -923,6 +937,12 @@ class WorldMapViewer():
             fixation_point = initial_fixation_point.copy()
             camera_rotation = initial_camera_rotation.copy()
             camera_distance = initial_camera_distance
+        elif key == b'#':
+            DISPLAY_ENABLED = not DISPLAY_ENABLED
+            if DISPLAY_ENABLED:
+                EXCEPTION_COUNTER = 0
+            print('Worldmap viewer redisplay %sabled.' %
+                  'en' if DISPLAY_ENABLED else 'dis')
         if print_camera:
             pitch = camera_rotation[1]
             yaw = camera_rotation[2]
@@ -954,4 +974,3 @@ class WorldMapViewer():
         self.height = height
         self.aspect = self.width/self.height
         glViewport(0, 0, width, height)
-
