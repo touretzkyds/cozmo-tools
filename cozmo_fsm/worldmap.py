@@ -168,7 +168,7 @@ class WallObj(WorldObject):
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
-        return '<WallObj %d: (%.1f,%.1f) @ %d deg. for %.1f%s>' % \
+        return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s>' % \
                (self.id, self.x, self.y, self.theta*180/pi, self.length, vis)
 
 class DoorwayObj(WorldObject):
