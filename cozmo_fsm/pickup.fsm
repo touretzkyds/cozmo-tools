@@ -4,7 +4,7 @@ from cozmo.objects import LightCube
 from .nodes import *
 from .transitions import *
 from .transform import wrap_angle
-from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, InvalidPose
+from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, InvalidPose
 from .worldmap import LightCubeObj
 from .doorpass import WallPilotToPose
 from .trace import tracefsm
@@ -77,12 +77,13 @@ class GoToCube(StateNode):
 
         def start(self, event=None):
             cube = self.parent.object
-            print('Selected cube',self.parent.wmobject)
             (x, y, theta) = self.parent.pick_side(100, use_world_map=True)
             self.target_pose = Pose(x, y, self.robot.pose.position.z,
-                                    angle_z=Angle(radians = wrap_angle(theta)))
-            print('pickup.GoToSide: traveling to (%.1f, %.1f) @ %.1f deg.' %
-                  (self.target_pose.position.x, self.target_pose.position.y,
+                                    angle_z=Angle(radians=wrap_angle(theta)))
+            (px,py,pq) = self.robot.world.particle_filter.pose
+            print('GoToSide: planned path from (%.1f, %.1f) @ %.1f deg. to pickup point (%.1f, %.1f) @ %.1f deg.' %
+                  (px, py, pq*180/pi,
+                   self.target_pose.position.x, self.target_pose.position.y,
                    self.target_pose.rotation.angle_z.degrees))
             super().start(event)
 
@@ -94,10 +95,7 @@ class GoToCube(StateNode):
         def start(self,event=None):
             super().start(event)
             cube = self.parent.object
-            if cube.is_visible:
-                vis = 'visible'
-            else:
-                vis = 'not visible'
+            vis = 'visible' if cube.is_visible else 'not visible'
             cx = cube.pose.position.x
             cy = cube.pose.position.y
             rx = self.robot.pose.position.x
@@ -106,7 +104,7 @@ class GoToCube(StateNode):
             dy = cy - ry
             dist = math.sqrt(dx*dx + dy*dy)
             bearing = wrap_angle(atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians) * 180/pi
-            print('%scube %s at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  brg=%5.1f' %
+            print('%scube %s at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  rel. brg=%5.1f' %
                   (self.id_string, vis, cx, cy, rx, ry, dist, bearing))
 
 
@@ -163,53 +161,59 @@ class GoToCube(StateNode):
             dx = cube.pose.position.x - self.robot.pose.position.x
             dy = cube.pose.position.y - self.robot.pose.position.y
             self.distance = Distance(sqrt(dx*dx + dy*dy) - self.offset)
+            print('ForwardToCube: distance %.1f mm' % self.distance.distance_mm)
             super().start(event)
 
     $setup{
         # GoToCube machine
         
-        droplift: SetLiftHeight(0) =C=> waitlift
-        droplift =F=> waitlift   # will fail if on charger
+        droplift: SetLiftHeight(0) =C=> {waitlift, looker}
+        droplift =F=> {waitlift, looker}   # lift motion will fail if on charger
 
-        waitlift: StateNode() =T(0.5)=>    # allow time for vision to set up world map
-           {looker, check_almost_docked_0}
+        waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
+           check_almost_docked
 
         looker: LookAtObject()
 
-        check_almost_docked_0: StateNode() =T(1)=> check_almost_docked
-        
         check_almost_docked: self.CheckAlmostDocked()
-        check_almost_docked =S=> go_cube2
+        check_almost_docked =S=> turn_to_cube2
         check_almost_docked =F=> check_start
 
         check_start: PilotCheckStart()
-        check_start =S=> go_side
-        check_start =F=> Forward(-80) =C=> StateNode() =T(0.5)=> check_start
+        check_start =S=> Print('Start collision check passed.') =N=> go_side
+        check_start =F=> Print('Backing up to escape start collision...') =N=>
+           Forward(-80) =C=> StateNode() =T(0.5)=> check_start2
+
+        check_start2: PilotCheckStart()
+        check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
+        check_start2 =PILOT(StartCollides)=> ParentPilotEvent()
 
         go_side: self.GoToSide()
         go_side =PILOT=> go_side_pilot: ParentPilotEvent()
         go_side =F=> ParentFails()
-        go_side =C=> self.ReportPosition('go_side')
-            =T(0.75)=> self.ReportPosition('go_side')
-            =T(0.75)=> self.ReportPosition('go_side')
-            =N=> go_cube1
+        go_side =C=> self.ReportPosition('go_side_deccel')
+            =T(0.75)=> self.ReportPosition('go_side_stopped')
+            =N=> turn_to_cube1
 
-        go_cube1: self.TurnToCube(0,True) =C=>
-            self.ReportPosition('go_cube1') =T(0.75)=> self.ReportPosition('go_cube1')
-            =T(0.75)=> self.ReportPosition('go_cube1') =N=> approach
-        go_cube1 =F=> Forward(-50) =C=> StateNode() =T(1)=> go_cube2
+        turn_to_cube1: self.TurnToCube(0,check_vis=True) =C=>
+            self.ReportPosition('turn_to_cube1_deccel')
+            =T(0.75)=> self.ReportPosition('turn_to_cube1_stopped')
+            =N=> approach
+        turn_to_cube1 =F=> Forward(-50) =C=> StateNode() =T(1)=> turn_to_cube2
 
         approach: self.ForwardToCube(60) =C=>
-            self.ReportPosition('approach') =T(0.75)=> self.ReportPosition('approach') =T(0.75)=>
+            self.ReportPosition('approach') =T(0.75)=>
             self.ReportPosition('approach') =N=>
-            self.TurnToCube(0,False) =C=> self.ForwardToCube(15) =C=> end
+            self.TurnToCube(0,check_vis=False) =C=> self.ForwardToCube(15) =C=> success
 
-        go_cube2: self.TurnToCube(0,True)
-        go_cube2 =F=> Print("Cube Lost") =N=> ParentFails()
-        go_cube2 =C=> self.ForwardToCube(60) =C=>
-            self.TurnToCube(0,False) =C=> self.ForwardToCube(20) =C=> end
+        turn_to_cube2: self.TurnToCube(0,check_vis=True)
+        turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> ParentFails()
+        turn_to_cube2 =C=> self.ForwardToCube(60) =C=> turn_to_cube3
 
-        end: ParentCompletes()
+        turn_to_cube3: self.TurnToCube(0,check_vis=False)   # can't fail
+        turn_to_cube3 =C=> self.ForwardToCube(20) =C=> success
+
+        success: ParentCompletes()
     }
 
 class SetCarrying(StateNode):

@@ -423,7 +423,7 @@ class ParticleFilter():
         if self.sensor_model.evaluate(self.particles):  # true if log_weights changed
             var = self.update_weights()
             if var > 0:
-                print('resample')
+                #print('resample')
                 self.resample()
         if self.robot.carrying:
             self.robot.world.world_map.update_carried_object(self.robot.carrying)
@@ -654,7 +654,7 @@ class SLAMParticle(Particle):
             # The landmark must have moved, so reset our estimate.
             #print('id=%s  dist=%5.1f  brg=%5.1f  orient=%5.1f' %
             #      (id, sensor_dist, sensor_bearing*180/pi, sensor_orient*180/pi))
-            print('delta id=', id, delta_sensor)
+            #print('delta id=', id, delta_sensor)
             new_mu = np.array([[self.x + sensor_dist*cos(sensor_bearing+self.theta)],
                                [self.y + sensor_dist*sin(sensor_bearing+self.theta)],
                                [sensor_orient]])

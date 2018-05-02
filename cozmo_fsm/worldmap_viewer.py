@@ -204,13 +204,13 @@ class WorldMapViewer():
         glDisableClientState(GL_COLOR_ARRAY)
         glDisableClientState(GL_VERTEX_ARRAY)
 
-    def make_light_cube(self,lcube,cube_obst):
+    def make_light_cube(self,lcube,cube_obj):
         global gl_lists
-        cube_number = cube_obst.id
-        pos = (cube_obst.x, cube_obst.y, cube_obst.z)
+        cube_number = cube_obj.id
+        pos = (cube_obj.x, cube_obj.y, cube_obj.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
-        valid_pose = (lcube.pose.is_valid and cube_obst.pose_confidence >= 0) or \
-                     self.robot.carrying is cube_obst
+        valid_pose = (lcube.pose.is_valid and cube_obj.pose_confidence >= 0) or \
+                     self.robot.carrying is cube_obj
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         glPushMatrix()
@@ -218,7 +218,7 @@ class WorldMapViewer():
         if lcube.is_visible:
             t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)
         else:
-            t = transform.aboutZ(cube_obst.theta)
+            t = transform.aboutZ(cube_obj.theta)
         t = t.transpose()   # Transpose the matrix for sending to OpenGL
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
@@ -330,12 +330,12 @@ class WorldMapViewer():
         gl_lists.append(c)
 
 
-    def make_wall(self,wall_obst):
+    def make_wall(self,wall_obj):
         global gl_lists
-        wall_spec = worldmap.wall_marker_dict[wall_obst.id]
-        half_length = wall_obst.length / 2
-        half_height = wall_obst.height / 2
-        door_height = wall_obst.door_height
+        wall_spec = worldmap.wall_marker_dict[wall_obj.id]
+        half_length = wall_obj.length / 2
+        half_height = wall_obj.height / 2
+        door_height = wall_obj.door_height
         wall_thickness = 4.0
         widths = []
         last_x = -half_length
@@ -350,29 +350,29 @@ class WorldMapViewer():
         edges.append([0., half_length, door_height/2, 1.])
         widths.append(half_length-last_x)
         edges = np.array(edges).T
-        edges = transform.aboutZ(wall_obst.theta).dot(edges)
-        edges = transform.translate(wall_obst.x,wall_obst.y).dot(edges)
+        edges = transform.aboutZ(wall_obj.theta).dot(edges)
+        edges = transform.translate(wall_obj.x,wall_obj.y).dot(edges)
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
-        if wall_obst.is_foreign:
+        if wall_obj.is_foreign:
             color = color_white
         else:
             color = color_yellow
         for i in range(0,len(widths)):
             center = edges[:, 2*i : 2*i+2].mean(1).reshape(4,1)
-            dimensions=(wall_thickness, widths[i], wall_obst.door_height)
+            dimensions=(wall_thickness, widths[i], wall_obj.door_height)
             glPushMatrix()
             glTranslatef(*center.flatten()[0:3])
-            glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
+            glRotatef(wall_obj.theta*180/pi, 0, 0, 1)
             self.make_cube(size=dimensions, color=color)
             glPopMatrix()
         # Make the transom
         glPushMatrix()
-        transom_height = wall_obst.height - wall_obst.door_height
-        z = wall_obst.door_height + transom_height/2
-        glTranslatef(wall_obst.x, wall_obst.y, z)
-        glRotatef(wall_obst.theta*180/pi, 0, 0, 1)
-        self.make_cube(size=(wall_thickness, wall_obst.length, transom_height),
+        transom_height = wall_obj.height - wall_obj.door_height
+        z = wall_obj.door_height + transom_height/2
+        glTranslatef(wall_obj.x, wall_obj.y, z)
+        glRotatef(wall_obj.theta*180/pi, 0, 0, 1)
+        self.make_cube(size=(wall_thickness, wall_obj.length, transom_height),
                        edges=False, color=color)
         glPopMatrix()
         glEndList()
@@ -479,10 +479,10 @@ class WorldMapViewer():
         glEndList()
         gl_lists.append(c)
 
-    def make_foreign_cube(self,cube_obst):
+    def make_foreign_cube(self,cube_obj):
         global gl_lists
-        cube_number = cube_obst.id
-        pos = (cube_obst.x, cube_obst.y, cube_obst.z)
+        cube_number = cube_obj.id
+        pos = (cube_obj.x, cube_obj.y, cube_obj.z)
         color = color_white
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
