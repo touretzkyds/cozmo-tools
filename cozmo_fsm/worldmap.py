@@ -121,9 +121,18 @@ class ArucoMarkerObj(WorldObject):
 
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
-                 door_width=75, door_height=105, markers=[],
-                 doorways=[], door_ids=[], is_foreign=False, world_map=None):
+                 door_width=75, door_height=105, markers=dict(),
+                 doorways=[], door_ids=[], is_foreign=False, world_map=None,
+                 wall_spec=None):
         super().__init__(id,x,y)
+        if wall_spec:
+            length = wall_spec.length
+            height = wall_spec.height
+            door_width = wall_spec.door_width
+            door_height = wall_spec.door_height
+            markers = wall_spec.markers.copy()
+            doorways = wall_spec.doorways.copy()
+            door_ids = wall_spec.door_ids.copy()
         self.z = height/2
         self.theta = theta
         self.length = length
@@ -576,7 +585,7 @@ wall_marker_dict = dict()
 
 class WallSpec():
     def __init__(self, length=100, height=210, door_width=77, door_height=105,
-                 markers={}, doorways=[], door_ids=[]):
+                 markers=dict(), doorways=[], door_ids=[]):
         self.length = length
         self.height = height
         self.door_width = door_width
