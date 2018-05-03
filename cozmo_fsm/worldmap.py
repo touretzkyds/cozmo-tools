@@ -452,9 +452,10 @@ class WorldMap():
                 for key,value in spec.markers.items():
                     if key in self.robot.world.world_map.objects:
                         aruco_marker = self.robot.world.world_map.objects[key]
-                        s = 0 if value[0] == +1 else pi
+                        dir = value[0]    # +1 for front side or -1 for back side
+                        s = 0 if dir == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
-                        wall_xyz = transform.point(wall.length/2 - value[1][0], 0, value[1][1])
+                        wall_xyz = transform.point(dir*(wall.length/2 - value[1][0]), 0, value[1][1])
                         rel_xyz = transform.aboutZ(aruco_marker.theta + pi/2).dot(wall_xyz)
                         aruco_marker.x = wall.x + rel_xyz[0][0]
                         aruco_marker.y = wall.y + rel_xyz[1][0]
