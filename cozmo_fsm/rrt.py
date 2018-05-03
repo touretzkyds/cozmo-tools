@@ -457,7 +457,7 @@ class RRT():
         self.robot.world.world_map.update_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
-            if not obj.obstacle: continue
+            if not obj.is_obstacle: continue
             if self.robot.carrying is obj: continue
             if obj.pose_confidence < 0: continue
             if isinstance(obj, WallObj):

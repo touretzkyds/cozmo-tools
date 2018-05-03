@@ -11,7 +11,7 @@ import cozmo
 from .transform import wrap_angle, wrap_selected_angles, tprint
 from .aruco import ArucoMarker
 from .cozmo_kin import center_of_rotation_offset
-from .worldmap import WallObj, wall_marker_dict, ArucoMarkerObj
+from .worldmap import WorldObject, WallObj, wall_marker_dict, ArucoMarkerObj
 from .perched import Cam
 
 class Particle():
@@ -876,7 +876,7 @@ class SLAMSensorModel(SensorModel):
             sensor_dist = sqrt(id.x**2 + id.y**2)
             sensor_bearing = atan2(id.y,id.x)
             sensor_orient = id.theta
-            id = "Wall-"+str(id.id)
+            id = id.id
         elif isinstance(id, Cam):
             # turning to cylindrical coordinates
             sensor_dist = sqrt(id.x**2 + id.y**2)
@@ -898,7 +898,7 @@ class SLAMSensorModel(SensorModel):
         if id not in self.landmarks:
             # Not checking for spurious wall as it is very unlikely to see
             # two or more spurious markers simultaneously
-            if not (isinstance(id, str) or isinstance(id, WallObj) ):
+            if isinstance(id, int):  # must be ArUco marker
                 seen_count = self.candidate_landmarks.get(id,0)
                 if seen_count < 5:
                     # add 2 because we're going to subtract 1 at the end
@@ -915,7 +915,7 @@ class SLAMSensorModel(SensorModel):
             # Add new landmark to sensor model's landmark list so worldmap can reference it
             self.landmarks[id] = self.robot.world.particle_filter.particles[0].landmarks[id]
             # Delete new landmark from tentative candidate list; it's established now.
-            if not ( isinstance(id, str) or isinstance(id, WallObj) ):
+            if isinstance(id, int):
                 del self.candidate_landmarks[id]
             return False
         # If we reach here, we're seeing a familiar landmark, so evaluate
@@ -924,12 +924,19 @@ class SLAMSensorModel(SensorModel):
             # camera frame so we'll just update particle 0 and use
             # that to update the sensor model.
             pp = [particles[0]]
-            pp = particles # *** DEBUG
-            evaluated = True # False
+            evaluated = False
         else:
             # We've moved a bit, so we should update every particle.
             pp = particles
             evaluated = True
+
+        if id in self.robot.world.world_map.objects:
+            obj = self.robot.world.world_map.objects[id]
+            should_update_landmark = not obj.is_fixed
+        else:
+            should_update_landmark = True
+        landmark_is_camera =  isinstance(id, str) and 'Video' in id
+
         for p in pp:
             # Use sensed bearing and distance to get
             # particle's prediction of landmark position in
@@ -948,14 +955,15 @@ class SLAMSensorModel(SensorModel):
             error2_sq = 0 # *** (sensor_dist * wrap_angle(sensor_orient - lm_orient))**2
             p.log_weight -= (error1_sq + error2_sq) / self.distance_variance
             # Update landmark in this particle's map
-            if isinstance(id, str) and 'Video' in id:
-                # special function for cameras as landmark list has more variables
-                p.update_landmark_cam(id, sensor_dist, sensor_bearing,
-                                      sensor_height, sensor_phi, sensor_theta, dx, dy)
-            else:
-                p.update_landmark(id, sensor_dist, sensor_bearing,
-                                  sensor_orient, dx, dy)
-            return evaluated
+            if should_update_landmark:
+                if landmark_is_camera:
+                    # special function for cameras as landmark list has more variables
+                    p.update_landmark_cam(id, sensor_dist, sensor_bearing,
+                                          sensor_height, sensor_phi, sensor_theta, dx, dy)
+                else:
+                    p.update_landmark(id, sensor_dist, sensor_bearing,
+                                      sensor_orient, dx, dy)
+        return evaluated
 
 class SLAMParticleFilter(ParticleFilter):
     def __init__(self, robot, landmark_test=SLAMSensorModel.is_aruco, **kwargs):
@@ -974,6 +982,14 @@ class SLAMParticleFilter(ParticleFilter):
         for p in self.particles:
             p.landmarks.clear()
         self.sensor_model.landmarks.clear()
+
+    def add_landmark(self,landmark):
+        for p in self.particles:
+            mu = np.array([[landmark.x], [landmark.y]])
+            theta = np.array([landmark.theta])
+            sigma = np.zeros([3,3])
+            p.landmarks[landmark.id] = [mu, theta, sigma]
+        self.sensor_model.landmarks[landmark.id] = landmark
 
     def update_weights(self):
         var = super().update_weights()
@@ -1001,5 +1017,9 @@ class SLAMParticleFilter(ParticleFilter):
         """Calls evaluate() to find landmarks and add them to the maps.
         Also updates existing landmarks."""
         self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
-        #self.sensor_model.landmarks = self.best_particle.landmarks
         self.sensor_model.landmarks = self.particles[0].landmarks
+        return
+        for key,value in self.particles[0].landmarks.items():
+            if (key not in self.sensor_model.landmarks) or \
+               not self.sensor_model.landmarks[key].is_fixed:            
+                self.sensor_model.landmarks[key] = self.particles[0].landmarks[key]

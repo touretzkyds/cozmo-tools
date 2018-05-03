@@ -332,7 +332,7 @@ class WorldMapViewer():
 
     def make_wall(self,wall_obj):
         global gl_lists
-        wall_spec = worldmap.wall_marker_dict[wall_obj.id]
+        wall_spec = worldmap.wall_marker_dict[wall_obj.id[5:]]
         half_length = wall_obj.length / 2
         half_height = wall_obj.height / 2
         door_height = wall_obj.door_height
@@ -889,6 +889,8 @@ class WorldMapViewer():
             if EXCEPTION_COUNTER >= 2:
                 print('\n\nworldmap_viewer:  Too many errors.  Stopping redisplay.') 
                 DISPLAY_ENABLED = False
+            else:
+                raise
                 
 
     def keyPressed(self, key, x, y):

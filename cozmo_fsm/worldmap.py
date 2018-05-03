@@ -2,6 +2,7 @@ from math import pi, inf, sin, cos, tan, atan2, sqrt
 from cozmo.faces import Face
 from cozmo.objects import LightCube, CustomObject, EvtObjectMovingStopped
 
+from . import evbase
 from . import transform
 from . import custom_objs
 from .transform import wrap_angle
@@ -12,7 +13,8 @@ class WorldObject():
         self.x = x
         self.y = y
         self.z = z
-        self.obstacle = True
+        self.is_fixed = False   # True for walls and markers in predefined maps
+        self.is_obstacle = True
         if is_visible is not None:
             self.is_visible = is_visible
         self.sdk_obj = None
@@ -122,9 +124,8 @@ class ArucoMarkerObj(WorldObject):
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
                  door_width=75, door_height=105, markers=dict(),
-                 doorways=[], door_ids=[], is_foreign=False, world_map=None,
+                 doorways=[], door_ids=[], is_foreign=False, is_fixed=False,
                  wall_spec=None):
-        super().__init__(id,x,y)
         if wall_spec:
             length = wall_spec.length
             height = wall_spec.height
@@ -133,6 +134,16 @@ class WallObj(WorldObject):
             markers = wall_spec.markers.copy()
             doorways = wall_spec.doorways.copy()
             door_ids = wall_spec.door_ids.copy()
+        if id is None:
+            if len(markers) > 0:
+                k = list(markers.keys())
+                k.sort()
+                id = 'Wall-%s' % k[0]
+            elif wall_spec and wall_spec.label:
+                id = 'Wall-%s' % wall_spec.label
+            else:
+                raise ValueError('id (e.g., "A") must be supplied if wall has no markers')
+        super().__init__(id,x,y)
         self.z = height/2
         self.theta = theta
         self.length = length
@@ -143,24 +154,32 @@ class WallObj(WorldObject):
         self.doorways = doorways
         self.door_ids = door_ids
         self.is_foreign = is_foreign
-        self.world_map = world_map
+        self.is_fixed = is_fixed
 
     def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
         if self.is_foreign is None: return  # *** DEBUGGING HACK
         if abs(self.y - y) > 5:
-            print('x: %.1f / %.1f    y: %.1f / %.1f    theta: %.1f / %.1f' %
+            print('worldmap aruco: x: %.1f / %.1f    y: %.1f / %.1f    theta: %.1f / %.1f' %
                   (self.x, x, self.y, y, self.theta, theta))
             # self.is_foreign = None  # *** DEBUGGING HACK
         self.x = x
         self.y = y
         self.theta = theta
 
+    def make_doorways(self, world_map):
+        index = 0
+        for index in range(len(self.doorways)):
+            doorway = DoorwayObj(self, index)
+            doorway.pose_confidence = +1
+            world_map.objects[doorway.id] = doorway
+
     @property
     def is_visible(self):
         count = 0
+        world_map = evbase.robot_for_loading.world.world_map
         for m in self.markers.keys():
-            if m in self.world_map.objects and self.world_map.objects[m].is_visible:
+            if m in world_map.objects and world_map.objects[m].is_visible:
                 count += 1
                 if count == 2:
                     return True
@@ -168,8 +187,9 @@ class WallObj(WorldObject):
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
-        return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s>' % \
-               (self.id, self.x, self.y, self.theta*180/pi, self.length, vis)
+        fix = ' fixed' if self.is_fixed else ''
+        return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s%s>' % \
+               (self.id, self.x, self.y, self.theta*180/pi, self.length, fix, vis)
 
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
@@ -178,7 +198,7 @@ class DoorwayObj(WorldObject):
         self.theta = wall.theta
         self.wall = wall
         self.index = index
-        self.obstacle = False
+        self.is_obstacle = False
         self.update()
 
     def update(self):
@@ -195,7 +215,7 @@ class DoorwayObj(WorldObject):
 
     def __repr__(self):
         return '<DoorwayObj %s: (%.1f,%.1f) @ %d deg.>' % \
-               (self.id[8:], self.x, self.y, self.theta*180/pi)
+               (self.id, self.x, self.y, self.theta*180/pi)
 
 
 class ChipObj(WorldObject):
@@ -212,7 +232,7 @@ class FaceObj(WorldObject):
     def __init__(self, sdk_obj, id, x, y, z, name):
         super().__init__(id, x, y, z)
         self.sdk_obj = sdk_obj
-        self.obstacle = False
+        self.is_obstacle = False
 
     @property
     def name(self):
@@ -403,15 +423,15 @@ class WorldMap():
                 
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
-            if isinstance(key,str) and 'Wall' in key:
+            if isinstance(key,str) and 'Wall-' in key:
                 if key in self.objects and isinstance(self.objects[key], WallObj):
                     wall = self.objects[key]
-                    if not wall.is_foreign:
+                    if (not wall.is_fixed) and (not wall.is_foreign):
                         wall.update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
-                    id = int(key[-(len(key)-5):])
-                    wall_spec = wall_marker_dict[id]
-                    wall = WallObj(id,
+                    print('Creating new wall in worldmap:',key)
+                    wall_spec = wall_marker_dict[key[5:]]
+                    wall = WallObj(id=key,
                                    x=value[0][0][0],
                                    y=value[0][1][0],
                                    theta=value[1],
@@ -422,24 +442,19 @@ class WorldMap():
                                    markers=wall_spec.markers,
                                    doorways=wall_spec.doorways,
                                    door_ids=wall_spec.door_ids,
-                                   is_foreign=False,
-                                   world_map=self)
+                                   is_foreign=False)
                     self.objects[key] = wall
                     wall.pose_confidence = +1
                     # Make the doorways
-                    index = 0
-                    for index in range(len(wall.doorways)):
-                        doorway = DoorwayObj(wall, index)
-                        doorway.pose_confidence = +1
-                        self.robot.world.world_map.objects[doorway.id] = doorway
+                    wall.make_doorways(self.robot.world.world_map)
                 # Relocate the aruco markers to their predefined positions
-                spec = wall_marker_dict[wall.id]
+                spec = wall_marker_dict[wall.id[5:]]
                 for key,value in spec.markers.items():
                     if key in self.robot.world.world_map.objects:
                         aruco_marker = self.robot.world.world_map.objects[key]
                         s = 0 if value[0] == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
-                        wall_xyz = transform.point(value[1][0] - wall.length/2, 0, value[1][1])
+                        wall_xyz = transform.point(wall.length/2 - value[1][0], 0, value[1][1])
                         rel_xyz = transform.aboutZ(aruco_marker.theta + pi/2).dot(wall_xyz)
                         aruco_marker.x = wall.x + rel_xyz[0][0]
                         aruco_marker.y = wall.y + rel_xyz[1][0]
@@ -584,8 +599,9 @@ class WorldMap():
 wall_marker_dict = dict()
 
 class WallSpec():
-    def __init__(self, length=100, height=210, door_width=77, door_height=105,
+    def __init__(self, label=None, length=100, height=210, door_width=77, door_height=105,
                  markers=dict(), doorways=[], door_ids=[]):
+        self.label = label
         self.length = length
         self.height = height
         self.door_width = door_width
@@ -593,9 +609,11 @@ class WallSpec():
         self.markers = markers
         self.doorways = doorways
         self.door_ids = door_ids
-        ids = list(markers.keys())
-        self.id = min(ids)
+        marker_ids = list(markers.keys())
+        if len(marker_ids) > 0 and not label:
+            label = str(min(marker_ids))
+        self.id = 'Wall-%s' % label
         global wall_marker_dict
-        for id in ids:
+        for id in marker_ids:
             wall_marker_dict[id] = self
-
+        wall_marker_dict[label] = self

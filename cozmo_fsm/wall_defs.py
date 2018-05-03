@@ -100,4 +100,6 @@ def make_walls():
 
     
     
+    wA = WallSpec(label='A', length=300, height=80)
+
 make_walls()
