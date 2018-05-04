@@ -149,9 +149,7 @@ class ParticleViewer():
         if not landmarks: return
         # Extract keys and values as quickly as we can because
         # dictionary can change while we're iterating.
-        id_list = list(landmarks.keys())
-        specs_list = list(landmarks.values())
-        for (id,specs) in zip(id_list,specs_list):
+        for (id,specs) in list(landmarks.items()):
             color = None
             if isinstance(id, cozmo.objects.LightCube):
                 label = id.cube_id
@@ -215,7 +213,10 @@ class ParticleViewer():
         if isinstance(id, cozmo.objects.LightCube):
             size = (44,44)
         elif isinstance(id,str) and 'Wall' in id:
-            wall = self.robot.world.world_map.objects[id]
+            try:
+                wall = self.robot.world.world_map.objects[id]
+            except KeyError:  # race condition: not in worldmap yet
+                return
             size = (20, wall.length)
         else: # Aruco
             size = (20,50)
@@ -372,6 +373,8 @@ class ParticleViewer():
             self.robot.loop.create_task(self.look(ang))
         elif key == b'z':     # randomize
             pf.initializer.initialize(self.robot)
+        elif key == b'Z':     # randomize
+            pf.increase_variance()
         elif key == b'c':     # clear landmarks
             pf.clear_landmarks()
             print('Landmarks cleared.')

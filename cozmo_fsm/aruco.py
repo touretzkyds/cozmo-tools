@@ -11,9 +11,12 @@ class ArucoMarker(object):
         self.opencv_translation = translation
         self.opencv_rotation = (180/math.pi)*rotation
 
-        # Cozmo coordinates in camera reference frame
+        # Marker coordinates in robot's camera reference frame
         self.camera_coords = (-translation[0], -translation[1], translation[2])
+
+        # Distance in the x-y plane; particle filter ignores height so don't include it
         self.camera_distance = math.sqrt(translation[0]*translation[0] +
+                                         # translation[1]*translation[1] +
                                          translation[2]*translation[2])
         # Conversion to euler angles
         self.euler_rotation = self.rotationMatrixToEulerAngles(

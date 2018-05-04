@@ -383,7 +383,7 @@ class CubeSensorModel(SensorModel):
 #================ Particle Filter ================
 
 class ParticleFilter():
-    def __init__(self, robot, num_particles=100,
+    def __init__(self, robot, num_particles=500,
                  initializer = RandomWithinRadius(),
                  motion_model = "default",
                  sensor_model = "default",
@@ -410,6 +410,8 @@ class ParticleFilter():
         self.min_log_weight = -300  # prevent floating point underflow in exp()
         self.initializer.initialize(robot)
         self.exp_weights = np.empty(self.num_particles)
+        self.dist_jitter = 2 # mm
+        self.hdg_jitter = 0.01 # radians
         self.new_indices = np.empty(self.num_particles, dtype=np.int)
         self.new_x = np.empty(self.num_particles)
         self.new_y = np.empty(self.num_particles)
@@ -520,12 +522,9 @@ class ParticleFilter():
         self.install_new_particles()
 
     def jitter_new_particles(self):
-        dist_jitter = 2 # mm
-        hdg_jitter = 0.01 # radians
-
-        x_jitter = np.random.normal(0, dist_jitter, size=self.num_particles)
-        y_jitter = np.random.normal(0, dist_jitter, size=self.num_particles)
-        theta_jitter = np.random.normal(0, hdg_jitter, size=self.num_particles)
+        x_jitter = 0 * np.random.normal(0, self.dist_jitter, size=self.num_particles)
+        y_jitter = 0 * np.random.normal(0, self.dist_jitter, size=self.num_particles)
+        theta_jitter = 0 * np.random.normal(0, self.hdg_jitter, size=self.num_particles)
 
         new_x = self.new_x; new_y = self.new_y; new_theta = self.new_theta
         particles = self.particles
@@ -547,6 +546,21 @@ class ParticleFilter():
             p.theta = new_theta[i]
             p.log_weight = 0.0
             p.weight = 1.0
+
+    def increase_variance(self):
+        print('Particle filter: increasing variance.')
+        particles = self.particles
+        x_jitter = np.random.normal(0, 10*self.dist_jitter, size=self.num_particles)
+        y_jitter = np.random.normal(0, 10*self.dist_jitter, size=self.num_particles)
+        theta_jitter = np.random.normal(0, 20*self.hdg_jitter, size=self.num_particles)
+        for i in range(self.num_particles):
+            p = particles[i]
+            p.x += x_jitter[i]
+            p.y += y_jitter[i]
+            p.theta = wrap_angle(p.theta + theta_jitter[i])
+            p.log_weight = 0.0
+            p.weight = 1.0
+        self.variance_estimate()
 
     def set_pose(self,x,y,theta):
         for i in range(self.num_particles):
@@ -696,7 +710,11 @@ class SLAMParticle(Particle):
         # (ex,ey) is vector from particle to MAP position of lm
         ex = old_mu[0,0] - self.x
         ey = old_mu[1,0] - self.y
-        h = np.array([[sqrt(ex**2+ey**2)], [wrap_angle(atan2(ey,ex) - self.theta)], [old_height[0]], [old_height[1]], [old_height[2]]])
+        h = np.array([[sqrt(ex**2+ey**2)],
+                      [wrap_angle(atan2(ey,ex) - self.theta)],
+                      [old_height[0]],
+                      [old_height[1]],
+                      [old_height[2]]])
         new_mu = np.append(old_mu,[old_height]).reshape([5,1]) + K.dot(wrap_selected_angles(z - h,[1,3,4]))
         new_sigma = (I - K.dot(H)).dot(old_sigma)
         # [ [x,y], [z,orient,pitch], covariance_matrix]
@@ -983,13 +1001,14 @@ class SLAMParticleFilter(ParticleFilter):
             p.landmarks.clear()
         self.sensor_model.landmarks.clear()
 
-    def add_landmark(self,landmark):
+    def add_fixed_landmark(self,landmark):
+        mu = np.array([[landmark.x], [landmark.y]])
+        theta = np.array([landmark.theta])
+        sigma = np.zeros([3,3])
+        mu_theta_sigma = (mu, theta, sigma)
         for p in self.particles:
-            mu = np.array([[landmark.x], [landmark.y]])
-            theta = np.array([landmark.theta])
-            sigma = np.zeros([3,3])
-            p.landmarks[landmark.id] = [mu, theta, sigma]
-        self.sensor_model.landmarks[landmark.id] = landmark
+            p.landmarks[landmark.id] = mu_theta_sigma
+        self.sensor_model.landmarks[landmark.id] = mu_theta_sigma
 
     def update_weights(self):
         var = super().update_weights()

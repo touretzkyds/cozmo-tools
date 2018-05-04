@@ -162,8 +162,7 @@ class PilotCheckStart(StateNode):
             return
         except Exception as e:
             print('PilotCheckStart: Unexpected planner exception',e)
-            self.post_failure()
-            return
+            raise
         self.post_event(PilotEvent(True))
         self.post_success()
 

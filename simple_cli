@@ -131,6 +131,7 @@ def runfsm(module_name, running_modules=dict()):
     a class of the same name. It calls that class's constructor and then
     calls the instance's start() method."""
 
+    global running_fsm
     running_fsm = cozmo_fsm.program.running_fsm
     if running_fsm:
         robot.stop_all_motors()
@@ -233,6 +234,7 @@ def start_stuff(args):
 """)
 
 def show_stuff(args):
+    global running_fsm
     running_fsm = cozmo_fsm.program.running_fsm
     spec = args[0] if len(args) > 0 else ""
     if spec == 'active':
@@ -253,6 +255,9 @@ def show_stuff(args):
         running_fsm.simple_cli_callback = simple_cli_callback
         cozmo_fsm.program.running_fsm = running_fsm
         robot.loop.call_soon(running_fsm.start)
+    elif spec == "crosshairs":
+        if running_fsm:
+            running_fsm.viewer_crosshairs = not running_fsm.viewer_crosshairs
     elif spec == "particle_viewer":
         if not robot.world.particle_viewer:
             robot.world.particle_viewer = ParticleViewer(robot)
@@ -278,6 +283,7 @@ def show_stuff(args):
     else:
         print("""Invalid option. Try one of:
   show viewer
+  show crosshairs
   show worldmap_viewer
   show particle_viewer
   show path_viewer
@@ -442,8 +448,9 @@ def show_particle(args):
             print('Particle number must be between 0 and',
                   len(robot.world.particle_filter.particles)-1)
             return
-    print ('Particle %s:  x=%6.1f  y=%6.1f  theta=%6.1f deg   w=%.7f' %
-           (particle_number, particle.x, particle.y, particle.theta*180/pi, particle.weight))
+    print ('Particle %s:  x=%6.1f  y=%6.1f  theta=%6.1f deg   log wt=%f [%.25f]' %
+           (particle_number, particle.x, particle.y, particle.theta*180/pi,
+            particle.log_weight, particle.weight))
     if len(particle.landmarks) > 0:
         print('Landmarks:')
         show_landmarks_helper(particle.landmarks)

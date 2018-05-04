@@ -117,8 +117,9 @@ class ArucoMarkerObj(WorldObject):
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
-        return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s>' % \
-               (self.id, self.x, self.y, self.z, self.theta*180/pi, vis)
+        fix = ' fixed' if self.is_fixed else ''
+        return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s%s>' % \
+               (self.id, self.x, self.y, self.z, self.theta*180/pi, fix, vis)
 
 
 class WallObj(WorldObject):
@@ -173,6 +174,21 @@ class WallObj(WorldObject):
             doorway = DoorwayObj(self, index)
             doorway.pose_confidence = +1
             world_map.objects[doorway.id] = doorway
+
+    def make_arucos(self, world_map):
+        for key,value in self.markers.items():
+            wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
+            s = 0 if value[0] == +1 else pi
+            rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
+            x = self.x + rel_xyz[1][0]
+            y = self.y + rel_xyz[0][0]
+            z = rel_xyz[2][0]
+            theta = wrap_angle(self.theta + s)
+            marker = ArucoMarkerObj(world_map.robot.world.aruco, id=key, x=x, y=y, z=z, theta=theta)
+            marker.is_fixed = self.is_fixed
+            world_map.objects[key] = marker
+            if self.is_fixed:
+                world_map.robot.world.particle_filter.add_fixed_landmark(marker)        
 
     @property
     def is_visible(self):
@@ -326,6 +342,17 @@ class WorldMap():
         self.objects = dict()
         self.shared_objects = dict()
         
+    def add_fixed_landmark(self,landmark):
+        landmark.is_fixed = True
+        self.objects[landmark.id] = landmark
+        self.robot.world.particle_filter.add_fixed_landmark(landmark)
+        if isinstance(landmark,WallObj):
+            wall = landmark
+            wall.make_doorways(self)
+            wall.make_arucos(self)
+            for key in wall.markers.keys():
+                self.robot.world.particle_filter.add_fixed_landmark(self.objects[key])
+
     def update_map(self):
         """Called to update the map after every camera image, after
         object_observed and object_moved events, and just before the
