@@ -320,7 +320,11 @@ class WorldMapViewer():
         glNewList(c, GL_COMPILE)
         glPushMatrix()
         glTranslatef(face.x, face.y, face.z)
-        glColor4f(0., 1., 0., 0.9)
+        if face.is_visible:
+            color = (0.0, 1.0, 0.0, 0.9)
+        else:
+            color = (0.0, 0.5, 0.0, 0.7)
+        glColor4f(*color)
         quadric = gluNewQuadric()
         gluQuadricOrientation(quadric, GLU_OUTSIDE)
         glScalef(1.0, 1.0, 2.0)

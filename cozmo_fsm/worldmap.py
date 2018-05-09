@@ -259,7 +259,7 @@ class FaceObj(WorldObject):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        return "<FaceObj name:'%s' expr:%s (%.1f, %.1f, %.1f) vis:%s>" % \
+        return "<FaceObj name:'%s' expression:%s (%.1f, %.1f, %.1f) vis:%s>" % \
                (self.name, self.expression, self.x, self.y, self.z, self.is_visible)
 
 
@@ -362,7 +362,11 @@ class WorldMap():
             self.update_cube(cube)
         if self.robot.world.charger: self.update_charger()
         for face in self.robot.world._faces.values():
-            self.update_face(face)
+            if face.face_id == face.updated_face_id:                
+                self.update_face(face)
+            else:
+                if face in self.robot.world.world_map.objects:
+                    del  self.robot.world.world_map.objects[face]
         self.update_arucos()
         self.update_walls()
         self.update_doorways()
@@ -514,6 +518,8 @@ class WorldMap():
             face_obj = FaceObj(face, face.face_id, pos.x, pos.y, pos.z,
                                face.name)
             self.robot.world.world_map.objects[face] = face_obj
+        else:
+            face_obj.sdk_obj = face  # in case face.updated_id changed
         # now update the face
         if face.is_visible:
             face_obj.x = pos.x
