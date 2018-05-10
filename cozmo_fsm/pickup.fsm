@@ -361,7 +361,7 @@ class PickUpCube(StateNode):
         goto_cube: GoToCube()
         goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> ParentFails()
         goto_cube =F=> ParentFails()
-        goto_cube =C=> AbortAllActions() # clear head and lift tracks
+        goto_cube =C=> StopAllMotors() # clear head and lift tracks
           =C=> {raise_lift, raise_head}
 
         #raise_lift: SetLiftHeight(0.7)

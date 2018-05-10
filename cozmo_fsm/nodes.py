@@ -366,6 +366,14 @@ class AbortAllActions(StateNode):
         self.robot.abort_all_actions()
         self.post_completion()
 
+class StopAllMotors(StateNode):
+    """Abort head and lift actions but not speech."""
+    def start(self,event=None):
+        super().start(event)
+        self.robot.stop_all_motors()
+        self.post_completion()
+        
+
 #________________ Color Images ________________
 
 class ColorImageBase(StateNode):
