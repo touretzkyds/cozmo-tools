@@ -214,6 +214,7 @@ class RRT():
                     break
             (treeA, treeB) = (treeB, treeA)
             swapped = not swapped
+        # Search terminated. Check for success.
         if swapped:
             (treeA, treeB) = (treeB, treeA)
         if status is self.REACHED:

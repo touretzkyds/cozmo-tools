@@ -367,7 +367,6 @@ class AbortAllActions(StateNode):
         self.post_completion()
 
 class StopAllMotors(StateNode):
-    """Abort head and lift actions but not speech."""
     def start(self,event=None):
         super().start(event)
         self.robot.stop_all_motors()

@@ -822,12 +822,12 @@ class SLAMSensorModel(SensorModel):
         # Call with just_looking=True to just look for new landmarks; no evaluation.
         evaluated = False
 
+        # Do this even if forced, to check for robot origin_id change
+        (dist,turn_angle) = self.compute_robot_motion()
         # Unless forced, only evaluate if the robot moved enough
         # for evaluation to be worthwhile.
-        if not force:
-            (dist,turn_angle) = self.compute_robot_motion()
-            if (dist < 5) and abs(turn_angle) < 2*pi/180:
-                return False
+        if (not force) and (dist < 5) and abs(turn_angle) < 2*pi/180:
+            return False
         if not just_looking:
             self.last_evaluate_pose = self.robot.pose
         # Cache seen marker objects because vision is in another thread.

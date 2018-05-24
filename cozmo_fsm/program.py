@@ -196,14 +196,6 @@ class StateMachineProgram(StateNode):
             cozmo.objects.EvtObjectObserved,
             self.robot.world.world_map.handle_object_observed)
 
-        self.robot.world.add_event_handler(
-            cozmo.objects.EvtObjectMovingStarted,
-            self.robot.world.world_map.handle_object_moved)
-
-        self.robot.world.add_event_handler(
-            cozmo.objects.EvtObjectMovingStopped,
-            self.robot.world.world_map.handle_object_moved)
-
         # Start speech recognition if requested
         if self.speech:
             self.speech_listener = SpeechListener(self.robot,self.thesaurus,debug=self.speech_debug)

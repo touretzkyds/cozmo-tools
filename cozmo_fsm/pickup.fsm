@@ -27,8 +27,8 @@ class GoToCube(StateNode):
             raise ValueError(self.object)
         self.children['looker'].object = self.object
         super().start(event)
-        if self.wmobject.pose_confidence < 0 or not self.object.pose.is_valid:
-            print('GoToCube: cube has invalid pose!', self.wmobject)
+        if self.wmobject.pose_confidence < 0:
+            print('GoToCube: cube has invalid pose!', self.wmobject, self.object.pose)
             self.post_event(PilotEvent(InvalidPose))
             self.post_failure()
 
@@ -109,8 +109,7 @@ class GoToCube(StateNode):
 
 
     class TurnToCube(Turn):
-        def __init__(self, offset=0, check_vis=False):
-            self.offset = offset
+        def __init__(self, check_vis=False):
             self.check_vis = check_vis
             super().__init__()
 
@@ -123,7 +122,7 @@ class GoToCube(StateNode):
                 super().start(event)
                 self.post_failure()
             else:
-                (cx, cy, _) = self.parent.pick_side(self.offset, False)
+                (cx, cy, _) = self.parent.pick_side(0, False)
                 rx = self.robot.pose.position.x
                 ry = self.robot.pose.position.y
                 dx = cx - rx
@@ -160,7 +159,10 @@ class GoToCube(StateNode):
             cube = self.parent.object
             dx = cube.pose.position.x - self.robot.pose.position.x
             dy = cube.pose.position.y - self.robot.pose.position.y
-            self.distance = Distance(sqrt(dx*dx + dy*dy) - self.offset)
+            dist = sqrt(dx*dx + dy*dy) - self.offset
+            if (dist < 0):
+                print('***** ForwardToCube negative distance:',dist)
+            self.distance = Distance(dist)
             print('ForwardToCube: distance %.1f mm' % self.distance.distance_mm)
             super().start(event)
 
@@ -181,12 +183,14 @@ class GoToCube(StateNode):
 
         check_start: PilotCheckStart()
         check_start =S=> Print('Start collision check passed.') =N=> go_side
+        # TODO: instead of blindly backing up, find the best direction to move.
         check_start =F=> Print('Backing up to escape start collision...') =N=>
            Forward(-80) =C=> StateNode() =T(0.5)=> check_start2
 
+        # Second chance to avoid StartCollides.  There is no third chance.
         check_start2: PilotCheckStart()
         check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
-        check_start2 =PILOT(StartCollides)=> ParentPilotEvent()
+        check_start2 =F=> ParentPilotEvent()
 
         go_side: self.GoToSide()
         go_side =PILOT=> go_side_pilot: ParentPilotEvent()
@@ -195,7 +199,7 @@ class GoToCube(StateNode):
             =T(0.75)=> self.ReportPosition('go_side_stopped')
             =N=> turn_to_cube1
 
-        turn_to_cube1: self.TurnToCube(0,check_vis=True) =C=>
+        turn_to_cube1: self.TurnToCube(check_vis=True) =C=>
             self.ReportPosition('turn_to_cube1_deccel')
             =T(0.75)=> self.ReportPosition('turn_to_cube1_stopped')
             =N=> approach
@@ -204,13 +208,13 @@ class GoToCube(StateNode):
         approach: self.ForwardToCube(60) =C=>
             self.ReportPosition('approach') =T(0.75)=>
             self.ReportPosition('approach') =N=>
-            self.TurnToCube(0,check_vis=False) =C=> self.ForwardToCube(15) =C=> success
+            self.TurnToCube(check_vis=False) =C=> self.ForwardToCube(15) =C=> success
 
-        turn_to_cube2: self.TurnToCube(0,check_vis=True)
+        turn_to_cube2: self.TurnToCube(check_vis=True)
         turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> ParentFails()
         turn_to_cube2 =C=> self.ForwardToCube(60) =C=> turn_to_cube3
 
-        turn_to_cube3: self.TurnToCube(0,check_vis=False)   # can't fail
+        turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
         turn_to_cube3 =C=> self.ForwardToCube(20) =C=> success
 
         success: ParentCompletes()
@@ -255,7 +259,7 @@ class PickUpCube(StateNode):
         def probe_column(self, im, col, row_start, row_end):
             """
             Probe one column of the image, looking for the top horizontal
-            black bar of the cube marker.  This bar should be 22-24 pixels
+            black bar of the cube marker.  This bar should be 23-32 pixels
             thick.  Use adaptive thresholding by sorting the pixels and
             finding the darkest ones to set the black threshold.
             """
@@ -312,10 +316,10 @@ class PickUpCube(StateNode):
         def start(self,event=None):
             super().start(event)
             im = np.array(self.robot.world.latest_image.raw_image)
-            min_length = 23
+            min_length = 20
             max_length = 32
             bad_runs = 0
-            print('Verifying pickup.  hangle=%4.1f langle=%4.1f lheight=%4.1f' %
+            print('Verifying pickup.  hangle=%4.1f deg.  langle=%4.1f deg.  lheight=%4.1f mm' %
                   (self.robot.head_angle.degrees, self.robot.lift_angle.degrees,
                    self.robot.lift_height.distance_mm))
             for col in range(100,220,20):
@@ -367,9 +371,9 @@ class PickUpCube(StateNode):
         #raise_lift: SetLiftHeight(0.7)
         #raise_head: SetHeadAngle(28)
         raise_lift: SetLiftHeight(0.4)
-        raise_head: SetHeadAngle(0)
+        raise_head: SetHeadAngle(5) =C=> raise_head2: SetHeadAngle(0)
 
-        {raise_lift, raise_head} =C=> verify
+        {raise_lift, raise_head2} =C=> verify
 
         verify: self.VerifyPickup()
         verify =S=> satisfied
@@ -418,6 +422,8 @@ class DropObject(StateNode):
 
 
 class PickUpCubeForeign(StateNode):
+
+    # *** THIS IS OLD CODE AND NEEDS TO BE UPDATED ***
 
     def __init__(self, cube_id=None):
         self.object_id = cube_id

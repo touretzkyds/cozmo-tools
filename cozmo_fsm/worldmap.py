@@ -392,14 +392,16 @@ class WorldMap():
             id = tuple(key for (key,value) in self.robot.world.light_cubes.items() if value == cube)[0]
             wmobject = LightCubeObj(cube, id)
             self.objects[cube] = wmobject
-            if not cube.pose.is_comparable(self.robot.pose):
-                wmobject.update_from_sdk = False
-                wmobject.pose_confidence = -1
-            else:
-                wmobject.pose_confidence = 0
         if cube.is_visible:
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1
+        elif not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
+            wmobject.update_from_sdk = False
+            wmobject.pose_confidence = -1
+        else:       # Robot re-localized so cube came back
+            pass  # skip for now due to SDK bug
+            # wmobject.update_from_sdk = True
+            # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
         if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
             self.update_coords_from_sdk(wmobject, cube)
         return wmobject
@@ -411,12 +413,16 @@ class WorldMap():
         else:
             wmobject = ChargerObj(charger)
             self.objects[charger] = wmobject
-            if not charger.pose.is_comparable(self.robot.pose):
-                wmobject.update_from_sdk = False
-                wmobject.pose_confidence = -1
         if charger.is_visible or self.robot.is_on_charger:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
+        elif not charger.pose.is_comparable(self.robot.pose):
+            wmobject.update_from_sdk = False
+            wmobject.pose_confidence = -1
+        else:       # Robot re-localized so charger came back
+            pass  # skip for now due to SDK bug
+            # wmobject.update_from_sdk = True
+            # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
         if wmobject.update_from_sdk:  # True unless pose isn't comparable
             self.update_coords_from_sdk(wmobject, charger)
         return wmobject
@@ -606,24 +612,6 @@ class WorldMap():
             self.update_custom_object(evt.obj)
         elif isinstance(evt.obj, Face):
             self.update_face(evt.obj)
-
-    def handle_object_moved(self, evt, **kwargs):
-        cube = evt.obj
-        if self.robot.carrying and self.robot.carrying.sdk_obj is cube:
-            pass
-        else:
-            # print(evt, kwargs)
-            if cube in self.robot.world.world_map.objects:
-                wmobject = self.robot.world.world_map.objects[cube]
-                if self.robot.carrying is wmobject: return
-                if cube.is_visible:
-                    wmobject.pose_confidence = +1
-                else:
-                    if isinstance(evt, EvtObjectMovingStopped) and \
-                       evt.move_duration > 1:
-                        wmobject.pose_confidence = -1
-                    else:
-                        wmobject.pose_confidence = min(0, wmobject.pose_confidence)
 
 
 #================ Wall Specification  ================
