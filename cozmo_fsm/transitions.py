@@ -26,17 +26,21 @@ class CSFEventBase(Transition):
         if self.running: return
         super().start()
         self.observed_sources = set()
+        print('==> start',self.running,self.name,self.observed_sources)
         for source in self.sources:
             self.robot.erouter.add_listener(self, self.event_type, source)
 
     def handle_event(self,event):
-        if not self.running: return
-        if TRACE.trace_level >= TRACE.listener_invocation:
+        if not self.running:
+            print('***',self,'got an event while not running!')
+            return
+        if True or  TRACE.trace_level >= TRACE.listener_invocation:
             print('TRACE%d: %s is handling %s' %
                   (TRACE.listener_invocation, self,event))
         super().handle_event(event)
         if isinstance(event, self.event_type):
             self.observed_sources.add(event.source)
+            print('==>',self.name,self.observed_sources)
             if len(self.observed_sources) >= (self.count or len(self.sources)):
                 self.fire(event)
         else:

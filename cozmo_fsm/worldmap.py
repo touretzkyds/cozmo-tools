@@ -1,4 +1,6 @@
 from math import pi, inf, sin, cos, tan, atan2, sqrt
+import time
+
 from cozmo.faces import Face
 from cozmo.objects import LightCube, CustomObject, EvtObjectMovingStopped
 
@@ -110,16 +112,20 @@ class ArucoMarkerObj(WorldObject):
         super().__init__(id,x,y,z)
         self.aruco_parent = aruco_parent
         self.theta = theta
+        self.pose_confidence = +1
 
     @property
     def is_visible(self):
         return self.id in self.aruco_parent.seen_marker_ids
 
     def __repr__(self):
-        vis = ' visible' if self.is_visible else ''
-        fix = ' fixed' if self.is_fixed else ''
-        return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s%s>' % \
-               (self.id, self.x, self.y, self.z, self.theta*180/pi, fix, vis)
+        if self.pose_confidence >= 0:
+            vis = ' visible' if self.is_visible else ''
+            fix = ' fixed' if self.is_fixed else ''
+            return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s%s>' % \
+                (self.id, self.x, self.y, self.z, self.theta*180/pi, fix, vis)
+        else:
+            return '<ArucoMarkObj %d: position unknown>' % self.id
 
 
 class WallObj(WorldObject):
@@ -389,15 +395,13 @@ class WorldMap():
             return None
         else:
             # Cube is not in the worldmap, so add it.
-            id = tuple(key for (key,value) in self.robot.world.light_cubes.items() if value == cube)[0]
-            wmobject = LightCubeObj(cube, id)
+            wmobject = LightCubeObj(cube, cube.cube_id)
             self.objects[cube] = wmobject
         if cube.is_visible:
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1
         elif not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
             wmobject.update_from_sdk = False
-            wmobject.pose_confidence = -1
         else:       # Robot re-localized so cube came back
             pass  # skip for now due to SDK bug
             # wmobject.update_from_sdk = True
@@ -441,6 +445,7 @@ class WorldMap():
                 pftuple = None
             else:
                 pftuple = self.robot.world.particle_filter.sensor_model.landmarks.get(id, None)
+            wmobject.pose_confidence = +1
             if pftuple:  # Particle filter is tracking this marker
                 wmobject.x = pftuple[0][0][0]
                 wmobject.y = pftuple[0][1][0]
@@ -547,6 +552,7 @@ class WorldMap():
             elif id in custom_objs.custom_cube_types:
                 wmobject = CustomCubeObj(sdk_obj,id)
             self.objects[sdk_obj] = wmobject
+        wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
 
     def update_carried_object(self, wmobject):
@@ -603,6 +609,11 @@ class WorldMap():
                             CameraObj(id=int(key[-2]), x=val[0][0,0], y=val[0][1,0],
                                       z=val[1][0], theta=val[1][2], phi=val[1][1])
 
+    def invalidate_poses(self):
+        for key,wmobj in self.robot.world.world_map.objects.items():
+            if not wmobj.is_fixed:
+                wmobj.pose_confidence = -1
+
 #================ Event Handlers ================
 
     def handle_object_observed(self, evt, **kwargs):
@@ -613,6 +624,19 @@ class WorldMap():
         elif isinstance(evt.obj, Face):
             self.update_face(evt.obj)
 
+    def handle_object_move_started(self, evt, **kwargs):
+        cube = evt.obj
+        if self.robot.carrying and self.robot.carrying.sdk_obj is cube:
+            return
+        if self.robot.fetching and self.robot.fetching.sdk_obj is cube:
+            return
+        cube.movement_start_time = time.time()
+        wmobject = self.robot.world.world_map.objects[cube]
+        wmobject.pose_confidence = min(0, wmobject.pose_confidence)
+
+    def handle_object_move_stopped(self, evt, **kwargs):
+        cube = evt.obj
+        cube.movement_start_time = None
 
 #================ Wall Specification  ================
 

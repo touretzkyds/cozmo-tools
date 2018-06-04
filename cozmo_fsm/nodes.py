@@ -158,8 +158,8 @@ class DriveContinuous(StateNode):
         dist = math.sqrt((self.cur[0]-x)**2 + (self.cur[1]-y)**2)
         if self.pause_counter > 0:
             self.pause_counter -= 1
-            print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
-                  (x, y, q*180/pi, dist))
+            #print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
+            #      (x, y, q*180/pi, dist))
             return
         if not self.reached_dist:
             self.reached_dist = \
@@ -337,10 +337,11 @@ class LookAtObject(StateNode):
 
     def move_head(self,angle):
         try:
-            self.robot.set_head_angle(cozmo.util.radians(angle), in_parallel=True, num_retries=0)
+            self.robot.set_head_angle(cozmo.util.radians(angle), in_parallel=True, num_retries=2)
         except cozmo.exceptions.RobotBusy:
             print("LookAtObject: robot busy; can't move head to",angle)
             pass
+
 
 class Print(StateNode):
     "Argument can be a string, or a function to be evaluated at print time."
@@ -365,6 +366,16 @@ class AbortAllActions(StateNode):
         super().start(event)
         self.robot.abort_all_actions()
         self.post_completion()
+
+
+class AbortHeadAction(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        actionType = cozmo._clad._clad_to_engine_cozmo.RobotActionType.UNKNOWN
+        msg = cozmo._clad._clad_to_engine_iface.CancelAction(actionType=actionType)
+        self.robot.conn.send_msg(msg)
+        self.post_completion()
+
 
 class StopAllMotors(StateNode):
     def start(self,event=None):

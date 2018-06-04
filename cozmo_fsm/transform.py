@@ -147,3 +147,26 @@ def project_to_line(x0,y0,theta0,x1,y1):
     x2 = (b0-b1) / (m1-m0)
     y2 = m0 * x2 + b0
     return (x2,y2)
+
+def line_equation(p1, p2):
+    "Returns the line equation used by line_intersection."
+    A = (p1[1] - p2[1])
+    B = (p2[0] - p1[0])
+    C = (p1[0]*p2[1] - p2[0]*p1[1])
+    return (A, B, -C)
+
+def line_extrapolate(L, x):
+    (A,B,C) = L
+    s = +1 if B > 0 else -1
+    return C if B == 0 else (-A/B)*x + C*s
+
+def line_intersection(L1,L2):
+    "Intersection point of two lines defined by line equations"
+    D  = L1[0] * L2[1] - L1[1] * L2[0]
+    if D == 0: return False
+    Dx = L1[2] * L2[1] - L1[1] * L2[2]
+    Dy = L1[0] * L2[2] - L1[2] * L2[0]
+    x = Dx / D
+    y = Dy / D
+    return (x,y)
+

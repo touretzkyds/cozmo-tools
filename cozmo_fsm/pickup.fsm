@@ -3,7 +3,8 @@ from cozmo.objects import LightCube
 
 from .nodes import *
 from .transitions import *
-from .transform import wrap_angle
+from .transform import wrap_angle, line_equation, line_intersection
+from .cozmo_kin import center_of_rotation_offset
 from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, InvalidPose
 from .worldmap import LightCubeObj
 from .doorpass import WallPilotToPose
@@ -26,6 +27,8 @@ class GoToCube(StateNode):
         else:
             raise ValueError(self.object)
         self.children['looker'].object = self.object
+        self.sides = []
+        self.side = None
         super().start(event)
         if self.wmobject.pose_confidence < 0:
             print('GoToCube: cube has invalid pose!', self.wmobject, self.object.pose)
@@ -33,10 +36,10 @@ class GoToCube(StateNode):
             self.post_failure()
 
     def pick_side(self, dist, use_world_map):
-        "*** NOTE: This code is only correct for upright cubes"
+        "*** BUG: This code is only correct for upright cubes"
         cube = self.object
         if use_world_map:
-            wobj = self.robot.world.world_map.objects[cube]
+            wobj = self.robot.world.world_map.objects[cube] 
             x = wobj.x
             y = wobj.y
             ang = wobj.theta
@@ -56,9 +59,7 @@ class GoToCube(StateNode):
         sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
         return sorted_sides[0]
 
-    def almost_docked(self, side, use_world_map):
-        """Returns True if we're almost docked with the cube so we don't
-        need to check for collisions."""
+    def get_robot_pose(self, use_world_map):
         if use_world_map:
             rx = self.robot.world.particle_filter.pose[0]
             ry = self.robot.world.particle_filter.pose[1]
@@ -67,13 +68,35 @@ class GoToCube(StateNode):
             rx = self.robot.pose.position.x
             ry = self.robot.pose.position.y
             rtheta = self.robot.pose.rotation.angle_z.radians
-        dist = math.sqrt((rx-side[0])**2 + (ry-side[1])**2)
-        relative_angle = abs(wrap_angle(rtheta-side[2]) % (pi/2)) * (180/pi)
-        return (dist < 100) and (relative_angle < 10)
+        return (rx, ry, rtheta)
 
-    class GoToSide(PilotToPose):
+    def get_robot_line(self, use_world_map):
+        (rx, ry, rtheta) = self.get_robot_pose(use_world_map)
+        cx = rx + center_of_rotation_offset*cos(rtheta)
+        cy = ry + center_of_rotation_offset*sin(rtheta)
+        return line_equation((rx,ry), (cx,cy))
+
+    def get_cube_line(self, use_world_map):
+        if use_world_map:
+            ox = self.parent.wmobject.x
+            oy = self.parent.wmobject.y
+        else:
+            ox = self.parent.object.pose.position.x
+            oy = self.parent.object.pose.position.y
+        (sx, sy, stheta) = self.side
+        return line_equation((ox,oy), (sx,sy))
+
+    def measure_dockedness(self, side, use_world_map):
+        """Returns distance and relative angle to specified docking pose."""
+        (rx, ry, rtheta) = self.get_robot_pose(use_world_map)
+        (ox, oy, otheta) = side
+        dist = math.sqrt((rx-ox)**2 + (ry-oy)**2)
+        relative_angle = abs(wrap_angle(rtheta-otheta) % (pi/2)) * (180/pi)
+        return (dist, relative_angle)
+
+    class PilotToSide(PilotToPose):
         def __init__(self):
-            super().__init__(None)
+            super().__init__(None, verbose=True)
 
         def start(self, event=None):
             cube = self.parent.object
@@ -81,11 +104,12 @@ class GoToCube(StateNode):
             self.target_pose = Pose(x, y, self.robot.pose.position.z,
                                     angle_z=Angle(radians=wrap_angle(theta)))
             (px,py,pq) = self.robot.world.particle_filter.pose
-            print('GoToSide: planned path from (%.1f, %.1f) @ %.1f deg. to pickup point (%.1f, %.1f) @ %.1f deg.' %
+            print('PilotToSide: planned path from (%.1f, %.1f) @ %.1f deg. to pickup point (%.1f, %.1f) @ %.1f deg.' %
                   (px, py, pq*180/pi,
                    self.target_pose.position.x, self.target_pose.position.y,
                    self.target_pose.rotation.angle_z.degrees))
             super().start(event)
+
 
     class ReportPosition(StateNode):
         def __init__(self,id=None):
@@ -117,7 +141,7 @@ class GoToCube(StateNode):
             if self.running: return
             cube = self.parent.object
             if self.check_vis and not cube.is_visible:
-                print('** TurnToCube could not see the cube.')
+                print('** TurnToCube %s could not see the cube.' % self.name)
                 self.angle = None
                 super().start(event)
                 self.post_failure()
@@ -132,22 +156,38 @@ class GoToCube(StateNode):
                                      * 180/pi)
                 if abs(self.angle.degrees) <= 2:
                     self.angle = degrees(0)
-                print('TurnToCube: cube at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  angle=%5.1f' %
-                      (cx, cy, rx, ry, dist, self.angle.degrees))
+                if abs(self.angle.degrees) > 60:
+                    print('********>> BIG TURN in',self)
+                print('TurnToCube %s: cube at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  turn angle=%5.1f' %
+                      (self.name, cx, cy, rx, ry, dist, self.angle.degrees))
                 super().start(event)
 
+
     class CheckAlmostDocked(StateNode):
+        # *** TODO: convert to iterate through all feasible sides
         def start(self, event=None):
             if self.running: return
             super().start(event)
             cube = self.parent.object
-            if not cube.is_visible:
-                self.post_failure()
             side = self.parent.pick_side(25, False)
-            if self.parent.almost_docked(side,False):
-                self.post_success()
+            self.parent.side = side
+            (dist, relative_angle) = self.parent.measure_dockedness(side,False)
+            max_distance_from_dock_point = 100 # millimeters
+            max_angle_from_dock_heading = 10 # degrees
+            if dist < max_distance_from_dock_point:
+                if relative_angle < max_angle_from_dock_heading and cube.is_visible:
+                    print('CheckAlmostDocked is satisfied.  dist=%.1f mm  angle=%.1f deg.' %
+                          (dist, relative_angle))
+                    self.post_completion()
+                else:
+                    print('CheckAlmostDocked: bad angle.  (dist=%.1f mm)  angle=%.1f deg.' %
+                          (dist, relative_angle))
+                    self.post_success()
             else:
+                print('CheckAlmostDocked: too far away.  dist=%.1f mm.  (angle=%.1f deg.)' %
+                      (dist, relative_angle))
                 self.post_failure()
+
 
     class ForwardToCube(Forward):
         def __init__(self, offset):
@@ -161,40 +201,70 @@ class GoToCube(StateNode):
             dy = cube.pose.position.y - self.robot.pose.position.y
             dist = sqrt(dx*dx + dy*dy) - self.offset
             if (dist < 0):
-                print('***** ForwardToCube negative distance:',dist)
+                print('***** ForwardToCube %s negative distance: %.1f mm' % (self.name,dist))
             self.distance = Distance(dist)
-            print('ForwardToCube: distance %.1f mm' % self.distance.distance_mm)
+            print('ForwardToCube %s: distance %.1f mm' % (self.name, self.distance.distance_mm))
+            super().start(event)
+
+
+    class ManualDock1(Forward):
+        def start(self,event=None):
+            rline = self.parent.get_robot_line(use_world_map=True)
+            cline = self.parent.get_cube_line(use_world_map=True)
+            (intx, inty) = line_intersection(rline, cline)
+            (rx, ry,rtheta) = self.parent.get_robot_pose(use_world_map=True)
+            dist = sqrt((rx-intx)**2 + (ry-inty)**2)
+            dist = min(dist, 100)
+            self.distance = Distance(-(dist+center_of_rotation_offset))
+            print('ManualDock1: int=',(intx,inty),' distance=',self.distance)
+            super().start(event)            
+             
+    class ManualDock2(Turn):
+        def start(self,event=None):
+            (rx,ry,rtheta) = self.parent.get_robot_pose(use_world_map=True)
+            (ox,oy,o_theta) = self.parent.side
+            bearing = atan2(oy-ry, ox-rx)
+            self.angle = Angle(radians=wrap_angle(bearing-rtheta))
             super().start(event)
 
     $setup{
         # GoToCube machine
         
-        droplift: SetLiftHeight(0) =C=> {waitlift, looker}
-        droplift =F=> {waitlift, looker}   # lift motion will fail if on charger
+        droplift: SetLiftHeight(0)
+        droplift =C=> {looker, waitlift}
+        droplift =F=> {looker, waitlift}   # lift motion will fail if on charger
+
+        looker: LookAtObject()
 
         waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
            check_almost_docked
 
-        looker: LookAtObject()
+        check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
+        check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
+        check_almost_docked =S=> manual_dock1        # we're close: skip the Pilot and set up dock manually
+        check_almost_docked =F=> pilot_check_start   # not close: use the Pilot to path plan
 
-        check_almost_docked: self.CheckAlmostDocked()
-        check_almost_docked =S=> turn_to_cube2
-        check_almost_docked =F=> check_start
+        manual_dock1: self.ManualDock1()
+        manual_dock1 =C=> manual_dock2
+        manual_dock1 =T(10)=> Print('Cannot manual dock from here') =N=> pilot_check_start  # temporary
 
-        check_start: PilotCheckStart()
-        check_start =S=> Print('Start collision check passed.') =N=> go_side
+        manual_dock2: self.ManualDock2() =C=> turn_to_cube1
+
+        pilot_check_start: PilotCheckStart()
+        pilot_check_start =S=> Print('Start collision check passed.') =N=> go_side
         # TODO: instead of blindly backing up, find the best direction to move.
-        check_start =F=> Print('Backing up to escape start collision...') =N=>
-           Forward(-80) =C=> StateNode() =T(0.5)=> check_start2
+        pilot_check_start =F=> Print('Backing up to escape start collision...') =N=>
+           Forward(-80) =C=> StateNode() =T(0.5)=> pilot_check_start2
 
         # Second chance to avoid StartCollides.  There is no third chance.
-        check_start2: PilotCheckStart()
-        check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
-        check_start2 =F=> ParentPilotEvent()
+        pilot_check_start2: PilotCheckStart()
+        pilot_check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
+        pilot_check_start2 =PILOT(StartCollides)=> check_start2_pilot: ParentPilotEvent()
+        pilot_check_start2 =F=> failure
 
-        go_side: self.GoToSide()
+        go_side: self.PilotToSide()
         go_side =PILOT=> go_side_pilot: ParentPilotEvent()
-        go_side =F=> ParentFails()
+        go_side =F=> failure
         go_side =C=> self.ReportPosition('go_side_deccel')
             =T(0.75)=> self.ReportPosition('go_side_stopped')
             =N=> turn_to_cube1
@@ -208,16 +278,23 @@ class GoToCube(StateNode):
         approach: self.ForwardToCube(60) =C=>
             self.ReportPosition('approach') =T(0.75)=>
             self.ReportPosition('approach') =N=>
-            self.TurnToCube(check_vis=False) =C=> self.ForwardToCube(15) =C=> success
+            turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=>
+            forward_to_cube_1a: self.ForwardToCube(15) =C=> success
 
         turn_to_cube2: self.TurnToCube(check_vis=True)
-        turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> ParentFails()
-        turn_to_cube2 =C=> self.ForwardToCube(60) =C=> turn_to_cube3
+        turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> failure
+        turn_to_cube2 =C=> forward_to_cube2
+
+        forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3        
 
         turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
-        turn_to_cube3 =C=> self.ForwardToCube(20) =C=> success
+        turn_to_cube3 =C=> forward_to_cube3
 
-        success: ParentCompletes()
+        forward_to_cube3: self.ForwardToCube(20) =C=> success
+
+        success: Print('GoToSide has succeeded.') =N=> ParentCompletes()
+
+        failure: Print('GoToSide has failed.') =N=> ParentFails()
     }
 
 class SetCarrying(StateNode):
@@ -229,7 +306,7 @@ class SetCarrying(StateNode):
     def start(self, event=None):
         if self.objparam is not None:
             self.object = self.objparam
-        elif self.object is None:
+        else:
             self.object = self.parent.object
         if isinstance(self.object, LightCube):
             self.wmobject = self.robot.world.world_map.objects[self.object]
@@ -241,15 +318,54 @@ class SetCarrying(StateNode):
         self.robot.carrying = self.wmobject
         self.wmobject.update_from_sdk = False
         self.wmobject.pose_confidence = +1
+        self.robot.fetching = None
         super().start(event)
         self.post_completion()
 
 class SetNotCarrying(StateNode):
     def start(self,event=None):
         self.robot.carrying = None
-        self.parent.object = None
         super().start(event)
         self.post_completion()
+
+class CheckCarrying(StateNode):
+    def start(self, event=None):
+        super().start(event)
+        if self.robot.carrying:
+            self.post_success()
+        else:
+            self.post_failure()
+
+class SetFetching(StateNode):
+    "Prevents pose invalidation if we bump the cube while trying to pick it up."
+    def __init__(self,objparam=None):
+        self.objparam = objparam
+        self.object = None
+        super().__init__()
+        
+    def start(self, event=None):
+        if self.objparam is not None:
+            self.object = self.objparam
+        else:
+            self.object = self.parent.object
+        if isinstance(self.object, LightCube):
+            self.wmobject = self.robot.world.world_map.objects[self.object]
+        elif isinstance(self.object, LightCubeObj):
+            self.wmobject = self.object
+            self.object = self.object.sdk_obj
+        else:
+            raise ValueError(self.object)
+        self.robot.fetching = self.wmobject
+        super().start(event)
+        self.post_completion()
+
+
+class SetNotFetching(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        self.robot.fetching = None
+        self.post_completion()
+
 
 class PickUpCube(StateNode):
     """Pick up a cube using our own dock and verify routines.
@@ -309,8 +425,8 @@ class PickUpCube(StateNode):
                 retval = -1
             else:
                 retval = black_run_length
-            print('  col=%3d wmin=%5.1f wmean=%5.1f bmean=%5.1f black_thresh=%5.1f run_length=%d' %
-                  (col, wmin, wmean, bmean, black_thresh, black_run_length))
+            #print('  col=%3d wmin=%5.1f wmean=%5.1f bmean=%5.1f black_thresh=%5.1f run_length=%d' %
+            #      (col, wmin, wmean, bmean, black_thresh, black_run_length))
             return retval
 
         def start(self,event=None):
@@ -362,16 +478,20 @@ class PickUpCube(StateNode):
         super().start(event)
 
     $setup{  # PickUpCube machine
-        goto_cube: GoToCube()
-        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> ParentFails()
-        goto_cube =F=> ParentFails()
-        goto_cube =C=> StopAllMotors() # clear head and lift tracks
-          =C=> {raise_lift, raise_head}
+        fetch: SetFetching() =C=> check_carry
 
-        #raise_lift: SetLiftHeight(0.7)
-        #raise_head: SetHeadAngle(28)
+        check_carry: CheckCarrying()
+        check_carry =S=> DropObject() =C=> goto_cube
+        check_carry =F=> goto_cube
+
+        goto_cube: GoToCube()
+        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> fail
+        goto_cube =F=> fail
+        goto_cube =C=> AbortHeadAction() =T(0.1) => # clear head track
+           {raise_lift, raise_head}
+
         raise_lift: SetLiftHeight(0.4)
-        raise_head: SetHeadAngle(5) =C=> raise_head2: SetHeadAngle(0)
+        raise_head: SetHeadAngle(5) =C=> raise_head2: SetHeadAngle(0, num_retries=2)
 
         {raise_lift, raise_head2} =C=> verify
 
@@ -403,21 +523,53 @@ class PickUpCube(StateNode):
 
         drop_lift: SetLiftHeight(0) =C=> backupmore: Forward(-5)
         drop_head_low: SetHeadAngle(-20)
-        {backupmore, drop_head_low} =C=> ParentFails()
+        {backupmore, drop_head_low} =C=> fail
+
+        fail: SetNotFetching() =C=> ParentFails()
 
         }
 
 class DropObject(StateNode):
-    def __init__(self):
-        super().__init__()
+
+    class SetObject(StateNode):
+        def start(self,event=None):
+            super().start(event)
+            self.parent.object = self.robot.carrying
+
+    class CheckCubeVisible(StateNode):
+        def start(self,event=None):
+            super().start(event)
+            for cube in self.robot.world.light_cubes.values():
+                if cube and cube.is_visible:
+                    self.post_completion()
+                    return
+            self.post_failure()
 
     $setup {
-        SetLiftHeight(0) =C=> SetNotCarrying() =N=> {backup, lookdown}
+        SetLiftHeight(0) =C=> self.SetObject() =N=> SetFetching() =N=>
+          SetNotCarrying() =N=> {backup, lookdown}
 
-        backup: Forward(-10)
-        lookdown: SetHeadAngle(-20)
+        backup: Forward(-15)
 
-        {backup, lookdown} =C=> ParentCompletes()
+        # Robots differ on head angle alignment, so try a shallow angle,
+        # and if we don't see the cube, try a steeper one.
+        lookdown: SetHeadAngle(-12)
+        lookdown =C=> head_angle_wait
+        lookdown =F=> head_angle_wait
+
+        head_angle_wait: Print('head_wait') =T(0.5)=> check_visible
+
+        check_visible: self.CheckCubeVisible()
+        check_visible =F=> lookdown2p
+
+        lookdown2p: Print('lookdown2p') =N=> lookdown2
+        lookdown2: SetHeadAngle(-20)
+        lookdown2 =F=> wrap_up  # Shouldn't fail, but just in case
+        lookdown2 =T(3)=> Print('lookdown2 timed out') =N=> wrap_up
+
+        {backup, check_visible, lookdown2} =C(2)=> wrap_up
+
+        wrap_up: Print('Drop wrap-up') =N=> SetNotFetching() =N=> ParentCompletes()
     }
 
 

@@ -187,7 +187,7 @@ class Transition(EventListener):
         if self.running:
             # don't stop if we still have a live source
             for src in self.sources:
-                if src.running:
+                if True or src.running:
                     if TRACE.trace_level >= TRACE.transition_startstop:
                         print('TRACE%d:' % TRACE.transition_startstop,self,'saved from stopping by',src)
                         return

@@ -130,6 +130,7 @@ class StateMachineProgram(StateNode):
         self.robot.kine = self.kine_class(self.robot)
         self.robot.was_picked_up = False
         self.robot.carrying = None
+        self.robot.fetching = None
 
         # World map and path planner
         self.robot.enable_facial_expression_estimation(True)
@@ -187,7 +188,7 @@ class StateMachineProgram(StateNode):
             self.worldmap_viewer.start()
         self.robot.world.worldmap_viewer = self.worldmap_viewer
 
-        # Request camera image and object motion streams
+        # Request camera image and object recognition streams
         self.robot.camera.image_stream_enabled = True
         self.robot.world.add_event_handler(cozmo.world.EvtNewCameraImage,
                                            self.process_image)
@@ -195,6 +196,19 @@ class StateMachineProgram(StateNode):
         self.robot.world.add_event_handler(
             cozmo.objects.EvtObjectObserved,
             self.robot.world.world_map.handle_object_observed)
+
+        # Set up cube motion detection
+        cubes = self.robot.world.light_cubes
+        for i in cubes:
+            cubes[i].movement_start_time = None
+
+        self.robot.world.add_event_handler(
+            cozmo.objects.EvtObjectMovingStarted,
+            self.robot.world.world_map.handle_object_move_started)
+
+        self.robot.world.add_event_handler(
+            cozmo.objects.EvtObjectMovingStopped,
+            self.robot.world.world_map.handle_object_move_stopped)
 
         # Start speech recognition if requested
         if self.speech:
@@ -207,6 +221,7 @@ class StateMachineProgram(StateNode):
     def robot_picked_up(self):
         print('** Robot was picked up!')
         self.robot.stop_all_motors()
+        self.robot.world.world_map.invalidate_poses()
         self.run_picked_up_handler(self)
 
     def run_picked_up_handler(self,node):
@@ -234,7 +249,28 @@ class StateMachineProgram(StateNode):
 
     def poll(self):
         global charger_warned
+        # Invalidate cube pose if the cube moved and isn't seen
+        move_duration_threshold = 0.5 # seconds
+        cubes = self.robot.world.light_cubes
+        now = None
+        for i in cubes:
+            cube = cubes[i]
+            if self.robot.carrying and self.robot.carrying.sdk_obj is cube:
+                continue
+            if self.robot.fetching and self.robot.fetching.sdk_obj is cube:
+                continue
+            if cube.movement_start_time is not None and not cube.is_visible:
+                now = now or time.time()
+                if (now - cube.movement_start_time) > move_duration_threshold:
+                    wcube = self.robot.world.world_map.objects[cube]
+                    wcube.pose_confidence = -1
+                    cube.movement_start_time = None
+                    print('Invalidating pose of ', wcube)
+                    
+        # Update robot kinematic description
         self.robot.kine.get_pose()
+
+        # Handle robot being picked up or put down
         if self.robot.is_picked_up:
             # robot is in the air
             if self.robot.was_picked_up:
@@ -249,6 +285,8 @@ class StateMachineProgram(StateNode):
                 else:
                     pf.move()
         self.robot.was_picked_up = self.robot.is_picked_up
+
+        # Handle robot being placed on the charger
         if self.robot.is_on_charger:
             if not charger_warned:
                 print("\n** On charger. Type robot.drive_off_charger_contacts() to enable motion.")
