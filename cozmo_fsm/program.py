@@ -249,19 +249,22 @@ class StateMachineProgram(StateNode):
 
     def poll(self):
         global charger_warned
-        # Invalidate cube pose if the cube moved and isn't seen
-        move_duration_threshold = 0.5 # seconds
+        # Invalidate cube pose if cube has been moving and isn't seen
+        move_duration_regular_threshold = 0.5 # seconds
+        move_duration_fetch_threshold = 1 # seconds
         cubes = self.robot.world.light_cubes
         now = None
         for i in cubes:
             cube = cubes[i]
             if self.robot.carrying and self.robot.carrying.sdk_obj is cube:
                 continue
-            if self.robot.fetching and self.robot.fetching.sdk_obj is cube:
-                continue
             if cube.movement_start_time is not None and not cube.is_visible:
                 now = now or time.time()
-                if (now - cube.movement_start_time) > move_duration_threshold:
+                if self.robot.fetching and self.robot.fetching.sdk_obj is cube:
+                    threshold = move_duration_fetch_threshold
+                else:
+                    threshold = move_duration_regular_threshold
+                if (now - cube.movement_start_time) > threshold:
                     wcube = self.robot.world.world_map.objects[cube]
                     wcube.pose_confidence = -1
                     cube.movement_start_time = None

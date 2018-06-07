@@ -752,8 +752,6 @@ class ActionNode(StateNode):
         if isinstance(result, cozmo.action.Action):
             self.cozmo_action_handle = result
         elif result is None: # Aborted
-            self.post_failure()
-            self.post_completion()
             return
         else:
             raise ValueError("Result of %s launch_action() is %s, not a cozmo.action.Action." %
