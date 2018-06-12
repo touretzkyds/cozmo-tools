@@ -564,9 +564,8 @@ class WorldMap():
         lift_attach_frame = self.robot.kine.joints['lift_attach']
         tmat = self.robot.kine.base_to_link(world_frame).dot(self.robot.kine.joint_to_base(lift_attach_frame))
         # *** HACK *** : depth calculation only works for cubes; need to handle custom obj, chips
-        # *** HACK *** : icon location is not centered on robot baseframe location, so using 3*half_depth
         half_depth = wmobject.size[0] / 2
-        new_pose = tmat.dot(transform.point(3*half_depth,0))
+        new_pose = tmat.dot(transform.point(half_depth,0))
         theta = self.robot.world.particle_filter.pose[2]
         wmobject.x = new_pose[0,0]
         wmobject.y = new_pose[1,0]
