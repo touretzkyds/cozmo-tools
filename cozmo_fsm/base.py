@@ -190,7 +190,7 @@ class Transition(EventListener):
                 if src.running:
                     if TRACE.trace_level >= TRACE.transition_startstop:
                         print('TRACE%d:' % TRACE.transition_startstop,self,'saved from stopping by',src)
-                        return
+                    return
             if TRACE.trace_level >= TRACE.transition_startstop:
                 print('TRACE%d:' % TRACE.transition_startstop, self, 'stopping')
             super().stop()
