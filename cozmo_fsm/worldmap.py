@@ -69,6 +69,7 @@ class ChargerObj(WorldObject):
         else:
             return '<ChargerObj: position unknown>'
 
+
 class CustomMarkerObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, z=0, theta=0):
         super().__init__(id,x,y,z)
@@ -83,6 +84,7 @@ class CustomMarkerObj(WorldObject):
         vis = ' visible' if self.is_visible else ''
         return '<CustomMarkerObj %d: (%.1f,%.1f)%s>' % \
                (self.id.object_id, self.x, self.y, vis)
+
 
 class CustomCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
@@ -107,6 +109,7 @@ class CustomCubeObj(WorldObject):
         return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
                (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi, vis)
 
+
 class ArucoMarkerObj(WorldObject):
     def __init__(self, aruco_parent, id=None, x=0, y=0, z=0, theta=0):
         super().__init__(id,x,y,z)
@@ -125,7 +128,7 @@ class ArucoMarkerObj(WorldObject):
             return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s%s>' % \
                 (self.id, self.x, self.y, self.z, self.theta*180/pi, fix, vis)
         else:
-            return '<ArucoMarkObj %d: position unknown>' % self.id
+            return '<ArucoMarkerObj %d: position unknown>' % self.id
 
 
 class WallObj(WorldObject):
@@ -166,9 +169,9 @@ class WallObj(WorldObject):
     def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
         if self.is_foreign is None: return  # *** DEBUGGING HACK
-        if abs(self.y - y) > 5:
-            print('worldmap aruco: x: %.1f / %.1f    y: %.1f / %.1f    theta: %.1f / %.1f' %
-                  (self.x, x, self.y, y, self.theta, theta))
+        if False and abs(self.y - y) > 5:  #*** DEBUG
+            print('worldmap update: %s: x: %.1f -> %.1f    y: %.1f -> %.1f    theta: %.1f -> %.1f deg.' %
+                  (self.id, self.x, x, self.y, y, self.theta*180/pi, theta*180/pi))
             # self.is_foreign = None  # *** DEBUGGING HACK
         self.x = x
         self.y = y
@@ -618,6 +621,7 @@ class WorldMap():
 
     def handle_object_observed(self, evt, **kwargs):
         if isinstance(evt.obj, LightCube):
+            # print('observed: ',evt.obj)
             self.update_cube(evt.obj)
         elif isinstance(evt.obj, CustomObject):
             self.update_custom_object(evt.obj)
@@ -627,6 +631,8 @@ class WorldMap():
     def handle_object_move_started(self, evt, **kwargs):
         cube = evt.obj
         if self.robot.carrying and self.robot.carrying.sdk_obj is cube:
+            return
+        if self.robot.fetching and self.robot.fetching.sdk_obj is cube:
             return
         cube.movement_start_time = time.time()
         wmobject = self.robot.world.world_map.objects[cube]

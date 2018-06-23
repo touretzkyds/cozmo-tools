@@ -35,7 +35,7 @@ def create_window(name,size=(500,500)):
     global WINDOW_REGISTRY
     glutInitWindowSize(*size)
     w = glutCreateWindow(name)
-    print('request creation of',w)
+    #print('request creation of window',w)
     WINDOW_REGISTRY.append(w)
     return w
 

@@ -270,6 +270,17 @@ def show_stuff(args):
         if not robot.world.worldmap_viewer:
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
+    elif spec == "debug":
+        running_fsm = StateMachineProgram(cam_viewer=True,
+                                          simple_cli_callback=simple_cli_callback)
+        running_fsm.set_name("CamViewer")
+        running_fsm.simple_cli_callback = simple_cli_callback
+        cozmo_fsm.program.running_fsm = running_fsm
+        robot.loop.call_soon(running_fsm.start)
+        robot.world.particle_viewer = ParticleViewer(robot)
+        robot.world.particle_viewer.start()
+        robot.world.worldmap_viewer = WorldMapViewer(robot)
+        robot.world.worldmap_viewer.start()
     elif spec == "pose":
         show_pose()
     elif spec == "landmarks":
