@@ -422,6 +422,7 @@ class WorldMap():
                 # remove foreign cube when local cube seen
                 del self.objects[foreign_id]
             wmobject = self.objects[cube_id]
+            wmobject.sdk_obj = cube  # In case created before seen
             if self.robot.carrying is wmobject:
                 if cube.is_visible: # we thought we were carrying it, but we're wrong
                     self.robot.carrying = None
@@ -449,11 +450,13 @@ class WorldMap():
 
     def update_charger(self):
         charger = self.robot.world.charger
+        if charger is None: return
         charger_id = 'Charger'
         wmobject = self.objects.get(charger_id, None)
         if wmobject is None:
             wmobject = ChargerObj(charger)
             self.objects[charger_id] = wmobject
+        wmobject.sdk_obj = charger  # In case we created charger before seeing it
         if charger.is_visible or self.robot.is_on_charger:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
@@ -585,6 +588,7 @@ class WorldMap():
         id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2])
         if id in self.objects:
             wmobject = self.objects[id]
+            wmobject.sdk_obj = sdk_obj  # In case created marker before seeing it
         else:
             type = sdk_obj.object_type
             if type in custom_objs.custom_marker_types:
