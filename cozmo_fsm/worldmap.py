@@ -197,11 +197,15 @@ class WallObj(WorldObject):
 
     def make_arucos(self, world_map):
         for key,value in self.markers.items():
+            # Project marker onto the wall; move marker if it already exists
             marker_id = 'Aruco-' + str(key)
             marker = world_map.objects.get(marker_id, None)
             if marker is None:
                 marker = ArucoMarkerObj(world_map.robot.world.aruco, marker_number=key)
                 world_map.objects[marker.id] = marker
+                print('make_arucos made', marker)
+            else:
+                print('make_arucos using',marker)
             wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
             rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
@@ -211,7 +215,8 @@ class WallObj(WorldObject):
             marker.theta = wrap_angle(self.theta + s)
             marker.is_fixed = self.is_fixed
             if self.is_fixed:
-                world_map.robot.world.particle_filter.add_fixed_landmark(marker)        
+                world_map.robot.world.particle_filter.add_fixed_landmark(marker)
+            print('make_aruco set',marker)
 
     @property
     def is_visible(self):
@@ -524,8 +529,9 @@ class WorldMap():
                 # Relocate the aruco markers to their predefined positions
                 spec = wall_marker_dict[wall.id]
                 for key,value in spec.markers.items():
-                    if key in self.robot.world.world_map.objects:
-                        aruco_marker = self.robot.world.world_map.objects[key]
+                    marker_id = 'Aruco-' + str(key)
+                    if marker_id in self.robot.world.world_map.objects:
+                        aruco_marker = self.robot.world.world_map.objects[marker_id]
                         dir = value[0]    # +1 for front side or -1 for back side
                         s = 0 if dir == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
