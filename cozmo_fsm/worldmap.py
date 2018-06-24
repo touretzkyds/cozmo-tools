@@ -76,11 +76,13 @@ class ChargerObj(WorldObject):
 
 class CustomMarkerObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+        custom_type = sdk_obj.object_type.name[-2:]
         if id is None:
-            id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2:])
+            id = 'CustomMarkerObj-' + str(custom_type)
         super().__init__(id,x,y,z)
         self.theta = theta
         self.sdk_obj = sdk_obj
+        self.custom_type = custom_type
 
     @property
     def is_visible(self):
@@ -94,12 +96,14 @@ class CustomMarkerObj(WorldObject):
 
 class CustomCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
+        custom_type = sdk_obj.object_type.name[-2:]
         if id is None:
-            id = 'CustomCubeObj-' + str(sdk_obj.object_type.name[-2:])
+            id = 'CustomCubeObj-' + str(custom_type)
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         self.update_from_sdk = True
         self.theta = theta
+        self.custom_type = custom_type
         if (size is None) and isinstance(id, CustomObject):
             self.size = (id.x_size_mm, id.y_size_mm, id.z_size_mm)
         elif size:
@@ -585,7 +589,7 @@ class WorldMap():
         if not sdk_obj.pose.is_comparable(self.robot.pose):
             print('Should never get here:',sdk_obj.pose,self.robot.pose)
             return
-        id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2])
+        id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2:])
         if id in self.objects:
             wmobject = self.objects[id]
             wmobject.sdk_obj = sdk_obj  # In case created marker before seeing it
