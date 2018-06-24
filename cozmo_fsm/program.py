@@ -265,10 +265,11 @@ class StateMachineProgram(StateNode):
                 else:
                     threshold = move_duration_regular_threshold
                 if (now - cube.movement_start_time) > threshold:
-                    wcube = self.robot.world.world_map.objects[cube]
+                    cube_id = 'Cube-' + str(cube.cube_id)
+                    wcube = self.robot.world.world_map.objects[cube_id]
                     wcube.pose_confidence = -1
                     cube.movement_start_time = None
-                    print('Invalidating pose of ', wcube)
+                    print('Invalidating pose of', wcube)
                     
         # Update robot kinematic description
         self.robot.kine.get_pose()

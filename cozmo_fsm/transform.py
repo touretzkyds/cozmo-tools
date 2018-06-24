@@ -3,7 +3,7 @@ Transformation matrices for kinematics calculations.
 """
 
 import numpy as np
-from math import sin, cos, tan, pi
+from math import sin, cos, tan, pi, atan2, sqrt
 
 def point(x=0,y=0,z=0):
     return np.array([ [x], [y], [z], [1.] ])
@@ -170,3 +170,17 @@ def line_intersection(L1,L2):
     y = Dy / D
     return (x,y)
 
+def rotation_matrix_to_euler_angles(R):
+    "Input R is a 3x3 rotation matrix."
+    sy = sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    singular = sy < 1e-6
+    if  not singular:
+        x = atan2(R[2,1] , R[2,2])
+        y = atan2(-R[2,0], sy)
+        z = atan2(R[1,0], R[0,0])
+    else:
+        x = atan2(-R[1,2], R[1,1])
+        y = atan2(-R[2,0], sy)
+        z = 0
+
+    return np.array([x, y, z])
