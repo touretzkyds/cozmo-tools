@@ -39,6 +39,8 @@ Available commands:
     show cam_viewer | path_viewer | worldmap_viewer
         Displays OpenCV viewer of the specified type.
 
+    show objects | landmarks | pose | particle [n]
+
     !cmd
         Runs 'cmd' in a shell and prints the result.
 *********
@@ -233,6 +235,18 @@ def start_stuff(args):
   start shared_map
 """)
 
+def sort_wmobject_ids(ids):
+    preference = ['Charger','Cube','Aruco','Wall','Door','CustomCube','CustomMarker','Room','Face']
+    def key(id):
+        index = 0
+        for prefix in preference:
+            if id.startswith(prefix):
+                break
+            else:
+                index += 1
+        return str(index) + id
+    return sorted(ids, key=key)        
+
 def show_stuff(args):
     global running_fsm
     running_fsm = cozmo_fsm.program.running_fsm
@@ -396,14 +410,18 @@ def show_landmarks():
     show_landmarks_helper(landmarks)
 
 def show_landmarks_helper(landmarks):
-    for (key,value) in landmarks.items():
+    sorted_keys = sort_wmobject_ids(landmarks)
+    for key in sorted_keys:
+        value = landmarks[key]
         x = value[0][0,0]
         y = value[0][1,0]
         theta = value[1] * 180/pi
-        if isinstance(key, int):
-            print('  Aruco marker %d' % key, end='')
-        elif isinstance(key, LightCube):
-            print('  Cube %d' % key.cube_id, end='')
+        if key.startswith('Aruco-'):
+            print('  Aruco marker %s' % key[6:], end='')
+        elif key.startswith('Wall-'):
+            print('  Wall %s' % key[5:], end='')
+        elif key.startswith('Cube-'):
+            print('  Cube %s' % key[5:], end='')
         else:
             print('  %r' % key, end='')
         print(' at (%.1f, %.1f) @ %.1f deg' % (x, y, theta))
@@ -414,30 +432,8 @@ def show_objects():
     objs = robot.world.world_map.objects
     print('%d object%s in the world map:' %
           (len(objs), '' if len(objs) == 1 else 's'))
-    basics = [charger, cube1, cube2, cube3]
-    ordered_keys = []
-    for key in basics:
-        if key in objs:
-            ordered_keys.append(key)
-    customs = []
-    arucos = []
-    walls = []
-    misc = []
-    for (key,value) in objs.items():
-        if key in basics:
-            pass
-        elif isinstance(value, CustomMarkerObj):
-            customs.append(key)
-        elif isinstance(value, ArucoMarkerObj):
-            arucos.append(key)
-        elif isinstance(value, WallObj):
-            walls.append(key)
-        else:
-            misc.append(key)
-    arucos.sort()
-    walls.sort()
-    ordered_keys = ordered_keys + customs + arucos + walls + misc
-    for key in ordered_keys:
+    sorted_keys = sort_wmobject_ids(objs.keys())
+    for key in sorted_keys:
         print('  ', objs[key])
     print()
 
