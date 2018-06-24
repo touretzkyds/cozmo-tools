@@ -77,7 +77,7 @@ class ChargerObj(WorldObject):
 class CustomMarkerObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
         if id is None:
-            id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2:0])
+            id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2:])
         super().__init__(id,x,y,z)
         self.theta = theta
         self.sdk_obj = sdk_obj
@@ -89,13 +89,13 @@ class CustomMarkerObj(WorldObject):
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
         return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s>' % \
-               (self.sdk_obj.object_type.name[-2:0], self.sdk_obj.object_id, self.x, self.y, vis)
+               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id, self.x, self.y, vis)
 
 
 class CustomCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
         if id is None:
-            id = 'CustomCubeObj-' + str(sdk_obj.object_type.name[-2:0])
+            id = 'CustomCubeObj-' + str(sdk_obj.object_type.name[-2:])
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         self.update_from_sdk = True
@@ -114,7 +114,8 @@ class CustomCubeObj(WorldObject):
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
         return '<CustomCubeObj-%s %d: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
-               (self.sdk_obj.object_type[-2:0], self.sdk_obj.object_id, self.x, self.y, self.z, self.theta*180/pi, vis)
+               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
+                self.x, self.y, self.z, self.theta*180/pi, vis)
 
 
 class ArucoMarkerObj(WorldObject):
@@ -581,15 +582,16 @@ class WorldMap():
         if not sdk_obj.pose.is_comparable(self.robot.pose):
             print('Should never get here:',sdk_obj.pose,self.robot.pose)
             return
-        if sdk_obj in self.objects:
-            wmobject = self.objects[sdk_obj]
+        id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2])
+        if id in self.objects:
+            wmobject = self.objects[id]
         else:
-            id = sdk_obj.object_type
-            if id in custom_objs.custom_marker_types:
+            type = sdk_obj.object_type
+            if type in custom_objs.custom_marker_types:
                 wmobject = CustomMarkerObj(sdk_obj,id)
-            elif id in custom_objs.custom_cube_types:
+            elif type in custom_objs.custom_cube_types:
                 wmobject = CustomCubeObj(sdk_obj,id)
-            self.objects[sdk_obj] = wmobject
+            self.objects[id] = wmobject
         wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
 
