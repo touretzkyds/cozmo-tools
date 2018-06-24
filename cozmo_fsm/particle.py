@@ -861,17 +861,17 @@ class SLAMSensorModel(SensorModel):
         # Evaluate walls.  First find the set of "good" markers.
         # Good markers have been seen consistently enough to be deemed reliable.
         good_markers = []
-        for marker_id in seen_marker_objects.keys():
-            id = 'Aruco-' + str(marker_id)
+        for num in seen_marker_objects.keys():
+            id = 'Aruco-' + str(num)
             if id in self.landmarks:
-                good_markers.append(marker_id)
+                good_markers.append(num)
         walls = self.generate_walls_from_markers(seen_marker_objects, good_markers)
         for wall in walls:
             self.process_landmark(wall.id, wall, just_looking, seen_marker_objects)
 
         # Evaluate perched cameras as landmarks
         if self.use_perched_cameras:
-            # add cammeras that can see the robot as landmarks
+            # Add cameras that can see the robot as landmarks.
             perched = list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
             for cam in perched:
                 id = 'Cam-XXX'
@@ -889,7 +889,7 @@ class SLAMSensorModel(SensorModel):
                     p.log_weight += wt_inc
             self.robot.world.particle_filter.variance_estimate()
 
-        # Update the candidate landmarks and delete any losers
+        # Update any candidate landmarks and delete any losers.
         for id in tuple(self.candidate_landmarks.keys()):
             self.candidate_landmarks[id] -= 1
             if self.candidate_landmarks[id] <= 0:
@@ -992,9 +992,9 @@ class SLAMSensorModel(SensorModel):
         landmark_is_camera =  id.startswith('Video')
 
         for p in pp:
-            # Use sensed bearing and distance to get
-            # particle's prediction of landmark position in
-            # the world.  Compare to its stored map position.
+            # Use sensed bearing and distance to get particle's
+            # prediction of landmark position in the world.  Compare
+            # to its stored map position.
             sensor_direction = p.theta + sensor_bearing
             dx = sensor_dist * cos(sensor_direction)
             dy = sensor_dist * sin(sensor_direction)
