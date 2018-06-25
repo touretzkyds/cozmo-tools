@@ -82,10 +82,14 @@ class CustomMarkerObj(WorldObject):
         super().__init__(id,x,y,z)
         self.theta = theta
         self.sdk_obj = sdk_obj
+        self.marker_number = int(id[-2:])
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        if self.sdk_obj is None:
+            return False
+        else:
+            return self.sdk_obj.is_visible
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
@@ -387,7 +391,7 @@ class WorldMap():
         self.robot = robot
         self.objects = dict()
         self.shared_objects = dict()
-        
+
     def add_fixed_landmark(self,landmark):
         landmark.is_fixed = True
         self.objects[landmark.id] = landmark
@@ -426,7 +430,7 @@ class WorldMap():
             self.update_cube(cube)
         if self.robot.world.charger: self.update_charger()
         for face in self.robot.world._faces.values():
-            if face.face_id == face.updated_face_id:                
+            if face.face_id == face.updated_face_id:
                 self.update_face(face)
             else:
                 if face in self.robot.world.world_map.objects:
@@ -525,7 +529,7 @@ class WorldMap():
             else:
                 # convert aruco sensor values to pf coordinates and update
                 pass
-                
+
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
             if key.startswith('Wall-'):
@@ -566,12 +570,12 @@ class WorldMap():
                         aruco_marker.x = wall.x + rel_xyz[0][0]
                         aruco_marker.y = wall.y + rel_xyz[1][0]
                         aruco_marker.z = rel_xyz[2][0]
-        
+
     def update_doorways(self):
         for key,value in self.robot.world.world_map.objects.items():
             if isinstance(key,str) and  'Doorway' in key:
                 value.update()
-                
+
 
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
