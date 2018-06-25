@@ -956,7 +956,7 @@ class SLAMSensorModel(SensorModel):
                     return False
             # Not checking to reject a spurious wall as we are very unlikely to see
             # two or more spurious markers simultaneously.
-            print('  *** ADDING LANDMARK %s at:  distance=%6.1f  bearing=%5.1f deg.' %
+            print('  *** PF ADDING LANDMARK %s at:  distance=%6.1f  bearing=%5.1f deg.' %
                   (id, sensor_dist, sensor_bearing*180/pi))
             for p in particles:
                 if id.startswith('Video'):

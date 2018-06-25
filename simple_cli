@@ -237,6 +237,7 @@ def start_stuff(args):
 
 def sort_wmobject_ids(ids):
     preference = ['Charger','Cube','Aruco','Wall','Door','CustomCube','CustomMarker','Room','Face']
+
     def key(id):
         index = 0
         for prefix in preference:
@@ -244,8 +245,10 @@ def sort_wmobject_ids(ids):
                 break
             else:
                 index += 1
-        return str(index) + id
-    return sorted(ids, key=key)        
+        return ('%02d' % index) + id
+    
+    result = sorted(ids, key=key)
+    return result
 
 def show_stuff(args):
     global running_fsm

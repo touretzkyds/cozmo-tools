@@ -76,13 +76,12 @@ class ChargerObj(WorldObject):
 
 class CustomMarkerObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
-        custom_type = sdk_obj.object_type.name[-2:]
         if id is None:
+            custom_type = sdk_obj.object_type.name[-2:]
             id = 'CustomMarkerObj-' + str(custom_type)
         super().__init__(id,x,y,z)
         self.theta = theta
         self.sdk_obj = sdk_obj
-        self.custom_type = custom_type
 
     @property
     def is_visible(self):
@@ -201,6 +200,7 @@ class WallObj(WorldObject):
             world_map.objects[doorway.id] = doorway
 
     def make_arucos(self, world_map):
+        "Called by add_fixed_landmark to make fixed aruco markers."
         for key,value in self.markers.items():
             # Project marker onto the wall; move marker if it already exists
             marker_id = 'Aruco-' + str(key)
@@ -398,6 +398,24 @@ class WorldMap():
             wall.make_arucos(self)
             for key in wall.markers.keys():
                 self.robot.world.particle_filter.add_fixed_landmark(self.objects[key])
+
+    def delete_wall(self,wall_id):
+        "Delete a wall, its markers, and its doorways, so we can predefine a new one."
+        wall = self.objects.get(wall_id,None)
+        if wall is None: return
+        marker_ids = [('Aruco-'+str(id)) for id in wall.markers.keys()]
+        door_ids = [('Doorway-'+str(id)) for id in wall.door_ids]
+        landmarks = self.robot.world.particle_filter.sensor_model.landmarks
+        del self.objects[wall_id]
+        del landmarks[wall_id]
+        for marker_id in marker_ids:
+            if marker_id in self.objects:
+                del self.objects[marker_id]
+            if marker_id in landmarks:
+                del landmarks[marker_id]
+        for door_id in door_ids:
+            if door_id in self.objects:
+                del self.objects[door_id]
 
     def update_map(self):
         """Called to update the map after every camera image, after
