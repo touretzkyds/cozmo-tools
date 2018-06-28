@@ -272,9 +272,9 @@ class DoorwayObj(WorldObject):
 
 
 class RoomObj(WorldObject):
-    def __init__(self,name,points):
+    def __init__(self,x,y,name,points):
         id = 'Room-' + name
-        super().__init__(id,0,0)
+        super().__init__(id,x,y)
         self.name = name
         self.points = points
         self.is_obstacle = False
@@ -411,7 +411,8 @@ class WorldMap():
         door_ids = [('Doorway-'+str(id)) for id in wall.door_ids]
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
         del self.objects[wall_id]
-        del landmarks[wall_id]
+        if wall_id in landmarks:
+            del landmarks[wall_id]
         for marker_id in marker_ids:
             if marker_id in self.objects:
                 del self.objects[marker_id]
