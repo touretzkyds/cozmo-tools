@@ -20,6 +20,7 @@ from .worldmap import WorldMap
 from .rrt import RRT
 from .path_viewer import PathViewer
 from .worldmap_viewer import WorldMapViewer
+from .cam_viewer import CamViewer
 from .speech import SpeechListener, Thesaurus
 from . import opengl
 from . import custom_objs
@@ -80,6 +81,7 @@ class StateMachineProgram(StateNode):
 
         self.windowName = None
         self.cam_viewer = cam_viewer
+        self.viewer = False
         self.annotate_sdk = annotate_sdk
         self.force_annotation = force_annotation
         self.annotated_scale_factor = annotated_scale_factor
@@ -157,13 +159,8 @@ class StateMachineProgram(StateNode):
 
         # Launch viewers
         if self.cam_viewer:
-            self.windowName = self.name
-            cv2.namedWindow(self.windowName)
-            cv2.startWindowThread()
-            # Display a dummy image to prevent glibc complaints when a camera
-            # image doesn't arrive quickly enough after the window opens.
-            dummy = numpy.array([[0]])
-            cv2.imshow(self.windowName,dummy)
+            self.viewer = CamViewer(self.robot)
+            self.viewer.start()
         else:
             self.windowName = None
 
