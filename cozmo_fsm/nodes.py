@@ -1078,7 +1078,7 @@ class StartBehavior(StateNode):
 
 class StopBehavior(StateNode):
     def start(self,event=None):
-        if self. running: return
+        if self.running: return
         super().start(event)
         try:
             if self.robot.behavior_handle:
