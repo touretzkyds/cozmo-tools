@@ -34,7 +34,9 @@ class LightCubeObj(WorldObject):
             id = 'Cube-' + str(sdk_obj.cube_id)
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
-        self.update_from_sdk = True
+        if sdk_obj:
+            self.sdk_obj.wm_obj = self
+            self.update_from_sdk = True
         self.theta = theta
         self.size = self.light_cube_size
 
@@ -57,7 +59,9 @@ class ChargerObj(WorldObject):
             id = 'Charger'
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
-        self.update_from_sdk = True
+        if sdk_obj:
+            self.sdk_obj.wm_obj = self
+            self.update_from_sdk = True
         self.theta = theta
         self.size = (104, 98, 10)
 
@@ -465,7 +469,7 @@ class WorldMap():
         if cube.is_visible:
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1
-        elif not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
+        elif (cube.pose is None) or not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
             wmobject.update_from_sdk = False
         else:       # Robot re-localized so cube came back
             pass  # skip for now due to SDK bug
@@ -487,7 +491,7 @@ class WorldMap():
         if charger.is_visible or self.robot.is_on_charger:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
-        elif not charger.pose.is_comparable(self.robot.pose):
+        elif (charger.pose is None) or not charger.pose.is_comparable(self.robot.pose):
             wmobject.update_from_sdk = False
             wmobject.pose_confidence = -1
         else:       # Robot re-localized so charger came back

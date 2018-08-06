@@ -20,7 +20,7 @@ class GoToCube(StateNode):
     def start(self, event=None):
         # self.object will normally be set up by the parent of this node
         if isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -39,10 +39,10 @@ class GoToCube(StateNode):
         "*** BUG: This code is only correct for upright cubes"
         cube = self.object
         if use_world_map:
-            wobj = self.robot.world.world_map.objects[cube] 
-            x = wobj.x
-            y = wobj.y
-            ang = wobj.theta
+            wmobj = self.object.wm_obj
+            x = wmobj.x
+            y = wmobj.y
+            ang = wmobj.theta
         else:
             x = cube.pose.position.x
             y = cube.pose.position.y
@@ -386,7 +386,7 @@ class SetCarrying(StateNode):
         else:
             self.object = self.parent.object
         if isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -427,7 +427,7 @@ class SetFetching(StateNode):
         else:
             self.object = self.parent.object
         if isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -526,6 +526,8 @@ class PickUpCube(StateNode):
             else:
                 self.post_failure()                
 
+        # end of class VerifyPickup
+
     # PickUpCube methods
 
     def __init__(self, cube=None):
@@ -540,12 +542,12 @@ class PickUpCube(StateNode):
     def start(self, event=None):
         if isinstance(self.cube, LightCube):
             self.object = self.cube
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.cube, LightCubeObj):
             self.wmobject = self.cube
             self.object = self.cube.sdk_obj
         elif isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
