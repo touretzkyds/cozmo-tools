@@ -307,8 +307,8 @@ class GoToCube(StateNode):
         # GoToCube machine
         
         droplift: SetLiftHeight(0)
-        droplift =C=> {looker, waitlift}
-        droplift =F=> {looker, waitlift}   # lift motion will fail if on charger
+        droplift =C=> Print('droplift succeeded') =N=> {looker, waitlift}
+        droplift =F=> Print('droplift failed') =N=> {looker, waitlift}   # lift motion fails if on charger
 
         looker: LookAtObject()
 
@@ -606,8 +606,14 @@ class PickUpCube(StateNode):
                                          ignore_lift_track=True) =C=>
         missed_cube: SetNotCarrying() =C=> Forward(-5) =C=> {drop_lift, drop_head_low}
 
-        drop_lift: SetLiftHeight(0) =C=> backupmore: Forward(-5)
+        drop_lift: SetLiftHeight(0)
+        drop_lift =C=> backupmore
+        drop_lift =F=> backupmore
+
+        backupmore: Forward(-5)
+
         drop_head_low: SetHeadAngle(-20)
+
         {backupmore, drop_head_low} =C=> fail
 
         fail: SetNotFetching() =C=> ParentFails()

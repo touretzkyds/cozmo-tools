@@ -779,16 +779,18 @@ class ActionNode(StateNode):
                 self.post_completion()
             elif self.cozmo_action_handle.failure_reason[0] == 'retry':
                 if self.retry_count < self.action_kwargs['num_retries']:
-                    print("*** ACTION %s FAILED WITH CODE 'retry': TRYING AGAIN" %
-                        self.cozmo_action_handle)
+                    print("*** ACTION %s of %s FAILED WITH CODE 'retry': TRYING AGAIN" %
+                          (self.cozmo_action_handle, self.name))
                     self.retry_count += 1
                     self.launch_or_retry()
                 else:
-                    print("*** RETRY COUNT EXCEEDED: FAILING")
+                    print("*** %s ACTION RETRY COUNT EXCEEDED: FAILING" % self.name)
                     self.post_failure(self.cozmo_action_handle)
             else:
-                print("*** ACTION %s FAILED AND CAN'T BE RETRIED." %
-                      self.cozmo_action_handle)
+                print("*** ACTION %s OF NODE %s FAILED DUE TO %s AND CAN'T BE RETRIED." %
+                      (self.cozmo_action_handle,
+                       self.name,
+                       self.cozmo_action_handle.failure_reason[0] or 'unknown reason'))
                 self.post_failure(self.cozmo_action_handle)
 
     def stop(self):
