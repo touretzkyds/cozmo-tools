@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 import cozmo
-
+from cozmo.util import degrees, distance_mm, speed_mmps
 from .evbase import EventRouter
 from .base import StateNode
 from .aruco import *
@@ -79,9 +79,8 @@ class StateMachineProgram(StateNode):
         
         self.kine_class = kine_class
 
-        self.windowName = None
         self.cam_viewer = cam_viewer
-        self.viewer = False
+        self.viewer = None
         self.annotate_sdk = annotate_sdk
         self.force_annotation = force_annotation
         self.annotated_scale_factor = annotated_scale_factor
@@ -159,10 +158,9 @@ class StateMachineProgram(StateNode):
 
         # Launch viewers
         if self.cam_viewer:
-            self.viewer = CamViewer(self.robot)
-            self.viewer.start()
+            self.viewer = True
         else:
-            self.windowName = None
+            self.viewer = None
 
         if self.particle_viewer:
             if self.particle_viewer is True:
@@ -241,8 +239,6 @@ class StateMachineProgram(StateNode):
             self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage,
                                                   self.process_image)
         except: pass
-        #if self.windowName is not None:
-        #    cv2.destroyWindow(self.windowName)
 
     def poll(self):
         global charger_warned
@@ -311,7 +307,7 @@ class StateMachineProgram(StateNode):
         # Done with image processing
 
         # Annotate and display image if requested
-        if self.force_annotation or self.windowName is not None:
+        if self.force_annotation or self.viewer is not None:
             scale = self.annotated_scale_factor
             # Apply Cozmo SDK annotations and rescale.
             if self.annotate_sdk:
@@ -336,10 +332,12 @@ class StateMachineProgram(StateNode):
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
             annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
-            if self.windowName:
-                if os.name == 'nt':
-                    cv2.waitKey(1)
-                cv2.imshow(self.windowName, annotated_im)
+            if self.viewer:
+                # wo_ann = cv2.resize(numpy.array(event.image.raw_image), (640, 480))
+                # CamViewer.incom_image = annotated_im
+                self.viewer = CamViewer(self.robot)
+                if not self.viewer.prog_start:
+                    self.viewer.start()
 
         # Use this heartbeat signal to look for new landmarks
         pf = self.robot.world.particle_filter
