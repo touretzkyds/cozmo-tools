@@ -6,6 +6,7 @@ from math import sin, cos, atan2, pi, radians
 import time
 import array
 import numpy as np
+import platform as pf
 
 try:
     from OpenGL.GLUT import *
@@ -47,6 +48,30 @@ World viewer keyboard commands:
   v            Toggle display of viewing parameters
   #            Disable/enable automatic redisplay
   h            Print help
+"""
+
+help_text_mac = """
+World viewer keyboard commands:
+  option + a       Translate gazepoint left
+  option + d       Translate gazepoint right
+  option + w       Translate gazepoint forward
+  option + s       Translate gazepoint backward
+  option + <       Zoom in
+  option + >       Zoom out
+  fn + up-arrow    Translate gazepoint up
+  fn + down-arrow  Translate gazepoint down
+
+  left-arrow       Orbit camera left
+  right-arrow      Orbit camera right
+  up-arrow         Orbit camera upward
+  down-arrow       Orbit camera downward
+
+  option + m       Toggle memory map
+  option + x       Toggle axes
+  option + z       Reset to initial view
+  option + v       Toggle display of viewing parameters
+  #                Disable/enable automatic redisplay
+  option + h       Print help
 """
 
 cube_vertices = array.array('f', [ \
@@ -101,7 +126,7 @@ color_green  = (0., 1., 0.)
 color_light_green  = (0., 0.5, 0.)
 color_blue   = (0., 0., 1.0)
 color_cyan   = (0., 1.0, 1.0)
-color_yellow = (0.8, 0.8, 0.)
+color_yellow = (1., .93, 0.)
 color_orange = (1., 0.5, .063)
 color_gray =   (0.5, 0.5, 0.5)
 color_light_gray =   (0.65, 0.65, 0.65)
@@ -204,10 +229,9 @@ class WorldMapViewer():
         glDisableClientState(GL_COLOR_ARRAY)
         glDisableClientState(GL_VERTEX_ARRAY)
 
-    def make_light_cube(self,cube_obj):
+    def make_light_cube(self,lcube,cube_obj):
         global gl_lists
-        lcube = cube_obj.sdk_obj
-        cube_number = lcube.cube_id
+        cube_number = cube_obj.id
         pos = (cube_obj.x, cube_obj.y, cube_obj.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
         valid_pose = (lcube.pose.is_valid and cube_obj.pose_confidence >= 0) or \
@@ -301,7 +325,7 @@ class WorldMapViewer():
             theta = i * (360/num_slices) * (pi/180)
             glVertex3f(r * cos(theta), r*sin(theta), 0.)
         glEnd()
-            
+
 
     def make_chip(self,chip):
         global gl_lists
@@ -337,7 +361,7 @@ class WorldMapViewer():
 
     def make_wall(self,wall_obj):
         global gl_lists
-        wall_spec = worldmap.wall_marker_dict[wall_obj.id]
+        wall_spec = worldmap.wall_marker_dict[wall_obj.id[5:]]
         half_length = wall_obj.length / 2
         half_height = wall_obj.height / 2
         door_height = wall_obj.door_height
@@ -369,7 +393,7 @@ class WorldMapViewer():
             glPushMatrix()
             glTranslatef(*center.flatten()[0:3])
             glRotatef(wall_obj.theta*180/pi, 0, 0, 1)
-            self.make_cube(size=dimensions, color=color, highlight=True)
+            self.make_cube(size=dimensions, color=color)
             glPopMatrix()
         # Make the transom
         glPushMatrix()
@@ -378,7 +402,7 @@ class WorldMapViewer():
         glTranslatef(wall_obj.x, wall_obj.y, z)
         glRotatef(wall_obj.theta*180/pi, 0, 0, 1)
         self.make_cube(size=(wall_thickness, wall_obj.length, transom_height),
-                       edges=False, color=color, highlight=True)
+                       edges=False, color=color)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -462,7 +486,7 @@ class WorldMapViewer():
 
     def make_aruco_marker(self,marker):
         global gl_lists
-        marker_number = marker.marker_number
+        marker_number = marker.id if isinstance(marker.id,int) else marker.id.object_id
         s = light_cube_size_mm
         pos = (marker.x, marker.y, marker.z)
         color = (color_red, color_green, color_blue)[marker_number%3]
@@ -750,7 +774,7 @@ class WorldMapViewer():
             items = tuple(self.robot.world.world_map.objects.items())
         for (key,obj) in items:
             if isinstance(obj, worldmap.LightCubeObj):
-                self.make_light_cube(obj)
+                self.make_light_cube(key,obj)
             elif isinstance(obj, worldmap.CustomCubeObj):
                 self.make_custom_cube(key,obj)
             elif isinstance(obj, worldmap.WallObj):
@@ -828,7 +852,7 @@ class WorldMapViewer():
 
     def window_creator(self):
         global WINDOW
-        WINDOW = opengl.create_window(bytes(self.windowName,'utf-8'), (self.width,self.height))        
+        WINDOW = opengl.create_window(bytes(self.windowName,'utf-8'), (self.width,self.height))
         glutDisplayFunc(self.display)
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
@@ -848,7 +872,10 @@ class WorldMapViewer():
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)
-        print("Type 'h' in the world map window for help.")
+        if pf.system() == 'Darwin':
+            print("Type 'option' + 'h' in the world map window for help.")
+        else:
+            print("Type 'h' in the world map window for help.")
 
     def display(self):
         global DISPLAY_ENABLED, EXCEPTION_COUNTER
@@ -892,13 +919,14 @@ class WorldMapViewer():
             print('Worldmap viewer exception:',e)
             EXCEPTION_COUNTER += 1
             if EXCEPTION_COUNTER >= 2:
-                print('\n\nworldmap_viewer:  Too many errors.  Stopping redisplay.') 
+                print('\n\nworldmap_viewer:  Too many errors.  Stopping redisplay.')
                 DISPLAY_ENABLED = False
             else:
                 raise
-                
+
 
     def keyPressed(self, key, x, y):
+        # print(str(key), ord(key))
         global DISPLAY_ENABLED, EXCEPTION_COUNTER
         if ord(key) == 27:
             print("Use 'exit' to quit.")
@@ -935,7 +963,10 @@ class WorldMapViewer():
         elif key == b'm':
             self.show_memory_map = not self.show_memory_map
         elif key == b'h':
-            print(help_text)
+            if pf.system() == 'Darwin':
+                print(help_text_mac)
+            else:
+                print(help_text)
         elif key == b'v':
             print_camera = not print_camera
             if not print_camera:
