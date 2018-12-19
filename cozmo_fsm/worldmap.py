@@ -9,6 +9,57 @@ from . import transform
 from . import custom_objs
 from .transform import wrap_angle
 
+import math
+
+ORIENTATION_UPRIGHT = 'upright'
+ORIENTATION_INVERTED = 'inverted'
+ORIENTATION_SIDEWAYS = 'sideways'
+ORIENTATION_TILTED = 'tilted'
+
+
+def quaternion_to_euler_angle(quaternion):
+    # source: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+    w, x, y, z = quaternion
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    X = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    Y = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    Z = math.atan2(t3, t4)
+
+    return X, Y, Z
+
+
+def get_orientation_state(quaternion):
+    x, y, z = quaternion_to_euler_angle(quaternion)
+    if (round(x, 1) == 0) and (round(y, 1) == 0):
+        orientation = ORIENTATION_UPRIGHT
+    elif abs(round(x, 1)) == round(math.pi, 1) and (round(y, 1) == 0):
+        orientation = ORIENTATION_INVERTED
+        z -= math.pi
+    elif abs(round(x, 1)) == round(math.pi/2, 1) and (round(y, 1) == 0):
+        orientation = ORIENTATION_SIDEWAYS
+        z = z-math.pi/2 if x>0 else z+math.pi/2
+        # print('type1: x: %.2f, y: %.2f, z: %.2f' % (x, y, z*180/math.pi))
+    elif abs(round(y, 1)) == round(math.pi/2, 1):
+        orientation = ORIENTATION_SIDEWAYS
+        w, x, y, z = quaternion
+        x, y, z = quaternion_to_euler_angle([w, y, x, z])
+        z = -y if x>0 else y+math.pi
+        # print('type2: x: %.2f, y: %.2f, z: %.2f' % (x, y, z*180/math.pi))
+
+    else:
+        orientation = ORIENTATION_TILTED
+
+    return orientation, x, y, z
+
+
 class WorldObject():
     def __init__(self, id=None, x=0, y=0, z=0, is_visible=None):
         self.id = id
@@ -39,6 +90,10 @@ class LightCubeObj(WorldObject):
             self.update_from_sdk = True
         self.theta = theta
         self.size = self.light_cube_size
+        self.orientation, _, _, z = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
+        if self.orientation is ORIENTATION_SIDEWAYS:
+            self.theta = z
+
 
     @property
     def is_visible(self):
@@ -46,9 +101,10 @@ class LightCubeObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
+            self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
             vis = ' visible' if self.is_visible else ''
-            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s>' % \
-                (self.sdk_obj.cube_id, self.x, self.y, self.z, self.theta*180/pi, vis)
+            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
+                (self.sdk_obj.cube_id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
             return '<LightCubeObj %d: position unknown>' % self.sdk_obj.cube_id
 
