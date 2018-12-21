@@ -585,11 +585,11 @@ class WorldMap():
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
         for (key,value) in self.robot.world.world_map.objects.items():
-            if isinstance(key, Face) and key.name == face.name:
-                if key is not face and face.is_visible:
+            if isinstance(value, FaceObj) and value.name == face.name:
+                if value.sdk_obj is not face and face.is_visible:
                     # Older Face object with same name: replace it with new one
-                    self.robot.world.world_map.objects.pop(key)
-                    self.robot.world.world_map.objects[face] = value
+                    value.sdk_obj = face
+                    value.id = face.face_id
                 return value
         return None
 
@@ -601,7 +601,11 @@ class WorldMap():
         if face_obj is None:
             face_obj = FaceObj(face, face.face_id, pos.x, pos.y, pos.z,
                                face.name)
-            self.robot.world.world_map.objects[face] = face_obj
+            if len(face.name) == 0:
+                key = 'Face:unknown'
+            else:
+                key = 'Face:' + face.name
+            self.robot.world.world_map.objects[key] = face_obj
         else:
             face_obj.sdk_obj = face  # in case face.updated_id changed
         # now update the face
