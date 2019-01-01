@@ -170,11 +170,15 @@ class WallObj(WorldObject):
             if len(markers) > 0:
                 k = list(markers.keys())
                 k.sort()
-                id = 'Wall-%s' % k[0]
+                self.wall_label = str(k[0])
+                id = 'Wall-%s' % self.wall_label
             elif wall_spec and wall_spec.label:
+                self.wall_label = wall_spec.label
                 id = 'Wall-%s' % wall_spec.label
             else:
                 raise ValueError('id (e.g., "A") must be supplied if wall has no markers')
+        else:
+            self.wall_label = id[1+id.find('-'):]
         super().__init__(id,x,y)
         self.z = height/2
         self.theta = theta
@@ -243,10 +247,13 @@ class WallObj(WorldObject):
         return False
 
     def __repr__(self):
-        vis = ' visible' if self.is_visible else ''
-        fix = ' fixed' if self.is_fixed else ''
-        return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s%s>' % \
-               (self.id, self.x, self.y, self.theta*180/pi, self.length, fix, vis)
+        if self.pose_confidence >= 0:
+            vis = ' visible' if self.is_visible else ''
+            fix = ' fixed' if self.is_fixed else ''
+            return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s%s>' % \
+                (self.id, self.x, self.y, self.theta*180/pi, self.length, fix, vis)
+        else:
+            return '<WallObj %s: position unknoown>' % self.id
 
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
@@ -271,8 +278,11 @@ class DoorwayObj(WorldObject):
             self.x = self.wall.x
 
     def __repr__(self):
-        return '<DoorwayObj %s: (%.1f,%.1f) @ %d deg.>' % \
-               (self.id, self.x, self.y, self.theta*180/pi)
+        if self.pose_confidence >= 0:
+            return '<DoorwayObj %s: (%.1f,%.1f) @ %d deg.>' % \
+                (self.id, self.x, self.y, self.theta*180/pi)
+        else:
+            return '<DoorwayObj %s: position unknown>' % self.id
 
 
 class RoomObj(WorldObject):
@@ -512,6 +522,7 @@ class WorldMap():
             marker_id = 'Aruco-' + str(key)
             wmobject = self.objects.get(marker_id, None)
             if wmobject is None:
+                # TODO: wait to see marker several times before adding.
                 wmobject = ArucoMarkerObj(aruco_parent,key)
                 self.objects[marker_id] = wmobject
                 pftuple = None
@@ -528,11 +539,12 @@ class WorldMap():
                                           value.camera_distance * cos(elevation))
                 base_pos = self.robot.kine.joint_to_base('camera').dot(cam_pos)
                 wmobject.z = base_pos[2,0]
-                wmobject.elevation=elevation
+                wmobject.elevation = elevation
                 wmobject.cam_pos = cam_pos
                 wmobject.base_pos = base_pos
             else:
-                # convert aruco sensor values to pf coordinates and update
+                # TODO: convert aruco sensor values to pf coordinates and update
+                # Right now we never get here because of HACK above.
                 pass
 
     def update_walls(self):
@@ -689,7 +701,7 @@ class WorldMap():
                                       z=val[1][0], theta=val[1][2], phi=val[1][1])
 
     def invalidate_poses(self):
-        for key,wmobj in self.robot.world.world_map.objects.items():
+        for wmobj in self.robot.world.world_map.objects.values():
             if not wmobj.is_fixed:
                 wmobj.pose_confidence = -1
 

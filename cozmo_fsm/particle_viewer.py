@@ -25,7 +25,7 @@ WINDOW = None
 
 class ParticleViewer():
     def __init__(self, robot,
-                 width=512, height=512, scale=1.0,
+                 width=512, height=512, scale=0.64,
                  windowName = "particle viewer",
                  bgcolor = (0,0,0)):
         self.robot=robot
@@ -33,8 +33,9 @@ class ParticleViewer():
         self.height = height
         self.bgcolor = bgcolor
         self.aspect = self.width/self.height
-        self.translation = [0., 0.]  # Translation in mm
+        self.translation = [200., 0.]  # Translation in mm
         self.scale = scale
+        self.verbose = False
         self.windowName = windowName
 
     def window_creator(self):
@@ -316,7 +317,8 @@ class ParticleViewer():
     def report_pose(self):
         (x,y,theta) = self.robot.world.particle_filter.pose
         hdg = math.degrees(theta)
-        print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (x, y, hdg))
+        if self.verbose:
+            print('Pose = (%5.1f, %5.1f) @ %3d deg.' % (x, y, hdg))
 
     async def forward(self,distance):
         handle = self.robot.drive_straight(distance_mm(distance), speed_mmps(50),
@@ -377,14 +379,15 @@ class ParticleViewer():
         elif key == b'k':     # head down
             ang = self.robot.head_angle.degrees - 5
             self.robot.loop.create_task(self.look(ang))
-        elif key == b'z':     # randomize
-            pf.initializer.initialize(self.robot)
+        elif key == b'z':     # delocalize
+            pf.delocalize()
+            #pf.initializer.initialize(self.robot)
         elif key == b'Z':     # randomize
             pf.increase_variance()
         elif key == b'c':     # clear landmarks
             pf.clear_landmarks()
             print('Landmarks cleared.')
-        elif key == b'v':     # display weight variance
+        elif key == b'V':     # display weight variance
             self.report_variance(pf)
         elif key == b'+':     # zoom in
             self.scale *= 1.25
@@ -393,6 +396,10 @@ class ParticleViewer():
         elif key == b'-':     # zoom out
             self.scale /= 1.25
             self.print_display_params()
+            return
+        elif key == b'v':     # toggle verbose mode
+            self.verbose = not self.verbose
+            self.report_pose()
             return
         elif key == b'h':     # print help
             self.print_help()
@@ -425,8 +432,9 @@ class ParticleViewer():
         glutPostRedisplay()
 
     def print_display_params(self):
-        print('scale=%.2f translation=[%.1f, %.1f]' %
-              (self.scale, *self.translation))
+        if self.verbose:
+            print('scale=%.2f translation=[%.1f, %.1f]' %
+                  (self.scale, *self.translation))
         glutPostRedisplay()
 
     def print_help(self):
@@ -437,12 +445,15 @@ Particle viewer commands:
    i/k       Head up/down 5 degrees
     e        Evaluate particles using current sensor info
     r        Resample particles (evaluates first)
-    z        Reset particle positions (randomize, or all 0 for SLAM)
+    z        Delocalize
+
     c        Clear landmarks (for SLAM)
   arrows     Translate the view up/down/left/right
    Home      Center the view (zero translation)
     +        Zoom in
     -        Zoom out
     $        Toggle redisplay (for debugging)
+    v        Toggle verbosity
+    V        Display weight variance
     h        Print this help text
 """)

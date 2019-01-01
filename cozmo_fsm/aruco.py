@@ -1,6 +1,8 @@
 import cv2, math
 from numpy import sqrt, arctan2, array, multiply
 
+ARUCO_MARKER_SIZE = 44
+
 class ArucoMarker(object):
     def __init__(self, aruco_parent, marker_id, bbox, translation, rotation):
         self.id = marker_id
@@ -29,14 +31,15 @@ class ArucoMarker(object):
     def __repr__(self):
         return self.__str__()
 
-    def rotationMatrixToEulerAngles(self,R) :
+    @staticmethod
+    def rotationMatrixToEulerAngles(R) :
         sy = sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
         singular = sy < 1e-6
-        if  not singular :
+        if  not singular:
             x = arctan2(R[2,1] , R[2,2])
             y = arctan2(-R[2,0], sy)
             z = arctan2(R[1,0], R[0,0])
-        else :
+        else:
             x = arctan2(-R[1,2], R[1,1])
             y = arctan2(-R[2,0], sy)
             z = 0
@@ -44,7 +47,7 @@ class ArucoMarker(object):
         return array([x, y, z])
 
 class Aruco(object):
-    def __init__(self, robot, arucolibname, marker_size=50):
+    def __init__(self, robot, arucolibname, marker_size=ARUCO_MARKER_SIZE):
         self.arucolibname = arucolibname
         self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
@@ -91,7 +94,7 @@ class Aruco(object):
         scaled_corners = [ multiply(corner, scale_factor) for corner in self.corners ]
         displayim = cv2.aruco.drawDetectedMarkers(image, scaled_corners, self.ids)
 
-        #add poses #currently fails since image is already scaled. How to scale camMat?
+        #add poses currently fails since image is already scaled. How to scale camMat?
         #if(self.ids is not None):
         #    for i in range(len(self.ids)):
         #      displayim = cv2.aruco.drawAxis(displayim,self.cameraMatrix,

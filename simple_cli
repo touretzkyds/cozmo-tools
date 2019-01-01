@@ -36,7 +36,7 @@ Available commands:
     show active
         Shows active state nodes and transitions.
 
-    show cam_viewer | path_viewer | worldmap_viewer
+    show cam_viewer | path_viewer | particle_viewer | worldmap_viewer
         Displays OpenCV viewer of the specified type.
 
     show objects | landmarks | pose | particle [n]
@@ -287,7 +287,7 @@ def show_stuff(args):
         if not robot.world.worldmap_viewer:
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
-    elif spec == "debug":
+    elif (spec == "all") or (spec == "all_viewers"):
         running_fsm = StateMachineProgram(cam_viewer=True,
                                           simple_cli_callback=simple_cli_callback)
         running_fsm.set_name("CamViewer")
@@ -296,6 +296,8 @@ def show_stuff(args):
         robot.loop.call_soon(running_fsm.start)
         robot.world.particle_viewer = ParticleViewer(robot)
         robot.world.particle_viewer.start()
+        robot.world.path_viewer = PathViewer(robot,world.rrt)
+        robot.world.path_viewer.start()
         robot.world.worldmap_viewer = WorldMapViewer(robot)
         robot.world.worldmap_viewer.start()
     elif spec == "pose":
@@ -310,11 +312,12 @@ def show_stuff(args):
         show_camera(args[1:])
     else:
         print("""Invalid option. Try one of:
-  show viewer
+  show viewer | cam_viewer
   show crosshairs
   show worldmap_viewer
   show particle_viewer
   show path_viewer
+  show all | all_viewers
   show active
   show kine [joint]
   show pose
@@ -419,6 +422,9 @@ def show_landmarks_helper(landmarks):
         x = value[0][0,0]
         y = value[0][1,0]
         theta = value[1] * 180/pi
+        sigma_x = sqrt(value[2][0,0])
+        sigma_y = sqrt(value[2][1,1])
+        sigma_theta = sqrt(value[2][2,2])*180/pi
         if key.startswith('Aruco-'):
             print('  Aruco marker %s' % key[6:], end='')
         elif key.startswith('Wall-'):
@@ -427,7 +433,8 @@ def show_landmarks_helper(landmarks):
             print('  Cube %s' % key[5:], end='')
         else:
             print('  %r' % key, end='')
-        print(' at (%.1f, %.1f) @ %.1f deg' % (x, y, theta))
+        print(' at (%6.1f, %6.1f) @ %4.1f deg    +/- (%4.1f,%4.1f)  +/- %3.1f deg' %
+              (x, y, theta, sigma_x, sigma_y, sigma_theta))
     print()
     
 
@@ -476,6 +483,17 @@ def show_camera(args):
     except ValueError:
         show_camera()
     robot.world.perched.check_camera(cam)
+
+def do_reload(module_name):
+    the_module = None
+    try:
+        the_module = reload(sys.modules[module_name])
+    except KeyError:
+        print("Module '%s' isn't loaded." % module_name)
+    except: raise
+    if the_module:
+        print(the_module)
+    print()
 
 def do_shell_command(cmd):
     try:
@@ -545,6 +563,9 @@ def cli_loop(robot):
         elif cli_loop._line[0:5] == 'show ' or cli_loop._line == 'show':
             show_args = cli_loop._line[5:].split(' ')
             show_stuff(show_args)
+            continue
+        elif cli_loop._line[0:7] == 'reload ':
+            do_reload(cli_loop._line[7:])
             continue
         elif cli_loop._line[0:6] == 'start ' or cli_loop._line == 'start':
             start_args = cli_loop._line[6:].split(' ')

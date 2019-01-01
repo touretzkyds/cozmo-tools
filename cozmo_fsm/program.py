@@ -45,8 +45,9 @@ class StateMachineProgram(StateNode):
 
                  aruco = True,
                  arucolibname = cv2.aruco.DICT_4X4_100,
-                 aruco_marker_size = 50,
-                 perched_cameras =True,
+                 aruco_marker_size = ARUCO_MARKER_SIZE,
+
+                 perched_cameras = False,
 
                  world_map = None,
                  worldmap_viewer = False,
@@ -236,7 +237,7 @@ class StateMachineProgram(StateNode):
     def robot_put_down(self):
         print('** Robot was put down.')
         pf = self.robot.world.particle_filter
-        pf.initializer.initialize(self.robot)
+        pf.delocalize()
 
     def stop(self):
         super().stop()
