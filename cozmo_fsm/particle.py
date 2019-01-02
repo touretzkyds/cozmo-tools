@@ -630,9 +630,6 @@ class SLAMParticle(Particle):
         lm_x = self.x + dx
         lm_y = self.y + dy
 
-        if self.index == 40:
-            print('Particle',self.index,(dx,dy),(self.x,self.y),(lm_x,lm_y))
-
         if lm_id.startswith('Aruco-') or lm_id.startswith('Wall-'):
             lm_orient = sensor_orient + self.theta
         elif lm_id.startswith('Cube-'):
@@ -1081,13 +1078,14 @@ class SLAMParticleFilter(ParticleFilter):
         x_jitter = np.random.normal(0.0, self.dist_jitter, size=self.num_particles)
         y_jitter = np.random.normal(0.0, self.dist_jitter, size=self.num_particles)
         theta_jitter = np.random.normal(0.0, self.hdg_jitter, size=self.num_particles)
+        phi_jitter = np.random.normal(0.0, self.hdg_jitter, size=self.num_particles)
         for i in range(self.num_particles):
             (sensor_dist, sensor_bearing, sensor_orient, lm_pose) = lm_specs[i % num_specs]
-            phi = lm_pose[1] - sensor_orient + pi + theta_jitter[i]
+            phi = lm_pose[1] - sensor_orient + pi + phi_jitter[i]
             p = particles[i]
             p.x = lm_pose[0][0,0] + sensor_dist * cos(phi) + x_jitter[i]
             p.y = lm_pose[0][1,0] + sensor_dist * sin(phi) + y_jitter[i]
-            p.theta = phi - pi - sensor_bearing + theta_jitter[i]
+            p.theta = phi - pi - sensor_bearing + phi_jitter[i] + theta_jitter[i]
             p_landmarks = self.sensor_model.landmarks.copy()
             if False and i<3:
                 print('NEW PARTICLE %d: ' % i, p.x, p.y, p.theta*180/pi)
