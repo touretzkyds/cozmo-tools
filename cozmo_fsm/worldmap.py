@@ -748,7 +748,6 @@ class WallSpec():
         self.markers = markers
         self.doorways = doorways
         self.door_ids = door_ids
-        #marker_ids = [('Aruco-'+str(key)) for key in markers.keys()]
         marker_ids = list(markers.keys())
         if len(marker_ids) > 0 and not label:
             label = str(min(marker_ids))
