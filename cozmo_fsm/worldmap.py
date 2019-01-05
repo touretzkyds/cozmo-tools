@@ -155,7 +155,7 @@ class ArucoMarkerObj(WorldObject):
 
 class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
-                 door_width=75, door_height=105, markers=dict(),
+                 door_width=75, door_height=105, marker_specs=dict(),
                  doorways=[], door_ids=[], is_foreign=False, is_fixed=False,
                  wall_spec=None):
         if wall_spec:
@@ -163,12 +163,14 @@ class WallObj(WorldObject):
             height = wall_spec.height
             door_width = wall_spec.door_width
             door_height = wall_spec.door_height
-            markers = wall_spec.markers.copy()
+            marker_specs = wall_spec.marker_specs.copy()
             doorways = wall_spec.doorways.copy()
             door_ids = wall_spec.door_ids.copy()
-        if id is None:
-            if len(markers) > 0:
-                k = list(markers.keys())
+        if id:
+            self.wall_label = id[1+id.rfind('-'):]
+        else:
+            if len(marker_specs) > 0:
+                k = list(marker_specs.keys())
                 k.sort()
                 self.wall_label = str(k[0])
                 id = 'Wall-%s' % self.wall_label
@@ -177,8 +179,6 @@ class WallObj(WorldObject):
                 id = 'Wall-%s' % wall_spec.label
             else:
                 raise ValueError('id (e.g., "A") must be supplied if wall has no markers')
-        else:
-            self.wall_label = id[1+id.find('-'):]
         super().__init__(id,x,y)
         self.z = height/2
         self.theta = theta
@@ -186,7 +186,7 @@ class WallObj(WorldObject):
         self.height = height
         self.door_width = door_width
         self.door_height = door_height
-        self.markers = markers
+        self.marker_specs = marker_specs
         self.doorways = doorways
         self.door_ids = door_ids
         self.is_foreign = is_foreign
@@ -195,11 +195,6 @@ class WallObj(WorldObject):
 
     def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
-        if self.is_foreign is None: return  # *** DEBUGGING HACK
-        if False and abs(self.y - y) > 5:  #*** DEBUG
-            print('worldmap update: %s: x: %.1f -> %.1f    y: %.1f -> %.1f    theta: %.1f -> %.1f deg.' %
-                  (self.id, self.x, x, self.y, y, self.theta*180/pi, theta*180/pi))
-            # self.is_foreign = None  # *** DEBUGGING HACK
         self.x = x
         self.y = y
         self.theta = theta
@@ -213,7 +208,7 @@ class WallObj(WorldObject):
 
     def make_arucos(self, world_map):
         "Called by add_fixed_landmark to make fixed aruco markers."
-        for key,value in self.markers.items():
+        for key,value in self.marker_specs.items():
             # Project marker onto the wall; move marker if it already exists
             marker_id = 'Aruco-' + str(key)
             marker = world_map.objects.get(marker_id, None)
@@ -225,7 +220,7 @@ class WallObj(WorldObject):
                 print('make_arucos using',marker)
             wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
-            rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
+             rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
             marker.x = self.x + rel_xyz[1][0]
             marker.y = self.y + rel_xyz[0][0]
             marker.z = rel_xyz[2][0]
@@ -237,13 +232,10 @@ class WallObj(WorldObject):
 
     @property
     def is_visible(self):
-        count = 0
-        seen_marker_ids = evbase.robot_for_loading.world.aruco.seen_marker_ids
-        for m in self.markers.keys():
+        seen_marker_ids = evbase.robot_for_loading.world.aruco.seen_marker_ids.copy()
+        for m in self.marker_specs.keys():
             if m in seen_marker_ids:
-                count += 1
-                if count == 2:
-                    return True
+                return True
         return False
 
     def __repr__(self):
@@ -414,14 +406,14 @@ class WorldMap():
             wall = landmark
             wall.make_doorways(self)
             wall.make_arucos(self)
-            for key in wall.markers.keys():
+            for key in wall.marker_specs.keys():
                 self.robot.world.particle_filter.add_fixed_landmark(self.objects[key])
 
     def delete_wall(self,wall_id):
         "Delete a wall, its markers, and its doorways, so we can predefine a new one."
         wall = self.objects.get(wall_id,None)
         if wall is None: return
-        marker_ids = [('Aruco-'+str(id)) for id in wall.markers.keys()]
+        marker_ids = [('Aruco-'+str(id)) for id in wall.marker_specs.keys()]
         door_ids = [('Doorway-'+str(id)) for id in wall.door_ids]
         landmarks = self.robot.world.particle_filter.sensor_model.landmarks
         del self.objects[wall_id]
@@ -514,7 +506,7 @@ class WorldMap():
 
     def update_arucos(self):
         try:
-            seen_marker_objects = self.robot.world.aruco.seen_marker_objects
+            seen_marker_objects = self.robot.world.aruco.seen_marker_objects.copy()
         except:
             return
         aruco_parent = self.robot.world.aruco
@@ -565,7 +557,7 @@ class WorldMap():
                                    height=wall_spec.height,
                                    door_width=wall_spec.door_width,
                                    door_height=wall_spec.door_height,
-                                   markers=wall_spec.markers,
+                                   marker_specs=wall_spec.marker_specs,
                                    doorways=wall_spec.doorways,
                                    door_ids=wall_spec.door_ids,
                                    is_foreign=False)
@@ -575,7 +567,7 @@ class WorldMap():
                     wall.make_doorways(self.robot.world.world_map)
                 # Relocate the aruco markers to their predefined positions
                 spec = wall_marker_dict[wall.id]
-                for key,value in spec.markers.items():
+                for key,value in spec.marker_specs.items():
                     marker_id = 'Aruco-' + str(key)
                     if marker_id in self.robot.world.world_map.objects:
                         aruco_marker = self.robot.world.world_map.objects[marker_id]
@@ -739,16 +731,16 @@ wall_marker_dict = dict()
 
 class WallSpec():
     def __init__(self, label=None, length=100, height=210, door_width=77, door_height=105,
-                 markers=dict(), doorways=[], door_ids=[]):
+                 marker_specs=dict(), doorways=[], door_ids=[]):
         self.label = label
         self.length = length
         self.height = height
         self.door_width = door_width
         self.door_height = door_height
-        self.markers = markers
+        self.marker_specs = marker_specs
         self.doorways = doorways
         self.door_ids = door_ids
-        marker_ids = list(markers.keys())
+        marker_ids = list(marker_specs.keys())
         if len(marker_ids) > 0 and not label:
             label = str(min(marker_ids))
         self.id = 'Wall-%s' % label

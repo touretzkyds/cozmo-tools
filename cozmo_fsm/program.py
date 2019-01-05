@@ -165,6 +165,7 @@ class StateMachineProgram(StateNode):
             # image doesn't arrive quickly enough after the window opens.
             dummy = numpy.array([[0]])
             cv2.imshow(self.windowName,dummy)
+            cv2.waitKey(1)
         else:
             self.windowName = None
 
@@ -342,7 +343,7 @@ class StateMachineProgram(StateNode):
             # Done with annotation
             annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
             if self.windowName:
-                if os.name == 'nt':
+                if True: # os.name == 'nt':
                     cv2.waitKey(1)
                 cv2.imshow(self.windowName, annotated_im)
 
