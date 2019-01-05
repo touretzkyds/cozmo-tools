@@ -220,7 +220,7 @@ class WallObj(WorldObject):
                 print('make_arucos using',marker)
             wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
-             rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
+            rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
             marker.x = self.x + rel_xyz[1][0]
             marker.y = self.y + rel_xyz[0][0]
             marker.z = rel_xyz[2][0]
