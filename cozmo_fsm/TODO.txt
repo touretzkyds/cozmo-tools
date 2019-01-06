@@ -1,0 +1,7 @@
+Remove arucos from particle landmark lists if the aruco is part of a wall.
+No need to maintain separate mu/sigma info for wall arucos.
+Should still allow single arucos to be used as landmarks if they
+are not part of a weall definition.
+
+This will speed up the particle filter because we won't be calling
+process_landmark on all the wall arucos.
