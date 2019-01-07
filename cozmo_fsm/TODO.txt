@@ -5,3 +5,9 @@ are not part of a weall definition.
 
 This will speed up the particle filter because we won't be calling
 process_landmark on all the wall arucos.
+
+
+Intersection of two line segments needed for path planner:
+https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+http://www.cs.swan.ac.uk/~cssimon/line_intersection.html
+
