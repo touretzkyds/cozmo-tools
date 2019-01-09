@@ -84,41 +84,34 @@ class DoorPass(StateNode):
     class TurnToMarker(Turn):
         """Use camera image and native pose to center the door marker."""
         def start(self,event=None):
-            marker_id = self.parent.object.index
-            if marker_id not in self.robot.world.aruco.seen_marker_ids:
+            marker_id = self.parent.object.marker_id
+            marker = self.robot.world.aruco.seen_marker_objects.get(marker_id, None)
+            if not marker:
                 self.angle = Angle(0)
                 super().start(event)
-                print("TurnToMarker failed!")
+                print("TurnToMarker failed to find marker %s!" % marker_id)
                 self.post_failure()
                 return
-            marker = self.robot.world.aruco.seen_marker_ids[marker_id]
             sensor_dist = marker.camera_distance
             sensor_bearing = atan2(marker.camera_coords[0],
                                    marker.camera_coords[2])
             x = self.robot.pose.position.x
             y = self.robot.pose.position.y
             theta = self.robot.pose.rotation.angle_z.radians
-
             direction = theta + sensor_bearing
             dx = sensor_dist * cos(direction)
             dy = sensor_dist * sin(direction)
-            cx = x + dx
-            cy = ry + dy
-            dist = math.sqrt(dx*dx + dy*dy)
             turn = wrap_angle(atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians)
-            if abs(turn) < 2*pi/180:
+            if abs(turn) < 0.5*pi/180:
                 self.angle = Angle(0)
             else:
                 self.angle = Angle(radians=turn)
-            print("TurnTOMarker turning by %.1f degrees" % turn*180/pi)
+            print("TurnTOMarker %s turning by %.1f degrees" % (self.name, self.angle.degrees))
             super().start(event)
-
 
     $setup{
         droplift: self.AdjustLiftHeight() =N=>
             SetHeadAngle(0) =T(0.5)=> check_start  # Time for vision to process
-
-        # If wall is not visible, turn toward closest the marker
 
         check_start: PilotCheckStart()
         check_start =S=> turn_to_gate1
@@ -128,26 +121,21 @@ class DoorPass(StateNode):
         check_start2 =S=> turn_to_gate1
         check_start2 =F=> ParentFails()
 
-        turn_to_gate1: self.TurnToGate(150)
-        turn_to_gate1 =C=> Print("Turning to gate1.") =T(0.5)=> forward_to_gate1 # turn_to_gate1
-        turn_to_gate1 =S=> Print("gate1 turn complete: tm") =TM=> forward_to_gate1
-
-        forward_to_gate1: self.ForwardToGate(150) =C=> Print("at gate1: tm") =TM=> {look_up, turn_to_gate2}
+        turn_to_gate1: self.TurnToGate(150) =C=> StateNode() =T(0.5)=> forward_to_gate1
+        forward_to_gate1: self.ForwardToGate(150) =C=> StateNode() =T(0.5)=> {look_up, turn_to_gate2}
 
         # If we're carrying a cube, should we lower the lift so we can see?
         look_up: SetHeadAngle(35)
 
-        turn_to_gate2: self.TurnToMarker() # self.TurnToGate(70)
-        turn_to_gate2 =C=> Print("Turning to gate 2.") =T(0.5)=> forward_to_gate2 # turn_to_gate2
-        turn_to_gate2 =S=> Print("gate2 turn complete: tm") =TM=> forward_to_gate2
+        turn_to_gate2: self.TurnToGate(70) =C=> StateNode() =T(0.5)=> turn_to_marker1
 
-        forward_to_gate2: self.ForwardToGate(70) =C=> Print("at gate2: tm") =TM=> turn_to_gate3
+        turn_to_marker1: self.TurnToMarker() =C=>
+            self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=> StateNode() =T(0.5)=> turn_to_marker2
 
-        turn_to_gate3: self.TurnToMarker()
-        turn_to_gate3 =C=> Print("Turning to gate 3.") =T(0.5)=>  {lower_head, through_door} # turn_to_gate3
-        turn_to_gate3 =S=> Print("gate3 turn complete: tm") =TM=> {lower_head, through_door}
+        turn_to_marker2: self.TurnToMarker() =C=> StateNode() =T(0.5)=>  {lower_head, through_door}
 
         lower_head: SetHeadAngle(0)
+
         through_door: Forward(150)
 
         {lower_head, through_door} =C=> ParentCompletes()
