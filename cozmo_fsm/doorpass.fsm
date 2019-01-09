@@ -87,7 +87,8 @@ class DoorPass(StateNode):
             marker_id = self.parent.object.index
             if marker_id not in self.robot.world.aruco.seen_marker_ids:
                 self.angle = Angle(0)
-                super.start(event)
+                super().start(event)
+                print("TurnToMarker failed!")
                 self.post_failure()
                 return
             marker = self.robot.world.aruco.seen_marker_ids[marker_id]
@@ -109,6 +110,7 @@ class DoorPass(StateNode):
                 self.angle = Angle(0)
             else:
                 self.angle = Angle(radians=turn)
+            print("TurnTOMarker turning by %.1f degrees" % turn*180/pi)
             super().start(event)
 
 
@@ -135,7 +137,7 @@ class DoorPass(StateNode):
         # If we're carrying a cube, should we lower the lift so we can see?
         look_up: SetHeadAngle(35)
 
-        turn_to_gate2: self.TurnToGate(70)
+        turn_to_gate2: self.TurnToMarker() # self.TurnToGate(70)
         turn_to_gate2 =C=> Print("Turning to gate 2.") =T(0.5)=> forward_to_gate2 # turn_to_gate2
         turn_to_gate2 =S=> Print("gate2 turn complete: tm") =TM=> forward_to_gate2
 
@@ -201,7 +203,7 @@ class GoToWall(StateNode):
                 distsq = (x-obj.x)**2 + (y-obj.y)**2
                 walls.append((distsq,obj))
         walls = sorted(walls, key=lambda x: x[0])
-        return 'Wall-%d' % walls[0][1].id if walls else None
+        return walls[0][1].id if walls else None
 
     def pick_side(self, dist):
         wall = self.object
