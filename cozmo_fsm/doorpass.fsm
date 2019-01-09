@@ -50,7 +50,7 @@ class DoorPass(StateNode):
         """Turn to the approach gate, or post success if we're already there."""
         def __init__(self,offset):
             self.offset = offset
-            super().__init__(speed=Angle(radians=0.5))
+            super().__init__(speed=Angle(radians=2.0))
 
         def start(self,event=None):
             (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
@@ -79,6 +79,7 @@ class DoorPass(StateNode):
             (gate_x, gate_y) = self.parent.calculate_gate(self.offset)
             dist = sqrt((gate_x-rx)**2 + (gate_y-ry)**2)
             self.distance = distance_mm(dist)
+            self.speed = speed_mmps(50)
             super().start(event)
 
     class TurnToMarker(Turn):
@@ -111,7 +112,7 @@ class DoorPass(StateNode):
 
     $setup{
         droplift: self.AdjustLiftHeight() =N=>
-            SetHeadAngle(0) =T(0.5)=> check_start  # Time for vision to process
+            SetHeadAngle(0) =T(0.2)=> check_start  # Time for vision to process
 
         check_start: PilotCheckStart()
         check_start =S=> turn_to_gate1
@@ -121,18 +122,18 @@ class DoorPass(StateNode):
         check_start2 =S=> turn_to_gate1
         check_start2 =F=> ParentFails()
 
-        turn_to_gate1: self.TurnToGate(150) =C=> StateNode() =T(0.5)=> forward_to_gate1
-        forward_to_gate1: self.ForwardToGate(150) =C=> StateNode() =T(0.5)=> {look_up, turn_to_gate2}
+        turn_to_gate1: self.TurnToGate(150) =C=> StateNode() =T(0.2)=> forward_to_gate1
+        forward_to_gate1: self.ForwardToGate(150) =C=> StateNode() =T(0.2)=> {look_up, turn_to_gate2}
 
         # If we're carrying a cube, should we lower the lift so we can see?
         look_up: SetHeadAngle(35)
 
-        turn_to_gate2: self.TurnToGate(70) =C=> StateNode() =T(0.5)=> turn_to_marker1
+        turn_to_gate2: self.TurnToGate(70) =C=> StateNode() =T(0.2)=> turn_to_marker1
 
         turn_to_marker1: self.TurnToMarker() =C=>
-            self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=> StateNode() =T(0.5)=> turn_to_marker2
+            self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=> StateNode() =T(0.2)=> turn_to_marker2
 
-        turn_to_marker2: self.TurnToMarker() =C=> StateNode() =T(0.5)=>  {lower_head, through_door}
+        turn_to_marker2: self.TurnToMarker() =C=> StateNode() =T(0.2)=>  {lower_head, through_door}
 
         lower_head: SetHeadAngle(0)
 

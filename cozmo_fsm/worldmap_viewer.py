@@ -771,6 +771,7 @@ class WorldMapViewer():
                 self.make_custom_marker(obj)
             elif isinstance(obj, worldmap.ArucoMarkerObj):
                 self.make_aruco_marker(obj)
+        # Make the doorways last, so transparency works correctly
         for (key,obj) in items:
             if isinstance(obj, worldmap.DoorwayObj):
                 self.make_doorway(obj)
@@ -840,7 +841,8 @@ class WorldMapViewer():
         glClearColor(*self.bgcolor, 0)
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)
-        # Enable transparency
+        # Enable transparency for doorways: see
+        #    https://www.opengl.org/archives/resources/faq/technical/transparency.htm
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
