@@ -253,7 +253,8 @@ class DoorwayObj(WorldObject):
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall
-        self.index = index
+        self.index = index  # which doorway is this?  0, 1, ...
+        self.marker_id = wall.door_ids[index]
         self.is_obstacle = False
         self.update()
 

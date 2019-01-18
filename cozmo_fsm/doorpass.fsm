@@ -6,10 +6,143 @@ from .nodes import *
 from .transitions import *
 from .transform import wrap_angle
 from .pilot import PilotToPose, PilotCheckStart
-from .worldmap import WallObj
+from .worldmap import WallObj, DoorwayObj
 from time import sleep
 
 from math import sin, cos, atan2, pi, sqrt
+
+class DoorPass(StateNode):
+    """Pass through a doorway. Assumes the doorway is nearby and unobstructed."""
+    def __init__(self, door=None):
+        super().__init__()
+        if isinstance(door, int):
+            door ='Doorway-%d' % door
+        if isinstance(door, str):
+            door = self.robot.world.world_map.objects.get(door)
+        if door:
+            self.object = door
+        
+    def calculate_gate(self,offset):
+        """Returns closest gate point (gx, gy)"""
+        (rx,ry,_) = self.robot.world.particle_filter.pose
+        dx = self.object.x
+        dy = self.object.y
+        dtheta = self.object.theta
+        pt1x = dx + offset * cos(dtheta)
+        pt1y = dy + offset * sin(dtheta)
+        pt2x = dx + offset * cos(dtheta+pi)
+        pt2y = dy + offset * sin(dtheta+pi)
+        dist1sq = (pt1x-rx)**2 + (pt1y-ry)**2
+        dist2sq = (pt2x-rx)**2 + (pt2y-ry)**2
+        if dist1sq < dist2sq:
+            return (pt1x, pt1y)
+        else:
+            return (pt2x, pt2y)
+
+    class AdjustLiftHeight(SetLiftHeight):
+        # TODO: If lift is high, push it higher (we're carrying something).
+        # If lift isn't high, drop it to zero
+        def start(self, event=None):
+            self.height = 0
+            super().start(event)
+
+    class TurnToGate(Turn):
+        """Turn to the approach gate, or post success if we're already there."""
+        def __init__(self,offset):
+            self.offset = offset
+            super().__init__(speed=Angle(radians=2.0))
+
+        def start(self,event=None):
+            (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
+            (gate_x, gate_y) = self.parent.calculate_gate(self.offset)
+            bearing = atan2(gate_y-ry, gate_x-rx)
+            turn = wrap_angle(bearing - rtheta)
+            print('^^ TurnToGate: gate=(%.1f, %.1f)  rtheta=%.1f  bearing=%.1f  turn=%.1f' %
+                  (gate_x, gate_y, rtheta*180/pi, bearing*180/pi, turn*180/pi))
+            if False and abs(turn) < 0.1:
+                self.angle = Angle(0)
+                super().start(event)
+                self.post_success()
+            else:
+                self.angle = Angle(radians=turn)
+                super().start(event)
+        
+
+    class ForwardToGate(Forward):
+        """Travel forward to reach the approach gate."""
+        def __init__(self,offset):
+            self.offset = offset
+            super().__init__()
+
+        def start(self,event=None):
+            (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
+            (gate_x, gate_y) = self.parent.calculate_gate(self.offset)
+            dist = sqrt((gate_x-rx)**2 + (gate_y-ry)**2)
+            self.distance = distance_mm(dist)
+            self.speed = speed_mmps(50)
+            super().start(event)
+
+    class TurnToMarker(Turn):
+        """Use camera image and native pose to center the door marker."""
+        def start(self,event=None):
+            marker_id = self.parent.object.marker_id
+            marker = self.robot.world.aruco.seen_marker_objects.get(marker_id, None)
+            if not marker:
+                self.angle = Angle(0)
+                super().start(event)
+                print("TurnToMarker failed to find marker %s!" % marker_id)
+                self.post_failure()
+                return
+            sensor_dist = marker.camera_distance
+            sensor_bearing = atan2(marker.camera_coords[0],
+                                   marker.camera_coords[2])
+            x = self.robot.pose.position.x
+            y = self.robot.pose.position.y
+            theta = self.robot.pose.rotation.angle_z.radians
+            direction = theta + sensor_bearing
+            dx = sensor_dist * cos(direction)
+            dy = sensor_dist * sin(direction)
+            turn = wrap_angle(atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians)
+            if abs(turn) < 0.5*pi/180:
+                self.angle = Angle(0)
+            else:
+                self.angle = Angle(radians=turn)
+            print("TurnTOMarker %s turning by %.1f degrees" % (self.name, self.angle.degrees))
+            super().start(event)
+
+    $setup{
+        droplift: self.AdjustLiftHeight() =N=>
+            SetHeadAngle(0) =T(0.2)=> check_start  # Time for vision to process
+
+        check_start: PilotCheckStart()
+        check_start =S=> turn_to_gate1
+        check_start =F=> Forward(-80) =C=> check_start2
+
+        check_start2: PilotCheckStart()
+        check_start2 =S=> turn_to_gate1
+        check_start2 =F=> ParentFails()
+
+        turn_to_gate1: self.TurnToGate(150) =C=> StateNode() =T(0.2)=> forward_to_gate1
+        forward_to_gate1: self.ForwardToGate(150) =C=> StateNode() =T(0.2)=> {look_up, turn_to_gate2}
+
+        # If we're carrying a cube, should we lower the lift so we can see?
+        look_up: SetHeadAngle(35)
+
+        turn_to_gate2: self.TurnToGate(70) =C=> StateNode() =T(0.2)=> turn_to_marker1
+
+        turn_to_marker1: self.TurnToMarker() =C=>
+            self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=> StateNode() =T(0.2)=> turn_to_marker2
+
+        turn_to_marker2: self.TurnToMarker() =C=> StateNode() =T(0.2)=>  {lower_head, through_door}
+
+        lower_head: SetHeadAngle(0)
+
+        through_door: Forward(150)
+
+        {lower_head, through_door} =C=> ParentCompletes()
+
+    }
+
 
 class GoToWall(StateNode):
     def __init__(self, wall=None, door=-1):
@@ -43,7 +176,7 @@ class GoToWall(StateNode):
                 print("Going to closest door")
                 super().start(event)
             elif self.door_id in self.wobj.door_ids:
-                self.door_coordinates = self.wobj.markers[self.door_id][1]
+                self.door_coordinates = self.wobj.marker_specs[self.door_id][1]
                 print(self.door_coordinates)
                 super().start(event)
             else:
@@ -59,7 +192,7 @@ class GoToWall(StateNode):
                 distsq = (x-obj.x)**2 + (y-obj.y)**2
                 walls.append((distsq,obj))
         walls = sorted(walls, key=lambda x: x[0])
-        return 'Wall-%d' % walls[0][1].id if walls else None
+        return walls[0][1].id if walls else None
 
     def pick_side(self, dist):
         wall = self.object
@@ -74,15 +207,15 @@ class GoToWall(StateNode):
             door_ids = self.wobj.door_ids
             sides = []
             for id in door_ids:
-               door_coordinates = self.wobj.markers[id][1]
-               s = self.wobj.markers[id][0]
+               door_coordinates = self.wobj.marker_specs[id][1]
+               s = self.wobj.marker_specs[id][0]
                sides.append((x - s*cos(ang)*dist - sin(ang)*(l - door_coordinates[0]),
                              y - s*sin(ang)*dist + cos(ang)*( l - door_coordinates[0]),
                              wrap_angle(ang+(1-s)*pi/2), id))
 
             sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
             self.door_id = sorted_sides[0][3]
-            self.door_coordinates = self.wobj.markers[self.door_id][1]
+            self.door_coordinates = self.wobj.marker_specs[self.door_id][1]
             print("Going to door", self.door_id )
             shortest = sorted_sides[0][0:3]
         else:
@@ -349,7 +482,7 @@ class GoToRobot(StateNode):
     def start(self,event=None):
         if self.gname in self.robot.world.world_map.objects:
            self.obj = self.robot.world.world_map.objects[self.gname]
-            super().start(event)
+           super().start(event)
         else:
             print("No Foreign")
             self.post_failure()
