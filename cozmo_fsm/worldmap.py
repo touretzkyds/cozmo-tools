@@ -7,9 +7,10 @@ from cozmo.objects import LightCube, CustomObject
 from . import evbase
 from . import transform
 from . import custom_objs
-from .transform import wrap_angle
+from .transform import wrap_angle, quat2rot
 
 import math
+import numpy
 
 ORIENTATION_UPRIGHT = 'upright'
 ORIENTATION_INVERTED = 'inverted'
@@ -37,23 +38,25 @@ def quaternion_to_euler_angle(quaternion):
 
 
 def get_orientation_state(quaternion):
+    q0, q1, q2, q3 = quaternion
+    mat_arr = quat2rot(q0, q1, q2, q3)
+    z_vec = numpy.array([0, 0, 1, 1])
+    z_dot = mat_arr.dot(z_vec)[:3]
+    dot_product = numpy.round(z_dot.dot(numpy.array([0, 0, 1])), decimals=2)
     x, y, z = quaternion_to_euler_angle(quaternion)
-    if (round(x, 1) == 0) and (round(y, 1) == 0):
+    if dot_product >= 0.9:
         orientation = ORIENTATION_UPRIGHT
-    elif abs(round(x, 1)) == round(math.pi, 1) and (round(y, 1) == 0):
+    elif dot_product <= -0.9:
         orientation = ORIENTATION_INVERTED
         z -= math.pi
-    elif abs(round(x, 1)) == round(math.pi/2, 1) and (round(y, 1) == 0):
+    elif -0.1 <= dot_product <= 0.1:
         orientation = ORIENTATION_SIDEWAYS
-        z = z-math.pi/2 if x>0 else z+math.pi/2
-        # print('type1: x: %.2f, y: %.2f, z: %.2f' % (x, y, z*180/math.pi))
-    elif abs(round(y, 1)) == round(math.pi/2, 1):
-        orientation = ORIENTATION_SIDEWAYS
-        w, x, y, z = quaternion
-        x, y, z = quaternion_to_euler_angle([w, y, x, z])
-        z = -y if x>0 else y+math.pi
-        # print('type2: x: %.2f, y: %.2f, z: %.2f' % (x, y, z*180/math.pi))
-
+        if round(y, 1) == 0:
+            z = z-math.pi/2 if x>0 else z+math.pi/2
+        else:
+            w, x, y, z = quaternion
+            x, y, z = quaternion_to_euler_angle([w, y, x, z])
+            z = -y if x>0 else y+math.pi
     else:
         orientation = ORIENTATION_TILTED
 
@@ -88,11 +91,9 @@ class LightCubeObj(WorldObject):
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
-        self.theta = theta
+        # self.theta = theta
         self.size = self.light_cube_size
-        self.orientation, _, _, z = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
-        if self.orientation is ORIENTATION_SIDEWAYS:
-            self.theta = z
+        self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
 
     @property
@@ -101,7 +102,6 @@ class LightCubeObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
             vis = ' visible' if self.is_visible else ''
             return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
                 (self.sdk_obj.cube_id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
@@ -120,6 +120,7 @@ class ChargerObj(WorldObject):
             self.update_from_sdk = True
         self.theta = theta
         self.size = (104, 98, 10)
+        self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     @property
     def is_visible(self):
@@ -128,8 +129,8 @@ class ChargerObj(WorldObject):
     def __repr__(self):
         if self.pose_confidence >= 0:
             vis = ' visible' if self.is_visible else ''
-            return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.%s>' % \
-                (self.x, self.y, self.z, self.theta*180/pi, vis)
+            return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
+                (self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
             return '<ChargerObj: position unknown>'
 
@@ -143,6 +144,7 @@ class CustomMarkerObj(WorldObject):
         self.theta = theta
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
+        self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     @property
     def is_visible(self):
@@ -533,6 +535,7 @@ class WorldMap():
             # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
         if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
             self.update_coords_from_sdk(wmobject, cube)
+            wmobject.orientation, _, _, wmobject.theta = get_orientation_state(cube.pose.rotation.q0_q1_q2_q3)
         return wmobject
 
     def update_charger(self):
@@ -556,6 +559,7 @@ class WorldMap():
             # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
         if wmobject.update_from_sdk:  # True unless pose isn't comparable
             self.update_coords_from_sdk(wmobject, charger)
+            wmobject.orientation, _, _, wmobject.theta = get_orientation_state(charger.pose.rotation.q0_q1_q2_q3)
         return wmobject
 
     def update_arucos(self):
@@ -689,6 +693,10 @@ class WorldMap():
             self.objects[id] = wmobject
         wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
+        if isinstance(wmobject, CustomMarkerObj):
+            wmobject.orientation, wmobject.theta, _, _ = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
+        elif isinstance(wmobject, CustomCubeObj):
+            wmobject.orientation, _, _, wmobject.theta = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     def update_carried_object(self, wmobject):
         #print('Updating carried object ',wmobject)
