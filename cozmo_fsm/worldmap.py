@@ -3,6 +3,7 @@ import time
 
 from cozmo.faces import Face
 from cozmo.objects import LightCube, CustomObject
+from cozmo.util import Pose
 
 from . import evbase
 from . import transform
@@ -518,14 +519,14 @@ class WorldMap():
                 # TODO: wait to see marker several times before adding.
                 wmobject = ArucoMarkerObj(aruco_parent,key)
                 self.objects[marker_id] = wmobject
-                pftuple = None
+                landmark_spec = None
             else:
-                pftuple = self.robot.world.particle_filter.sensor_model.landmarks.get(marker_id, None)
+                landmark_spec = self.robot.world.particle_filter.sensor_model.landmarks.get(marker_id, None)
             wmobject.pose_confidence = +1
-            if pftuple:  # Particle filter is tracking this marker
-                wmobject.x = pftuple[0][0][0]
-                wmobject.y = pftuple[0][1][0]
-                wmobject.theta = pftuple[1]
+            if isinstance(landmark_spec, tuple):  # Particle filter is tracking this marker
+                wmobject.x = landmark_spec[0][0][0]
+                wmobject.y = landmark_spec[0][1][0]
+                wmobject.theta = landmark_spec[1]
                 elevation = atan2(value.camera_coords[1], value.camera_coords[2])
                 cam_pos = transform.point(0,
                                           value.camera_distance * sin(elevation),
@@ -535,6 +536,10 @@ class WorldMap():
                 wmobject.elevation = elevation
                 wmobject.cam_pos = cam_pos
                 wmobject.base_pos = base_pos
+            elif isinstance(landmark_spec, Pose):
+                wmobject.x = landmark_spec.position.x
+                wmobject.y = landmark_spec.position.y
+                wmobject.theta = landmark_spec.rotation.angle_z.radians
             else:
                 # TODO: convert aruco sensor values to pf coordinates and update
                 # Right now we never get here because of HACK above.
