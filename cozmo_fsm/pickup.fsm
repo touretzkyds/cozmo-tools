@@ -5,17 +5,21 @@ from .nodes import *
 from .transitions import *
 from .transform import wrap_angle, line_equation, line_intersection
 from .cozmo_kin import center_of_rotation_offset
-from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, InvalidPose
-from .worldmap import LightCubeObj
+from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, GoalCollides, MaxIterations, InvalidPose
+from .worldmap import LightCubeObj, get_orientation_state
+from .worldmap import ORIENTATION_UPRIGHT, ORIENTATION_INVERTED, ORIENTATION_SIDEWAYS, ORIENTATION_TILTED
 from .doorpass import WallPilotToPose
 from .trace import tracefsm
 
 from math import sin, cos, atan2, pi, sqrt
 
+
 class GoToCube(StateNode):
     def __init__(self, cube=None):
         self.object = cube
         super().__init__()
+        self.side_index = 0
+        self.try_number = 0
 
     def start(self, event=None):
         # self.object will normally be set up by the parent of this node
@@ -42,25 +46,57 @@ class GoToCube(StateNode):
             wmobj = self.object.wm_obj
             x = wmobj.x
             y = wmobj.y
+
+            # bug: ang =\= wmobj.theta, why?
             ang = wmobj.theta
+
+            orientation = wmobj.orientation
+            print('Pick side from', self.object.wm_obj)
         else:
             x = cube.pose.position.x
             y = cube.pose.position.y
             ang = cube.pose.rotation.angle_z.radians
+            orientation, _, _, z = get_orientation_state(cube.pose.rotation.q0_q1_q2_q3)
+            if orientation == ORIENTATION_SIDEWAYS:
+                ang = wrap_angle(z)
         (rx, ry, rtheta) = self.get_robot_cor(use_world_map=use_world_map)
         dist = LightCubeObj.light_cube_size[0]/2 + offset
         side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
-        side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)        ]
-        side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
-        side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
-        sides = (side1, side2, side3, side4)
+        if use_world_map:
+            side1 = [ (x + cos(wrap_angle(wmobj.theta))*dist), (y + sin(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta + pi)   ]
+            side2 = [ (x - cos(wrap_angle(wmobj.theta))*dist), (y - sin(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta)]
+            side3 = [ (x + sin(wrap_angle(wmobj.theta))*dist), (y - cos(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta + pi/2) ]
+            side4 = [ (x - sin(wrap_angle(wmobj.theta))*dist), (y + cos(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta - pi/2) ]
+        else:
+            side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
+            side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)    ]
+            side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
+            side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
+        # sides = (side1, side2, side3, side4)
+        sides = (side2, side3, side1, side4)
+
+        # if the orientation is sideways, only one valid side to pickup cube
+        if orientation == ORIENTATION_SIDEWAYS:
+            self.try_number = 3
+            side = side2
+            d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
+            print('  side 0: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
+                  (d, side[0], side[1], side[2]*180/math.pi))
+            return side
+
         sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
+
         for i in range(4):
-            side = sorted_sides[i]
+            side = sides[i]
             d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
             print('  side %d: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
                   (i, d, side[0], side[1], side[2]*180/pi))
-        return sorted_sides[0]
+
+        if self.try_number == 0:
+            # initialize first try side index as the closest one
+            self.side_index = sides.index(sorted_sides[0])
+        print('Go to side %i' %self.side_index)
+        return sides[self.side_index]
 
     def get_robot_pose(self, use_world_map):
         if use_world_map:
@@ -181,7 +217,16 @@ class GoToCube(StateNode):
             (dist, relative_angle) = self.parent.measure_dockedness(side,True)
             max_distance_from_dock_point = 150 # millimeters
             max_angle_from_dock_heading = 10 # degrees
-            if dist < max_distance_from_dock_point:
+
+            if isinstance(cube, LightCube):
+                orientation = cube.wm_obj.orientation
+            elif isinstance(cube, LightCubeObj):
+                orientation = cube.sdk_obj.orientation
+
+            if orientation == ORIENTATION_SIDEWAYS:
+                print(orientation)
+                self.post_failure()
+            elif dist < max_distance_from_dock_point:
                 if relative_angle < max_angle_from_dock_heading and cube.is_visible:
                     print('CheckAlmostDocked is satisfied.  dist=%.1f mm  angle=%.1f deg.' %
                           (dist, relative_angle))
@@ -283,7 +328,7 @@ class GoToCube(StateNode):
                         print('ManualDock1: Alignment is close enough.')
                         super().start(event)
                         return
-             
+
     class ManualDock2(Turn):
         def start(self,event=None):
             (rx,ry,rtheta) = self.parent.get_robot_cor(use_world_map=True)
@@ -303,9 +348,28 @@ class GoToCube(StateNode):
             self.parent.wmobject.pose_confidence = -1
 
 
+    class TryAllSides(StateNode):
+        def __init__(self):
+            super().__init__()
+
+        def start(self, event=None):
+            super().start(event)
+            if self.parent.try_number > 2:
+                # Have tried all 4 sides, reset counter
+                print('Have tried all sides.')
+                self.parent.try_number = 0
+                self.parent.side_index = 0
+                self.post_success()
+            else:
+                self.parent.try_number += 1
+                self.parent.side_index = (self.parent.side_index + 1) % 4
+                self.post_failure()
+                print('Haven\'t tired out all sides of cube. Going to try the side', self.parent.side_index)
+
+
     $setup{
         # GoToCube machine
-        
+
         droplift: SetLiftHeight(0)
         droplift =C=> Print('droplift succeeded') =N=> {looker, waitlift}
         droplift =F=> Print('droplift failed') =N=> {looker, waitlift}   # lift motion fails if on charger
@@ -340,6 +404,8 @@ class GoToCube(StateNode):
         pilot_check_start2 =F=> failure
 
         go_side: self.PilotToSide()
+        go_side =PILOT(GoalCollides)=> failure
+        go_side =PILOT(MaxIterations)=> failure
         go_side =PILOT=> go_side_pilot: ParentPilotEvent()
         go_side =F=> failure
         go_side =C=> self.ReportPosition('go_side_deccel')
@@ -362,7 +428,7 @@ class GoToCube(StateNode):
         turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
         turn_to_cube2 =C=> forward_to_cube2
 
-        forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3        
+        forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3
 
         turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
         turn_to_cube3 =C=> forward_to_cube3
@@ -371,7 +437,11 @@ class GoToCube(StateNode):
 
         success: Print('GoToSide has succeeded.') =N=> ParentCompletes()
 
-        failure: Print('GoToSide has failed.') =N=> ParentFails()
+        failure: Print('GoToSide has failed.') =N=> try_all_sides
+
+        try_all_sides: self.TryAllSides()
+        try_all_sides =S=> ParentFails()
+        try_all_sides =F=> droplift
     }
 
 class SetCarrying(StateNode):
@@ -379,7 +449,7 @@ class SetCarrying(StateNode):
         self.objparam = objparam
         self.object = None
         super().__init__()
-        
+
     def start(self, event=None):
         if self.objparam is not None:
             self.object = self.objparam
@@ -420,7 +490,7 @@ class SetFetching(StateNode):
         self.objparam = objparam
         self.object = None
         super().__init__()
-        
+
     def start(self, event=None):
         if self.objparam is not None:
             self.object = self.objparam
@@ -448,7 +518,7 @@ class SetNotFetching(StateNode):
 class PickUpCube(StateNode):
     """Pick up a cube using our own dock and verify routines.
     Set self.object to indicate the cube to be picked up."""
-    
+
     class VerifyPickup(StateNode):
         def probe_column(self, im, col, row_start, row_end):
             """
@@ -524,7 +594,7 @@ class PickUpCube(StateNode):
             if bad_runs < 2:
                 self.post_success()
             else:
-                self.post_failure()                
+                self.post_failure()
 
         # end of class VerifyPickup
 
