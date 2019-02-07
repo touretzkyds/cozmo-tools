@@ -17,6 +17,8 @@ ORIENTATION_UPRIGHT = 'upright'
 ORIENTATION_INVERTED = 'inverted'
 ORIENTATION_SIDEWAYS = 'sideways'
 ORIENTATION_TILTED = 'tilted'
+ORIENTATION_LEFT = 'left'
+ORIENTATION_RIGHT = 'right'
 
 
 def quaternion_to_euler_angle(quaternion):
@@ -38,26 +40,41 @@ def quaternion_to_euler_angle(quaternion):
     return X, Y, Z
 
 
-def get_orientation_state(quaternion):
+def get_orientation_state(quaternion, isPlanar=False):
     q0, q1, q2, q3 = quaternion
     mat_arr = quat2rot(q0, q1, q2, q3)
     z_vec = numpy.array([0, 0, 1, 1])
     z_dot = mat_arr.dot(z_vec)[:3]
     dot_product = numpy.round(z_dot.dot(numpy.array([0, 0, 1])), decimals=2)
     x, y, z = quaternion_to_euler_angle(quaternion)
+    if isPlanar:
+        perpendicular = True if -0.5 < y < 0.5 else False
+        if not perpendicular:
+            dot_product = numpy.round(z_dot.dot(numpy.array([1, 0, 0])), decimals=2)
+            x, y, z = quaternion_to_euler_angle([q0, q2, q3, q1])
+            x = -y if x>0 else y+math.pi
+            x = x if x < math.pi else (x - 2*math.pi)
     if dot_product >= 0.9:
         orientation = ORIENTATION_UPRIGHT
     elif dot_product <= -0.9:
         orientation = ORIENTATION_INVERTED
         z -= math.pi
     elif -0.1 <= dot_product <= 0.1:
-        orientation = ORIENTATION_SIDEWAYS
-        if round(y, 1) == 0:
-            z = z-math.pi/2 if x>0 else z+math.pi/2
+        if isPlanar:
+            # Markers
+            if 0 < x < math.pi:
+                orientation = ORIENTATION_RIGHT
+            else:
+                orientation = ORIENTATION_LEFT
         else:
-            w, x, y, z = quaternion
-            x, y, z = quaternion_to_euler_angle([w, y, x, z])
-            z = -y if x>0 else y+math.pi
+            # Cubes
+            orientation = ORIENTATION_SIDEWAYS
+            if round(y, 1) == 0:
+                z = z-math.pi/2 if x>0 else z+math.pi/2
+            else:
+                w, x, y, z = quaternion
+                x, y, z = quaternion_to_euler_angle([w, y, x, z])
+                z = -y if x>0 else y+math.pi
     else:
         orientation = ORIENTATION_TILTED
 
@@ -119,6 +136,7 @@ class ChargerObj(WorldObject):
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
+        self.orientation = ''
         self.theta = theta
         self.size = (104, 98, 10)
         self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
@@ -145,7 +163,10 @@ class CustomMarkerObj(WorldObject):
         self.theta = theta
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
-        self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
+        self.orientation = ''
+        self.theta = theta
+        if self.sdk_obj:
+            self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
 
     @property
     def is_visible(self):
@@ -156,8 +177,8 @@ class CustomMarkerObj(WorldObject):
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
-        return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s>' % \
-               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id, self.x, self.y, vis)
+        return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s %s>' % \
+               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id, self.x, self.y, vis, self.orientation)
 
 
 class CustomCubeObj(WorldObject):
@@ -704,7 +725,7 @@ class WorldMap():
         wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
         if isinstance(wmobject, CustomMarkerObj):
-            wmobject.orientation, wmobject.theta, _, _ = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
+            wmobject.orientation, wmobject.theta, _, _ = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3, True)
         elif isinstance(wmobject, CustomCubeObj):
             wmobject.orientation, _, _, wmobject.theta = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
 
