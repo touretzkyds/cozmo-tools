@@ -365,6 +365,7 @@ class FaceObj(WorldObject):
         super().__init__(id, x, y, z)
         self.sdk_obj = sdk_obj
         self.is_obstacle = False
+        self.expression = 'unknown'
 
     @property
     def name(self):
