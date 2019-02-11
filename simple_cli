@@ -419,12 +419,20 @@ def show_landmarks_helper(landmarks):
     sorted_keys = sort_wmobject_ids(landmarks)
     for key in sorted_keys:
         value = landmarks[key]
-        x = value[0][0,0]
-        y = value[0][1,0]
-        theta = value[1] * 180/pi
-        sigma_x = sqrt(value[2][0,0])
-        sigma_y = sqrt(value[2][1,1])
-        sigma_theta = sqrt(value[2][2,2])*180/pi
+        if isinstance(value, Pose):
+            x = value.position.x
+            y = value.position.y
+            theta = value.rotation.angle_z.degrees
+            sigma_x = 0
+            sigma_y = 0
+            sigma_theta = 0
+        else:
+            x = value[0][0,0]
+            y = value[0][1,0]
+            theta = value[1] * 180/pi
+            sigma_x = sqrt(value[2][0,0])
+            sigma_y = sqrt(value[2][1,1])
+            sigma_theta = sqrt(value[2][2,2])*180/pi
         if key.startswith('Aruco-'):
             print('  Aruco marker %s' % key[6:], end='')
         elif key.startswith('Wall-'):
