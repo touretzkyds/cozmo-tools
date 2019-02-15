@@ -846,7 +846,7 @@ class SLAMSensorModel(SensorModel):
         for cube in self.robot.world.light_cubes.values():
             if self.landmark_test(cube):
                 id = 'Cube-'+str(cube.cube_id)
-                evaluated = self.process_landmark(id, cube, just_looking, seen_marker_objects) or evaluated
+                evaluated = self.process_landmark(id, cube, just_looking, []) or evaluated
 
         # Evaluate ArUco landmarks
         try:
@@ -918,8 +918,8 @@ class SLAMSensorModel(SensorModel):
             sensor_orient = data.theta
         elif id.startswith('Cube-'):
             # sdk values are in SDK's coordinate system, not ours
-            sdk_dx = landmark.pose.position.x - self.robot.pose.position.x
-            sdk_dy = landmark.pose.position.y - self.robot.pose.position.y
+            sdk_dx = data.pose.position.x - self.robot.pose.position.x
+            sdk_dy = data.pose.position.y - self.robot.pose.position.y
             sensor_dist = sqrt(sdk_dx**2 + sdk_dy**2)
             sdk_bearing = atan2(sdk_dy, sdk_dx)
             # sensor_bearing is lm bearing relative to robot centerline
@@ -927,7 +927,7 @@ class SLAMSensorModel(SensorModel):
                 wrap_angle(sdk_bearing-self.robot.pose.rotation.angle_z.radians)
             # sensor_orient is lm bearing relative to cube's North
             sensor_orient = \
-                wrap_angle(sdk_bearing - id.pose.rotation.angle_z.radians)
+                wrap_angle(sdk_bearing - data.pose.rotation.angle_z.radians)
         elif id.startswith('Cam'):
             # turning to cylindrical coordinates
             sensor_dist = sqrt(landmark.x**2 + landmark.y**2)

@@ -236,7 +236,6 @@ class GoToWall(StateNode):
 
         def start(self, event=None):
             wall = self.parent.object
-            wobj = self.parent.wobj
             (x, y, ang) = self.parent.pick_side(150)
             dtheta = wrap_angle(ang - self.robot.world.particle_filter.pose_estimate()[2])
             if abs(dtheta) > 0.1:
