@@ -31,9 +31,12 @@ class CV_Contour(StateMachineProgram):
         thresh1 = cv2.getTrackbarPos('thresh1','contour')
         ret, thresholded = cv2.threshold(gray, thresh1, 255, 0)
         cv2.imshow('contour',thresholded)
-        stuff, contours, hierarchy = \
-            cv2.findContours(thresholded, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
+        if cv2.__version__[0] >= '4':
+            contours, hierarchy = \
+                cv2.findContours(thresholded, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        else:  # in OpenCV 3.x there was an additional return value
+            dummy, contours, hierarchy = \
+                cv2.findContours(thresholded, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         areas = [(i, cv2.contourArea(contours[i])) for i in range(len(contours))]
         areas.sort(key=lambda x: x[1])
         areas.reverse()
