@@ -908,11 +908,18 @@ class SetHeadAngle(ActionNode):
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
 
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data
+        super().start(event)
+
     def action_launcher(self):
         return self.robot.set_head_angle(self.angle, **self.action_kwargs)
 
 class SetLiftHeight(ActionNode):
     def __init__(self, height=0, abort_on_stop=True, **action_kwargs):
+        """height is a percentage from 0 to 1"""
         self.height = height
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
@@ -925,15 +932,24 @@ class SetLiftHeight(ActionNode):
 
 class SetLiftAngle(SetLiftHeight):
     def __init__(self, angle, abort_on_stop=True, **action_kwargs):
-        def get_theta(height):
-            return math.asin((height-45)/66)
+
+        #def get_theta(height):
+        #   return math.asin((height-45)/66)
+
         if isinstance(angle, cozmo.util.Angle):
-            angle = angle.radians
-        min_theta = get_theta(cozmo.robot.MIN_LIFT_HEIGHT_MM)
-        max_theta = get_theta(cozmo.robot.MAX_LIFT_HEIGHT_MM)
+            angle = angle.degrees
+        self.angle = angle
+        super().__init__(0, abort_on_stop=abort_on_stop, **action_kwargs)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data.degrees
+        min_theta = cozmo.robot.MIN_LIFT_ANGLE.degrees
+        max_theta = cozmo.robot.MAX_LIFT_ANGLE.degrees
         angle_range = max_theta - min_theta
-        height_pct = (angle - min_theta) / angle_range
-        super().__init__(height_pct, abort_on_stop=abort_on_stop, **action_kwargs)
+        self.height = (self.angle - min_theta) / angle_range
+        super().start(event)
 
 
 class DockWithCube(ActionNode):
