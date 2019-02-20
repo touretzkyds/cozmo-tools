@@ -6,3 +6,5 @@ termcolor
 PyOpenGL
 PyOpenGL_accelerate
 pyreadline
+SpeechRecognition
+PyAudio
