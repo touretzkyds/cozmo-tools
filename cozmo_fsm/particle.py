@@ -728,7 +728,7 @@ class SLAMParticle(Particle):
 class SLAMSensorModel(SensorModel):
     @staticmethod
     def is_cube(x):
-        return isinstance(x, cozmo.objects.LightCube)
+        return isinstance(x, cozmo.objects.LightCube) and x.pose.is_valid
 
     @staticmethod
     def is_aruco(x):
