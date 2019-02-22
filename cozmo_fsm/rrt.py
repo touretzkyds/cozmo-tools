@@ -228,10 +228,16 @@ class RRT():
         ymin = min(start.y, goal.y)
         ymax = max(start.y, goal.y)
         for obst in self.obstacles:
-            xmin = min(xmin, np.min(obst.vertices[0]))
-            xmax = max(xmax, np.max(obst.vertices[0]))
-            ymin = min(ymin, np.min(obst.vertices[1]))
-            ymax = max(ymax, np.max(obst.vertices[1]))
+            if isinstance(obst,Circle):
+                xmin = obst.center[0] - obst.radius
+                xmax = obst.center[0] + obst.radius
+                ymin = obst.center[1] - obst.radius
+                ymax = obst.center[1] + obst.radius
+            else:
+                xmin = min(xmin, np.min(obst.vertices[0]))
+                xmax = max(xmax, np.max(obst.vertices[0]))
+                ymin = min(ymin, np.min(obst.vertices[1]))
+                ymax = max(ymax, np.max(obst.vertices[1]))
         xmin = xmin - 500
         xmax = xmax + 500
         ymin = ymin - 500
