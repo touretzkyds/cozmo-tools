@@ -710,7 +710,7 @@ class DropObject(StateNode):
         SetLiftHeight(0) =C=> check_carrying
 
         check_carrying: CheckCarrying()
-        check_carrying =F=> ParentCompletes()
+        check_carrying =F=> {backup, lookdown}
         check_carrying =S=> self.SetObject() =N=>
           SetNotCarrying() =N=> SetFetching() =N=> {backup, lookdown}
 
