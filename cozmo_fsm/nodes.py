@@ -15,7 +15,7 @@ from .base import *
 from .events import *
 from .cozmo_kin import wheelbase
 from .transform import wrap_angle
-from .worldmap import WorldObject
+from .worldmap import WorldObject, FaceObj, CustomMarkerObj
 
 #________________ Ordinary Nodes ________________
 
@@ -310,28 +310,44 @@ class LookAtObject(StateNode):
         super().stop()
 
     def poll(self):
-        if isinstance(self.object, WorldObject):
-            rpose = self.robot.world.particle_filter.pose
-            dx = self.object.x - rpose[0]
-            dy = self.object.y - rpose[1]
+        if isinstance(self.object, FaceObj) or isinstance(self.object, CustomMarkerObj):
+            image_box =  self.object.sdk_obj.last_observed_image_box
+            camera_center = self.robot.camera.config.center.y
+            delta = image_box.top_left_y + image_box.height/2 - camera_center
+            adjust_level = 0.1
+            if self.robot.left_wheel_speed.speed_mmps != 0 and self.robot.right_wheel_speed.speed_mmps != 0:
+                adjust_level = 0.2
+            if delta > 15:
+                angle = self.robot.head_angle.radians - adjust_level
+            elif delta < -15:
+                angle = self.robot.head_angle.radians + adjust_level
+            else:
+                angle = self.robot.head_angle.radians
+            angle = cozmo.robot.MAX_HEAD_ANGLE.radians if angle > cozmo.robot.MAX_HEAD_ANGLE.radians else angle
+            angle = cozmo.robot.MIN_HEAD_ANGLE.radians if angle < cozmo.robot.MIN_HEAD_ANGLE.radians else angle
         else:
-            opos = self.object.pose.position
-            rpos = self.robot.pose.position
-            dx = opos.x - rpos.x
-            dy = opos.y - rpos.y
-        dist = math.sqrt(dx**2 + dy**2)
-        if dist < 60:
-            angle = -0.4
-        elif dist < 80:
-            angle = -0.3
-        elif dist < 100:
-            angle = -0.2
-        elif dist < 140:
-            angle = -0.1
-        elif dist < 180:
-            angle = 0
-        else:
-            angle = 0.1
+            if isinstance(self.object, WorldObject):
+                rpose = self.robot.world.particle_filter.pose
+                dx = self.object.x - rpose[0]
+                dy = self.object.y - rpose[1]
+            else:
+                opos = self.object.pose.position
+                rpos = self.robot.pose.position
+                dx = opos.x - rpos.x
+                dy = opos.y - rpos.y
+            dist = math.sqrt(dx**2 + dy**2)
+            if dist < 60:
+                angle = -0.4
+            elif dist < 80:
+                angle = -0.3
+            elif dist < 100:
+                angle = -0.2
+            elif dist < 140:
+                angle = -0.1
+            elif dist < 180:
+                angle = 0
+            else:
+                angle = 0.1
         if abs(self.robot.head_angle.radians - angle) > 0.03:
             self.handle = self.robot.loop.call_soon(self.move_head, angle)
 
@@ -382,7 +398,7 @@ class StopAllMotors(StateNode):
         super().start(event)
         self.robot.stop_all_motors()
         self.post_completion()
-        
+
 
 #________________ Color Images ________________
 
@@ -481,7 +497,7 @@ class CoroutineNode(StateNode):
 
     def coroutine_launcher(self):
         raise Exception('%s lacks a coroutine_launcher() method' % self)
-    
+
     def stop(self):
         if not self.running: return
         if self.handle: self.handle.cancel()
@@ -517,7 +533,7 @@ class DriveWheels(CoroutineNode):
     def stop(self):
         if not self.running: return
         self.stop_wheels()
-        super().stop()        
+        super().stop()
 
 
 class DriveForward(DriveWheels):
@@ -760,7 +776,7 @@ class ActionNode(StateNode):
 
     def action_launcher(self):
         raise Exception('%s lacks an action_launcher() method' % self)
-    
+
     def post_when_complete(self):
        self.robot.loop.create_task(self.wait_for_completion())
 
@@ -807,7 +823,7 @@ class Say(ActionNode):
     class SayDataEvent(Event):
         def __init__(self,text=None):
             self.text = text
-            
+
     def __init__(self, text="I'm speechless",
                  abort_on_stop=False, **action_kwargs):
         self.text = text
@@ -1072,7 +1088,7 @@ class StartBehavior(StateNode):
             return '<%s %s active=%s>' % \
                    (self.__class__.__name__, self.name, self.behavior_handle.is_active)
         else:
-            return super().__repr__()        
+            return super().__repr__()
 
     def start(self,event=None):
         if self.running: return
