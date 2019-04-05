@@ -252,7 +252,7 @@ class WallObj(WorldObject):
             if len(marker_specs) > 0:
                 k = list(marker_specs.keys())
                 k.sort()
-                self.wall_label = str(k[0])
+                self.wall_label = k[0][1+k[0].rfind('-'):]
                 id = 'Wall-%s' % self.wall_label
             elif wall_spec and wall_spec.label:
                 self.wall_label = wall_spec.label
@@ -290,14 +290,11 @@ class WallObj(WorldObject):
         "Called by add_fixed_landmark to make fixed aruco markers."
         for key,value in self.marker_specs.items():
             # Project marker onto the wall; move marker if it already exists
-            marker_id = 'Aruco-' + str(key)
-            marker = world_map.objects.get(marker_id, None)
+            marker = world_map.objects.get(key, None)
             if marker is None:
-                marker = ArucoMarkerObj(world_map.robot.world.aruco, marker_number=key)
+                marker_number = int(key[1+key.rfind('-'):])
+                marker = ArucoMarkerObj(world_map.robot.world.aruco, marker_number=marker_number)
                 world_map.objects[marker.id] = marker
-                print('make_arucos made', marker)
-            else:
-                print('make_arucos using',marker)
             wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
             rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
@@ -308,7 +305,6 @@ class WallObj(WorldObject):
             marker.is_fixed = self.is_fixed
             if self.is_fixed:
                 world_map.robot.world.particle_filter.add_fixed_landmark(marker)
-            print('make_aruco set',marker)
 
     @property
     def is_visible(self):
@@ -329,7 +325,7 @@ class WallObj(WorldObject):
 
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
-        id = 'Doorway-%d' % (wall.door_ids[index])
+        id = 'Doorway-' + str(wall.door_ids[index])
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall
@@ -654,7 +650,8 @@ class WorldMap():
                     # Make the doorways
                     wall.make_doorways(self.robot.world.world_map)
                 # Relocate the aruco markers to their predefined positions
-                spec = wall_marker_dict[wall.id]
+                spec = wall_marker_dict.get(wall.id, None)
+                if spec is None: return
                 for key,value in spec.marker_specs.items():
                     marker_id = 'Aruco-' + str(key)
                     if marker_id in self.robot.world.world_map.objects:
@@ -834,9 +831,9 @@ class WallSpec():
         self.door_ids = door_ids
         marker_ids = list(marker_specs.keys())
         if len(marker_ids) > 0 and not label:
-            label = str(min(marker_ids))
-        self.id = 'Wall-%s' % label
+            label = min(marker_ids)
+        self.id = 'Wall-' + label[1+label.rfind('-'):]
         global wall_marker_dict
-        for num in marker_ids:
-            wall_marker_dict[num] = self
+        for id in marker_ids:
+            wall_marker_dict[id] = self
         wall_marker_dict[self.id] = self

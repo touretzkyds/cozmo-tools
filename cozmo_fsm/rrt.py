@@ -504,7 +504,6 @@ class RRT():
                           orient=wall.theta )
             r.obstacle = wall
             obst.append(r)
-        print('wall obst:',obst)
         return obst
 
     def generate_cube_obstacle(self,obj):
