@@ -513,7 +513,7 @@ class CoroutineNode(StateNode):
         raise Exception('%s lacks a coroutine_launcher() method' % self)
 
     def post_when_complete(self):
-        "Call this from within start() if the couroutine will signal completion."
+        "Call this from within start() if the coroutine will signal completion."
         self.robot.loop.create_task(self.wait_for_completion())
 
     async def wait_for_completion(self):
