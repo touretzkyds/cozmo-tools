@@ -9,7 +9,7 @@ from math import pi
 import cv2
 
 import cozmo
-from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
+from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle, Pose
 
 from .base import *
 from .events import *
@@ -359,6 +359,20 @@ class LookAtObject(StateNode):
             pass
 
 
+class SetPose(StateNode):
+    def __init__(self, pose=Pose(0,0,0,angle_z=degrees(0))):
+        super().__init__()
+        self.pose = pose
+
+    def start(self, event=None):
+        super().start(event)
+        if isinstance(event, DataEvent) and isinstance(event.data, Pose):
+            pose = event.data
+        else:
+            pose = self.pose
+        self.robot.world.particle_filter.set_pose(self.pose.x, self.pose.y, self.pose.angle_z.radians)
+
+
 class Print(StateNode):
     "Argument can be a string, or a function to be evaluated at print time."
     def __init__(self,spec=None):
@@ -497,6 +511,17 @@ class CoroutineNode(StateNode):
 
     def coroutine_launcher(self):
         raise Exception('%s lacks a coroutine_launcher() method' % self)
+
+    def post_when_complete(self):
+        "Call this from within start() if the couroutine will signal completion."
+        self.robot.loop.create_task(self.wait_for_completion())
+
+    async def wait_for_completion(self):
+        await self.handle
+        if TRACE.trace_level >= TRACE.await_satisfied:
+            print('TRACE%d:' % TRACE.await_satisfied, self,
+                  'await satisfied:', self.handle)
+        self.post_completion()
 
     def stop(self):
         if not self.running: return
@@ -734,6 +759,23 @@ class DriveArc(DriveWheels):
             self.poll_handle.cancel()
             self.stop_wheels()
             self.post_completion()
+
+
+#________________ Cube Disconnect/ReConnect ________________
+
+class DisconnectFromCubes(StateNode):
+    def start(self,event=None):
+        super().start(event)
+        self.robot.world.disconnect_from_cubes()
+
+
+class ConnectToCubes(CoroutineNode):
+    def start(self, event=None):
+        super().start(event)
+        self.post_when_complete()
+
+    def coroutine_launcher(self):
+        return self.robot.world.connect_to_cubes()
 
 
 #________________ Action Nodes ________________
