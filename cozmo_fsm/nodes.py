@@ -497,7 +497,7 @@ class CoroutineNode(StateNode):
         super().__init__()
         self.handle = None
 
-    def start(self,event=None):
+    def start(self, event=None):
         super().start(event)
         cor = self.coroutine_launcher()
         if inspect.iscoroutine(cor):

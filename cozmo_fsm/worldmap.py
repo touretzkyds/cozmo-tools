@@ -335,17 +335,23 @@ class DoorwayObj(WorldObject):
 
 
 class RoomObj(WorldObject):
-    def __init__(self, x, y, name, points=np.resize(np.array([0,0,0,1]),(4,4)).transpose()):
+    def __init__(self, name,
+                 points=np.resize(np.array([0,0,0,1]),(4,4)).transpose(),
+                 floor=1, door_ids=[], connections=[]):
         "points should be four points in homogeneous coordinates forming a convex polygon"
         id = 'Room-' + name
-        super().__init__(id,x,y)
         self.name = name
+        x,y,z,s = points.mean(1)
+        super().__init__(id,x,y)
         self.points = points
+        self.floor = floor
+        self.door_ids = door_ids
+        self.connections = connections
         self.is_obstacle = False
         self.is_fixed = True
 
     def __repr__(self):
-        return '<Room %s>' % self.name
+        return '<Room %s: (%.1f,%.1f) floor=%s>' % (self.name, self.x, self.y, self.floor)
 
 
 class ChipObj(WorldObject):
