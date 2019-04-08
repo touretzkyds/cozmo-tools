@@ -761,10 +761,10 @@ class DriveArc(DriveWheels):
             self.post_completion()
 
 
-#________________ Cube Disconnect/ReConnect ________________
+#________________ Cube Disconnect/Reconnect ________________
 
 class DisconnectFromCubes(StateNode):
-    def start(self,event=None):
+    def start(self, event=None):
         super().start(event)
         self.robot.world.disconnect_from_cubes()
 

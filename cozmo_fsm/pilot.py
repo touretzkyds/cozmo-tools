@@ -35,10 +35,11 @@ class ParentPilotEvent(StateNode):
 #---------------- PilotToPose ----------------
 
 class PilotToPose(StateNode):
-    def __init__(self, target_pose=None, verbose=False):
+    def __init__(self, target_pose=None, verbose=False, max_iter=RRT.DEFAULT_MAX_ITER):
         super().__init__()
         self.target_pose = target_pose
         self.verbose = verbose
+        self.max_iter = max_iter
 
     class PilotPlanner(StateNode):
         def planner(self,start_node,goal_node):
@@ -103,9 +104,10 @@ class PilotToPose(StateNode):
         planner: PilotPlanner() =D=> driver
         planner =F=> pfail
         
-        driver: DriveContinuous() =C=> pcomp: ParentCompletes()
+        driver: DriveContinuous() =C=> pcomp
         driver =F=> pfail
 
+        pcomp: ParentCompletes()
         pfail: ParentFails()
         """
 
@@ -131,6 +133,10 @@ class PilotToPose(StateNode):
         dtransC = CompletionTrans().set_name(my_name+"_completion")
         dtransC.add_sources(driver)
         dtransC.add_destinations(pcomp)
+
+    def start(self):
+        self.robot.world.rrt.max_iter = self.max_iter
+        super().start(self)
 
 class PilotPushToPose(PilotToPose):
     def __init__(self,pose):

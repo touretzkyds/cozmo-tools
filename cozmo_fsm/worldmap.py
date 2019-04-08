@@ -8,10 +8,10 @@ from cozmo.util import Pose
 from . import evbase
 from . import transform
 from . import custom_objs
-from .transform import wrap_angle, quat2rot
+from .transform import wrap_angle, quat2rot, quaternion_to_euler_angle
 
 import math
-import numpy
+import numpy as np
 
 ORIENTATION_UPRIGHT = 'upright'
 ORIENTATION_INVERTED = 'inverted'
@@ -21,36 +21,17 @@ ORIENTATION_LEFT = 'left'
 ORIENTATION_RIGHT = 'right'
 
 
-def quaternion_to_euler_angle(quaternion):
-    # source: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
-    w, x, y, z = quaternion
-    t0 = +2.0 * (w * x + y * z)
-    t1 = +1.0 - 2.0 * (x * x + y * y)
-    X = math.atan2(t0, t1)
-
-    t2 = +2.0 * (w * y - z * x)
-    t2 = +1.0 if t2 > +1.0 else t2
-    t2 = -1.0 if t2 < -1.0 else t2
-    Y = math.asin(t2)
-
-    t3 = +2.0 * (w * z + x * y)
-    t4 = +1.0 - 2.0 * (y * y + z * z)
-    Z = math.atan2(t3, t4)
-
-    return X, Y, Z
-
-
 def get_orientation_state(quaternion, isPlanar=False):
     q0, q1, q2, q3 = quaternion
     mat_arr = quat2rot(q0, q1, q2, q3)
-    z_vec = numpy.array([0, 0, 1, 1])
+    z_vec = np.array([0, 0, 1, 1])
     z_dot = mat_arr.dot(z_vec)[:3]
-    dot_product = numpy.round(z_dot.dot(numpy.array([0, 0, 1])), decimals=2)
+    dot_product = np.round(z_dot.dot(np.array([0, 0, 1])), decimals=2)
     x, y, z = quaternion_to_euler_angle(quaternion)
     if isPlanar:
         perpendicular = True if -0.5 < y < 0.5 else False
         if not perpendicular:
-            dot_product = numpy.round(z_dot.dot(numpy.array([1, 0, 0])), decimals=2)
+            dot_product = np.round(z_dot.dot(np.array([1, 0, 0])), decimals=2)
             x, y, z = quaternion_to_euler_angle([q0, q2, q3, q1])
             x = -y if x>0 else y+math.pi
             x = x if x < math.pi else (x - 2*math.pi)
@@ -112,7 +93,6 @@ class LightCubeObj(WorldObject):
         # self.theta = theta
         self.size = self.light_cube_size
         self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
-
 
     @property
     def is_visible(self):
@@ -355,7 +335,8 @@ class DoorwayObj(WorldObject):
 
 
 class RoomObj(WorldObject):
-    def __init__(self,x,y,name,points):
+    def __init__(self, x, y, name, points=np.resize(np.array([0,0,0,1]),(4,4)).transpose()):
+        "points should be four points in homogeneous coordinates forming a convex polygon"
         id = 'Room-' + name
         super().__init__(id,x,y)
         self.name = name
