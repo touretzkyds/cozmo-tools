@@ -76,7 +76,7 @@ class StateMachineProgram(StateNode):
             asyncio.ensure_future(cor)
         self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
         time.sleep(0.25)  # need time for custom objects to be transmitted
-        
+
         self.kine_class = kine_class
 
         self.windowName = None
@@ -163,7 +163,7 @@ class StateMachineProgram(StateNode):
             cv2.startWindowThread()
             # Display a dummy image to prevent glibc complaints when a camera
             # image doesn't arrive quickly enough after the window opens.
-            dummy = numpy.array([[0]])
+            dummy = numpy.array([[0]], numpy.int8)
             cv2.imshow(self.windowName,dummy)
             cv2.waitKey(1)
         else:
@@ -234,7 +234,7 @@ class StateMachineProgram(StateNode):
         else:
             for child in node.children.values():
                 self.run_picked_up_handler(child)
-            
+
     def robot_put_down(self):
         print('** Robot was put down.')
         pf = self.robot.world.particle_filter
@@ -272,7 +272,7 @@ class StateMachineProgram(StateNode):
                     wcube.pose_confidence = -1
                     cube.movement_start_time = None
                     print('Invalidating pose of', wcube)
-                    
+
         # Update robot kinematic description
         self.robot.kine.get_pose()
 
