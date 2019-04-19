@@ -51,7 +51,9 @@ class GoalCollides(RRTException): pass
 class MaxIterations(RRTException): pass
 
 class RRT():
-    def __init__(self, robot, max_iter=2000, step_size=10, arc_radius=40,
+    DEFAULT_MAX_ITER = 2000
+
+    def __init__(self, robot, max_iter=DEFAULT_MAX_ITER, step_size=10, arc_radius=40,
                  xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
@@ -504,7 +506,6 @@ class RRT():
                           orient=wall.theta )
             r.obstacle = wall
             obst.append(r)
-        print('wall obst:',obst)
         return obst
 
     def generate_cube_obstacle(self,obj):
