@@ -69,6 +69,8 @@ class StateMachineProgram(StateNode):
         if not hasattr(self.robot, 'erouter'):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
+        else:
+            self.robot.erouter.clear()
 
         # Reset custom objects
         cor = self.robot.world.undefine_all_custom_marker_objects()
