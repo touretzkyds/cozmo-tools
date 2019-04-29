@@ -19,6 +19,7 @@ import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees
 
 from . import opengl
+from .worldmap import ArucoMarkerObj
 
 REDISPLAY = True   # toggle this to suspend constant redisplay
 WINDOW = None
@@ -150,7 +151,10 @@ class ParticleViewer():
         if not landmarks: return
         # Extract keys and values as quickly as we can because
         # dictionary can change while we're iterating.
-        for (id,specs) in list(landmarks.items()):
+        arucos = [(marker.id, (np.array([[marker.x], [marker.y]]), marker.theta, None))
+                  for marker in self.robot.world.world_map.objects.values()
+                  if isinstance(marker, ArucoMarkerObj)]
+        for (id,specs) in list(landmarks.items()) + arucos:
             if not isinstance(id,str):
                 raise TypeError("Landmark id's must be strings: %r" % id)
             color = None
@@ -247,7 +251,8 @@ class ParticleViewer():
         ellipse_color = (color[1], color[2], color[0], 1)
         self.draw_particle_landmark_ellipse(lm_mu, lm_sigma, ellipse_color)
 
-    def draw_particle_landmark_ellipse(self,coords,sigma,color):
+    def draw_particle_landmark_ellipse(self, coords, sigma, color):
+        if sigma is None: return   # Arucos that are not solo landmarks
         (w,v) = np.linalg.eigh(sigma[0:2,0:2])
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse(coords, abs(w)**0.5, alpha*(180/pi), color=color)

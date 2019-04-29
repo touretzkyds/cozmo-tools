@@ -301,7 +301,7 @@ class WallObj(WorldObject):
             return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s%s>' % \
                 (self.id, self.x, self.y, self.theta*180/pi, self.length, fix, vis)
         else:
-            return '<WallObj %s: position unknoown>' % self.id
+            return '<WallObj %s: position unknown>' % self.id
 
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
@@ -325,6 +325,7 @@ class DoorwayObj(WorldObject):
             self.x = (self.y - b) / m
         else:
             self.x = self.wall.x
+        self.pose_confidence = self.wall.pose_confidence
 
     def __repr__(self):
         if self.pose_confidence >= 0:
@@ -507,7 +508,7 @@ class WorldMap():
             else:
                 if face in self.robot.world.world_map.objects:
                     del  self.robot.world.world_map.objects[face]
-        self.update_arucos()
+        self.update_aruco_landmarks()
         self.update_walls()
         self.update_doorways()
         self.update_perched_cameras()
@@ -571,14 +572,14 @@ class WorldMap():
             wmobject.orientation, _, _, wmobject.theta = get_orientation_state(charger.pose.rotation.q0_q1_q2_q3)
         return wmobject
 
-    def update_arucos(self):
+    def update_aruco_landmarks(self):
         try:
             seen_marker_objects = self.robot.world.aruco.seen_marker_objects.copy()
         except:
             return
         aruco_parent = self.robot.world.aruco
         for (key,value) in seen_marker_objects.items():
-            marker_id = 'Aruco-' + str(key)
+            marker_id = value.id_string
             wmobject = self.objects.get(marker_id, None)
             if wmobject is None:
                 # TODO: wait to see marker several times before adding.
@@ -640,9 +641,8 @@ class WorldMap():
                 spec = wall_marker_dict.get(wall.id, None)
                 if spec is None: return
                 for key,value in spec.marker_specs.items():
-                    marker_id = 'Aruco-' + str(key)
-                    if marker_id in self.robot.world.world_map.objects:
-                        aruco_marker = self.robot.world.world_map.objects[marker_id]
+                    if key in self.robot.world.world_map.objects:
+                        aruco_marker = self.robot.world.world_map.objects[key]
                         dir = value[0]    # +1 for front side or -1 for back side
                         s = 0 if dir == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
@@ -656,7 +656,6 @@ class WorldMap():
         for key,value in self.robot.world.world_map.objects.items():
             if isinstance(key,str) and  'Doorway' in key:
                 value.update()
-
 
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."

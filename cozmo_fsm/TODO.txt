@@ -1,11 +1,30 @@
-Remove arucos from particle landmark lists if the aruco is part of a wall.
-No need to maintain separate mu/sigma info for wall arucos.
-Should still allow single arucos to be used as landmarks if they
-are not part of a weall definition.
+Remove arucos from particle landmark lists if the aruco is part of a
+wall.  No need to maintain separate mu/sigma info for wall arucos.
+Should still allow solo arucos to be used as landmarks if they are not
+part of a wall definition.
 
 This will speed up the particle filter because we won't be calling
-process_landmark on all the wall arucos.
+process_landmark on all the wall arucos for every particle.
 
+**** Current bug: if we kidnap the robot so pf state is 'lost',
+make_particles_from_landmarks is punting because it only looks for
+solo aruco landmarks now; doesn't construct walls.
+
+
+================================================================
+
+Bug: If we see markers 43 and 44 we create Wall-43.  If we then pick
+up the robot so it delocalizes, and put it down so that it only sees
+marker 45, it will not add the marker or re-localize, even though
+it should know where it is because marker 45 gives it its
+position with respect to Wall-43.
+
+================================================================
+
+Should replace integer Aruco marker ids with 'Aruco-###' strings
+throughout.
+
+================================================================
 
 Intersection of two line segments needed for path planner:
 https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
