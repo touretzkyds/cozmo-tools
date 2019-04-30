@@ -1112,7 +1112,7 @@ class SLAMParticleFilter(ParticleFilter):
         good_markers = []
         for marker in seen_marker_objects.values():
             if marker.id_string in self.robot.world.world_map.objects or \
-               self.candidate_arucos.get(marker.id_string,-1) > 5:
+               self.sensor_model.candidate_arucos.get(marker.id_string,-1) > 5:
                 good_markers.append(marker.id)
         walls = self.sensor_model.generate_walls_from_markers(seen_marker_objects, good_markers)
         for wall in walls:
