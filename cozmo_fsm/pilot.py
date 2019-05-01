@@ -7,8 +7,12 @@ from .base import *
 from .rrt import *
 from .nodes import ParentFails, ParentCompletes, DriveArc, DriveContinuous
 from .events import PilotEvent
-from .transitions import CompletionTrans, FailureTrans, DataTrans
+from .transitions import CompletionTrans, FailureTrans, SuccessTrans, DataTrans
 from .cozmo_kin import wheelbase, center_of_rotation_offset
+from .worldmap import DoorwayObj
+from .transform import segment_intersect_test
+from .doorpass import DoorPass
+from .pilot0 import *
 
 from cozmo.util import distance_mm, speed_mmps
 
@@ -32,6 +36,57 @@ class ParentPilotEvent(StateNode):
             raise TypeError("ParentPilotEvent must be invoked with a PilotEvent, not %s" % event)
         self.parent.post_event(PilotEvent(event.status))
 
+#---------------- Navigation Plan ----------------
+
+class NavStep():
+    DRIVE = "drive"
+    DOORPASS = "doorpass"
+
+    def __init__(self, type, param):
+        self.type = type
+        self.param = param
+
+    def __repr__(self):
+        return '<NavStep %s %.30s>' % (self.type, repr(self.param))
+
+
+class NavPlan():
+    def __init__(self, steps=[]):
+        self.steps = steps
+
+    @staticmethod
+    def intersects_doorway(p1, p2, doorways):
+        print('p1=',p1,'p2=',p2)
+        for door in doorways:
+            if segment_intersect_test(p1, p2, door[1][0], door[1][1]):
+                return door[0]
+        return None
+
+    @staticmethod
+    def from_path(path, doorways):
+        steps = []
+        door = None
+        pt1 = path[0]
+        for i in range(1, len(path)):
+            pt2 = path[i]
+            door = NavPlan.intersects_doorway(pt1,pt2,doorways)
+            if door:
+                i -= 1
+                break
+            pt1 = pt2
+        new_path = path[0:i+1]
+        step1 = NavStep(NavStep.DRIVE, new_path)
+        steps.append(step1)
+        if door:
+            step2 = NavStep(NavStep.DOORPASS, door)
+            steps.append(step2)
+        plan = NavPlan(steps)
+        return plan
+
+    def __repr__(self):
+        steps = [s.type if s.type == NavStep.DRIVE else s.param for s in self.steps]
+        return '<NavPlan %s>' % repr(steps)
+
 #---------------- PilotToPose ----------------
 
 class PilotToPose(StateNode):
@@ -40,6 +95,10 @@ class PilotToPose(StateNode):
         self.target_pose = target_pose
         self.verbose = verbose
         self.max_iter = max_iter
+
+    def start(self, event=None):
+        self.robot.world.rrt.max_iter = self.max_iter
+        super().start(self)
 
     class PilotPlanner(StateNode):
         def planner(self,start_node,goal_node):
@@ -95,48 +154,141 @@ class PilotToPose(StateNode):
             if self.parent.verbose:
                 print('cpath =', cpath)
 
-            self.post_data(cpath)
+            doors = self.generate_doorway_list()
+            navplan = NavPlan.from_path(cpath, doors)
+            self.post_data(navplan)
+
+        def generate_doorway_list(self):
+            doorways = []
+            for (key,obj) in self.robot.world.world_map.objects.items():
+                if isinstance(obj,DoorwayObj):
+                    w = obj.door_width
+                    dx = w * sin(obj.theta)
+                    dy = w * cos(obj.theta)
+                    doorways.append((key, ((obj.x-dx, obj.y-dy), (obj.x+dx, obj.y+dy))))
+            return doorways
 
         # ----- End of PilotPlanner -----
 
+    class PilotExecutePlan(StateNode):
+        def start(self, event=None):
+            if not isinstance(event, DataEvent) and isinstance(event.data, NavPlan):
+                raise ValueError(event)
+            self.navplan = event.data
+            self.index = 0
+            super().start(event)
+
+        class DispatchStep(StateNode):
+            def start(self, event=None):
+                super().start(event)
+                step = self.parent.navplan.steps[self.parent.index]
+                print('nav step', step)
+                self.post_event(DataEvent(self,step.type))
+                    
+        class ExecuteDrive(DriveContinuous):
+            def start(self, event=None):
+                step = self.parent.navplan.steps[self.parent.index]
+                print('step',step)
+                super().start(DataEvent(None,step.param))
+
+        class ExecuteDoorPass(DoorPass):
+            def start(self, event=None):
+                step = self.parent.navplan.steps[self.parent.index]
+                super().start(DataEvent(None,step.param))
+
+        class NextStep(StateNode):
+            def start(self, event=None):
+                super().start(event)
+                self.parent.index += 1
+                if self.parent.index < len(self.parent.navplan.steps):
+                    self.post_success()
+                else:
+                    self.post_completion()
+                    
+        def setup(self):
+            """
+                dispatch: self.DispatchStep()
+                dispatch =D(NavStep.DRIVE)=> drive
+                dispatch =D(NavStep.DOORPASS)=> doorpass
+    
+                drive: self.ExecuteDrive()
+                drive =C=> next
+                drive =F=> ParentFails()
+    
+                doorpass: self.ExecuteDoorPass()
+                doorpass =C=> next
+                doorpass =F=> ParentFails()
+    
+                next: self.NextStep()
+                next =S=> dispatch
+                next =C=> ParentCompletes()
+            """
+            
+            # Code generated by genfsm on Wed May  1 05:46:16 2019:
+            
+            dispatch = self.DispatchStep() .set_name("dispatch") .set_parent(self)
+            drive = self.ExecuteDrive() .set_name("drive") .set_parent(self)
+            parentfails1 = ParentFails() .set_name("parentfails1") .set_parent(self)
+            doorpass = self.ExecuteDoorPass() .set_name("doorpass") .set_parent(self)
+            parentfails2 = ParentFails() .set_name("parentfails2") .set_parent(self)
+            next = self.NextStep() .set_name("next") .set_parent(self)
+            parentcompletes1 = ParentCompletes() .set_name("parentcompletes1") .set_parent(self)
+            
+            datatrans1 = DataTrans(NavStep.DRIVE) .set_name("datatrans1")
+            datatrans1 .add_sources(dispatch) .add_destinations(drive)
+            
+            datatrans2 = DataTrans(NavStep.DOORPASS) .set_name("datatrans2")
+            datatrans2 .add_sources(dispatch) .add_destinations(doorpass)
+            
+            completiontrans1 = CompletionTrans() .set_name("completiontrans1")
+            completiontrans1 .add_sources(drive) .add_destinations(next)
+            
+            failuretrans1 = FailureTrans() .set_name("failuretrans1")
+            failuretrans1 .add_sources(drive) .add_destinations(parentfails1)
+            
+            completiontrans2 = CompletionTrans() .set_name("completiontrans2")
+            completiontrans2 .add_sources(doorpass) .add_destinations(next)
+            
+            failuretrans2 = FailureTrans() .set_name("failuretrans2")
+            failuretrans2 .add_sources(doorpass) .add_destinations(parentfails2)
+            
+            successtrans1 = SuccessTrans() .set_name("successtrans1")
+            successtrans1 .add_sources(next) .add_destinations(dispatch)
+            
+            completiontrans3 = CompletionTrans() .set_name("completiontrans3")
+            completiontrans3 .add_sources(next) .add_destinations(parentcompletes1)
+            
+            return self
+
+        # End of PilotExecutePlan
+
     def setup(self):
         """
-        planner: PilotPlanner() =D=> driver
-        planner =F=> pfail
-        
-        driver: DriveContinuous() =C=> pcomp
-        driver =F=> pfail
-
-        pcomp: ParentCompletes()
-        pfail: ParentFails()
+            planner: self.PilotPlanner() =D=> exec
+    
+            exec: self.PilotExecutePlan()
+            exec =C=> ParentCompletes()
+            exec =F=> ParentFails()
         """
+        
+        # Code generated by genfsm on Wed May  1 05:46:16 2019:
+        
+        planner = self.PilotPlanner() .set_name("planner") .set_parent(self)
+        exec = self.PilotExecutePlan() .set_name("exec") .set_parent(self)
+        parentcompletes2 = ParentCompletes() .set_name("parentcompletes2") .set_parent(self)
+        parentfails3 = ParentFails() .set_name("parentfails3") .set_parent(self)
+        
+        datatrans3 = DataTrans() .set_name("datatrans3")
+        datatrans3 .add_sources(planner) .add_destinations(exec)
+        
+        completiontrans4 = CompletionTrans() .set_name("completiontrans4")
+        completiontrans4 .add_sources(exec) .add_destinations(parentcompletes2)
+        
+        failuretrans3 = FailureTrans() .set_name("failuretrans3")
+        failuretrans3 .add_sources(exec) .add_destinations(parentfails3)
+        
+        return self
 
-        # Build a little state machine by hand so we don't have to use genfsm
-        my_name = '_PilotToPose'
-        planner = self.PilotPlanner() .set_name(my_name+"_planner") .set_parent(self)
-        driver = DriveContinuous() .set_name(my_name+"_driver") .set_parent(self)
-        pfail = ParentFails().set_parent(self)
-        pcomp = ParentCompletes().set_parent(self)
-        # Planner fails if collision state or no path found
-        ptransF = FailureTrans().set_name(my_name+"_planfail")
-        ptransF.add_sources(planner)
-        ptransF.add_destinations(pfail)
-        # Planner sends data transition to activate driver
-        ptransD = DataTrans().set_name(my_name+"_data")
-        ptransD.add_sources(planner)
-        ptransD.add_destinations(driver)
-        # Driver will fail if robot is picked up
-        dtransF = FailureTrans().set_name(my_name+"_failure")
-        dtransF.add_sources(driver)
-        dtransF.add_destinations(pfail)
-        # Driver completes if destination reached
-        dtransC = CompletionTrans().set_name(my_name+"_completion")
-        dtransC.add_sources(driver)
-        dtransC.add_destinations(pcomp)
-
-    def start(self):
-        self.robot.world.rrt.max_iter = self.max_iter
-        super().start(self)
 
 class PilotPushToPose(PilotToPose):
     def __init__(self,pose):
@@ -146,27 +298,6 @@ class PilotPushToPose(PilotToPose):
     def planner(self,start_node,goal_node):
         self.robot.world.rrt.step_size=20
         return self.robot.world.rrt.plan_push_chip(start_node,goal_node)
-
-class PilotCheckStart(StateNode):
-    "Fails if rrt planner indicates start_collides"
-
-    def start(self, event=None):
-        super().start(event)
-        (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
-        start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
-        try:
-            self.robot.world.rrt.plan_path(start_node,start_node)
-        except StartCollides as e:
-            print('PilotCheckStart: Start collides!',e)
-            self.post_event(PilotEvent(StartCollides, e.args))
-            self.post_failure()
-            return
-        except Exception as e:
-            print('PilotCheckStart: Unexpected planner exception',e)
-            self.post_failure()
-            return
-        self.post_event(PilotEvent(True))
-        self.post_success()
 
 
 """

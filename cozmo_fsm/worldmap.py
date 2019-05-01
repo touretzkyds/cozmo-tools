@@ -309,6 +309,7 @@ class DoorwayObj(WorldObject):
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall
+        self.door_width = wall.door_width
         self.index = index  # which doorway is this?  0, 1, ...
         self.marker_id = wall.door_ids[index]
         self.is_obstacle = False
@@ -768,6 +769,7 @@ class WorldMap():
                                       z=val[1][0], theta=val[1][2], phi=val[1][1])
 
     def invalidate_poses(self):
+        # *** This medthod is not currently used. ***
         for wmobj in self.robot.world.world_map.objects.values():
             if not wmobj.is_fixed:
                 wmobj.pose_confidence = -1
