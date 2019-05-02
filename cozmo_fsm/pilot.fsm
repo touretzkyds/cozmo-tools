@@ -14,7 +14,7 @@ from .transform import segment_intersect_test
 from .doorpass import DoorPass
 from .pilot0 import *
 
-from cozmo.util import distance_mm, speed_mmps
+from cozmo.util import Pose, distance_mm, radians, degrees, speed_mmps
 
 #---------------- Pilot Exceptions and Events ----------------
 
@@ -224,12 +224,30 @@ class PilotToPose(StateNode):
 
         # End of PilotExecutePlan
 
+    class CheckArrival(StateNode):
+        def start(self, event=None):
+            super().start(event)
+            pf_pose = self.robot.world.particle_filter.pose
+            current_pose = Pose(pf_pose[0], pf_pose[1], 0, angle_z=radians(pf_pose[2]))
+            pose_diff = current_pose - self.parent.target_pose
+            distance = (pose_diff.position.x**2 + pose_diff.position.y**2) ** 0.5
+            MAX_TARGET_DISTANCE = 50.0 # mm
+            if distance <= MAX_TARGET_DISTANCE:
+                self.post_success()
+            else:
+                self.post_failure()
+
+
     $setup{
         planner: self.PilotPlanner() =D=> exec
 
         exec: self.PilotExecutePlan()
-        exec =C=> ParentCompletes()
+        exec =C=> check
         exec =F=> ParentFails()
+
+        check: self.CheckArrival()
+        check =S=> ParentCompletes()
+        check =F=> planner
     }
 
 
