@@ -68,12 +68,17 @@ def translation(t):
 
 def wrap_angle(angle_rads):
     """Keep angle between -pi and pi."""
-    if angle_rads <= -pi:
-        return 2*pi + angle_rads
-    elif angle_rads > pi:
-        return angle_rads - 2*pi
-    else:
-        return angle_rads
+    while angle_rads <= -pi:
+        angle_rads += 2*pi
+    while angle_rads > pi:
+        angle_rads -= 2*pi
+    return angle_rads
+    # if angle_rads <= -pi:
+    #     return 2*pi + angle_rads
+    # elif angle_rads > pi:
+    #     return angle_rads - 2*pi
+    # else:
+    #     return angle_rads
 
 def wrap_selected_angles(angle_rads, index):
     """Keep angle between -pi and pi for list"""

@@ -28,7 +28,7 @@ try:
     from OpenGL.GL import *
     from OpenGL.GLU import *
 except:
-    print('OpenGL not found - cam_viewer')
+    pass
 
 import math
 import random
@@ -327,7 +327,7 @@ class CamViewer():
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
         glutKeyboardUpFunc(self.keyPressedUp)
-        # glutMouseFunc(self.mouseClicked)
+        glutMouseFunc(self.mouseClicked)
         glutPassiveMotionFunc(self.motion)
         glutSpecialFunc(self.specialKeyPressed)
         glutSpecialUpFunc(self.specialKeyUp)
@@ -340,9 +340,9 @@ class CamViewer():
             opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
             CamViewer.prog_start = True
-            # self.reloadFile()
+            self.reloadFile()
             starttime = time.time()
-            # self.robot.set_head_angle(cozmo.util.Angle(0)).wait_for_completed()
+            self.robot.set_head_angle(cozmo.util.Angle(0)).wait_for_completed()
             while not WINDOW:
                 time.sleep(0.1)
 

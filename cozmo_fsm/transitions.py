@@ -31,7 +31,7 @@ class CSFEventBase(Transition):
 
     def handle_event(self,event):
         if not self.running:
-            print('***',self,'got an event while not running!')
+            print('***',self,'got an event ', event, ' while not running!')
             return
         if TRACE.trace_level >= TRACE.listener_invocation:
             print('TRACE%d: %s is handling %s' %

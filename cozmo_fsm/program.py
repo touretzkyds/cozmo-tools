@@ -46,8 +46,9 @@ class StateMachineProgram(StateNode):
 
                  aruco = True,
                  arucolibname = cv2.aruco.DICT_4X4_100,
-                 aruco_marker_size = 50,
-                 perched_cameras =True,
+                 aruco_marker_size = ARUCO_MARKER_SIZE,
+
+                 perched_cameras = False,
 
                  world_map = None,
                  worldmap_viewer = False,
@@ -76,7 +77,7 @@ class StateMachineProgram(StateNode):
             asyncio.ensure_future(cor)
         self.robot.loop.create_task(custom_objs.declare_objects(self.robot))
         time.sleep(0.25)  # need time for custom objects to be transmitted
-        
+
         self.kine_class = kine_class
 
         self.cam_viewer = cam_viewer
@@ -158,7 +159,14 @@ class StateMachineProgram(StateNode):
 
         # Launch viewers
         if self.cam_viewer:
-            self.viewer = True
+            self.windowName = self.name
+            cv2.namedWindow(self.windowName)
+            cv2.startWindowThread()
+            # Display a dummy image to prevent glibc complaints when a camera
+            # image doesn't arrive quickly enough after the window opens.
+            dummy = numpy.array([[0]], numpy.int8)
+            cv2.imshow(self.windowName,dummy)
+            cv2.waitKey(1)
         else:
             self.viewer = None
 
@@ -227,11 +235,11 @@ class StateMachineProgram(StateNode):
         else:
             for child in node.children.values():
                 self.run_picked_up_handler(child)
-            
+
     def robot_put_down(self):
         print('** Robot was put down.')
         pf = self.robot.world.particle_filter
-        pf.initializer.initialize(self.robot)
+        pf.delocalize()
 
     def stop(self):
         super().stop()
@@ -261,8 +269,8 @@ class StateMachineProgram(StateNode):
                     wcube = self.robot.world.world_map.objects[cube]
                     wcube.pose_confidence = -1
                     cube.movement_start_time = None
-                    print('Invalidating pose of ', wcube)
-                    
+                    print('Invalidating pose of', wcube)
+
         # Update robot kinematic description
         self.robot.kine.get_pose()
 
@@ -332,12 +340,10 @@ class StateMachineProgram(StateNode):
             annotated_im = self.user_annotate(annotated_im)
             # Done with annotation
             annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
-            if self.viewer:
-                # wo_ann = cv2.resize(numpy.array(event.image.raw_image), (640, 480))
-                # CamViewer.incom_image = annotated_im
-                self.viewer = CamViewer(self.robot)
-                if not self.viewer.prog_start:
-                    self.viewer.start()
+            if self.windowName:
+                if True: # os.name == 'nt':
+                    cv2.waitKey(1)
+                cv2.imshow(self.windowName, annotated_im)
 
         # Use this heartbeat signal to look for new landmarks
         pf = self.robot.world.particle_filter

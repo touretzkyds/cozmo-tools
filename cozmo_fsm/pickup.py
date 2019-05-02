@@ -5,22 +5,26 @@ from .nodes import *
 from .transitions import *
 from .transform import wrap_angle, line_equation, line_intersection
 from .cozmo_kin import center_of_rotation_offset
-from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, InvalidPose
-from .worldmap import LightCubeObj
+from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, GoalCollides, MaxIterations, InvalidPose
+from .worldmap import LightCubeObj, get_orientation_state
+from .worldmap import ORIENTATION_UPRIGHT, ORIENTATION_INVERTED, ORIENTATION_SIDEWAYS, ORIENTATION_TILTED
 from .doorpass import WallPilotToPose
 from .trace import tracefsm
 
 from math import sin, cos, atan2, pi, sqrt
 
+
 class GoToCube(StateNode):
     def __init__(self, cube=None):
         self.object = cube
         super().__init__()
+        self.side_index = 0
+        self.try_number = 0
 
     def start(self, event=None):
         # self.object will normally be set up by the parent of this node
         if isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -39,28 +43,60 @@ class GoToCube(StateNode):
         "*** BUG: This code is only correct for upright cubes"
         cube = self.object
         if use_world_map:
-            wobj = self.robot.world.world_map.objects[cube] 
-            x = wobj.x
-            y = wobj.y
-            ang = wobj.theta
+            wmobj = self.object.wm_obj
+            x = wmobj.x
+            y = wmobj.y
+
+            # bug: ang =\= wmobj.theta, why?
+            ang = wmobj.theta
+
+            orientation = wmobj.orientation
+            print('Pick side from', self.object.wm_obj)
         else:
             x = cube.pose.position.x
             y = cube.pose.position.y
             ang = cube.pose.rotation.angle_z.radians
+            orientation, _, _, z = get_orientation_state(cube.pose.rotation.q0_q1_q2_q3)
+            if orientation == ORIENTATION_SIDEWAYS:
+                ang = wrap_angle(z)
         (rx, ry, rtheta) = self.get_robot_cor(use_world_map=use_world_map)
         dist = LightCubeObj.light_cube_size[0]/2 + offset
         side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
-        side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)        ]
-        side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
-        side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
-        sides = (side1, side2, side3, side4)
+        if use_world_map:
+            side1 = [ (x + cos(wrap_angle(wmobj.theta))*dist), (y + sin(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta + pi)   ]
+            side2 = [ (x - cos(wrap_angle(wmobj.theta))*dist), (y - sin(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta)]
+            side3 = [ (x + sin(wrap_angle(wmobj.theta))*dist), (y - cos(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta + pi/2) ]
+            side4 = [ (x - sin(wrap_angle(wmobj.theta))*dist), (y + cos(wrap_angle(wmobj.theta))*dist), wrap_angle(wmobj.theta - pi/2) ]
+        else:
+            side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
+            side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)    ]
+            side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
+            side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
+        # sides = (side1, side2, side3, side4)
+        sides = (side2, side3, side1, side4)
+
+        # if the orientation is sideways, only one valid side to pickup cube
+        if orientation == ORIENTATION_SIDEWAYS:
+            self.try_number = 3
+            side = side2
+            d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
+            print('  side 0: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
+                  (d, side[0], side[1], side[2]*180/math.pi))
+            return side
+
         sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
+
         for i in range(4):
-            side = sorted_sides[i]
+            side = sides[i]
             d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
             print('  side %d: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
                   (i, d, side[0], side[1], side[2]*180/pi))
-        return sorted_sides[0]
+
+        if self.try_number == 0:
+            # initialize first try side index as the closest one
+            self.side_index = sides.index(sorted_sides[0])
+        print('Go to side %i' %self.side_index)
+        return sides[self.side_index]
 
     def get_robot_pose(self, use_world_map):
         if use_world_map:
@@ -181,7 +217,16 @@ class GoToCube(StateNode):
             (dist, relative_angle) = self.parent.measure_dockedness(side,True)
             max_distance_from_dock_point = 150 # millimeters
             max_angle_from_dock_heading = 10 # degrees
-            if dist < max_distance_from_dock_point:
+
+            if isinstance(cube, LightCube):
+                orientation = cube.wm_obj.orientation
+            elif isinstance(cube, LightCubeObj):
+                orientation = cube.sdk_obj.orientation
+
+            if orientation == ORIENTATION_SIDEWAYS:
+                print(orientation)
+                self.post_failure()
+            elif dist < max_distance_from_dock_point:
                 if relative_angle < max_angle_from_dock_heading and cube.is_visible:
                     print('CheckAlmostDocked is satisfied.  dist=%.1f mm  angle=%.1f deg.' %
                           (dist, relative_angle))
@@ -283,7 +328,7 @@ class GoToCube(StateNode):
                         print('ManualDock1: Alignment is close enough.')
                         super().start(event)
                         return
-             
+
     class ManualDock2(Turn):
         def start(self,event=None):
             (rx,ry,rtheta) = self.parent.get_robot_cor(use_world_map=True)
@@ -303,13 +348,32 @@ class GoToCube(StateNode):
             self.parent.wmobject.pose_confidence = -1
 
 
+    class TryAllSides(StateNode):
+        def __init__(self):
+            super().__init__()
+
+        def start(self, event=None):
+            super().start(event)
+            if self.parent.try_number > 2:
+                # Have tried all 4 sides, reset counter
+                print('Have tried all sides.')
+                self.parent.try_number = 0
+                self.parent.side_index = 0
+                self.post_success()
+            else:
+                self.parent.try_number += 1
+                self.parent.side_index = (self.parent.side_index + 1) % 4
+                self.post_failure()
+                print('Haven\'t tired out all sides of cube. Going to try the side', self.parent.side_index)
+
+
     def setup(self):
         """
             # GoToCube machine
-            
+    
             droplift: SetLiftHeight(0)
-            droplift =C=> {looker, waitlift}
-            droplift =F=> {looker, waitlift}   # lift motion will fail if on charger
+            droplift =C=> Print('droplift succeeded') =N=> {looker, waitlift}
+            droplift =F=> Print('droplift failed') =N=> {looker, waitlift}   # lift motion fails if on charger
     
             looker: LookAtObject()
     
@@ -341,6 +405,8 @@ class GoToCube(StateNode):
             pilot_check_start2 =F=> failure
     
             go_side: self.PilotToSide()
+            go_side =PILOT(GoalCollides)=> failure
+            go_side =PILOT(MaxIterations)=> failure
             go_side =PILOT=> go_side_pilot: ParentPilotEvent()
             go_side =F=> failure
             go_side =C=> self.ReportPosition('go_side_deccel')
@@ -363,7 +429,7 @@ class GoToCube(StateNode):
             turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
             turn_to_cube2 =C=> forward_to_cube2
     
-            forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3        
+            forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3
     
             turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
             turn_to_cube3 =C=> forward_to_cube3
@@ -372,29 +438,35 @@ class GoToCube(StateNode):
     
             success: Print('GoToSide has succeeded.') =N=> ParentCompletes()
     
-            failure: Print('GoToSide has failed.') =N=> ParentFails()
+            failure: Print('GoToSide has failed.') =N=> try_all_sides
+    
+            try_all_sides: self.TryAllSides()
+            try_all_sides =S=> ParentFails()
+            try_all_sides =F=> droplift
         """
         
-        # Code generated by genfsm on Thu Jun 14 20:36:10 2018:
+        # Code generated by genfsm on Wed Mar  6 12:38:46 2019:
         
         droplift = SetLiftHeight(0) .set_name("droplift") .set_parent(self)
+        print1 = Print('droplift succeeded') .set_name("print1") .set_parent(self)
+        print2 = Print('droplift failed') .set_name("print2") .set_parent(self)
         looker = LookAtObject() .set_name("looker") .set_parent(self)
         waitlift = StateNode() .set_name("waitlift") .set_parent(self)
         check_almost_docked = self.CheckAlmostDocked() .set_name("check_almost_docked") .set_parent(self)
         manual_dock1 = self.ManualDock1() .set_name("manual_dock1") .set_parent(self)
         turn1 = Turn() .set_name("turn1") .set_parent(self)
-        print1 = Print('turned. wait...') .set_name("print1") .set_parent(self)
-        print2 = Print('wait...') .set_name("print2") .set_parent(self)
-        print3 = Print('Cannot manual dock from here') .set_name("print3") .set_parent(self)
-        manual_dock2 = self.ManualDock2() .set_name("manual_dock2") .set_parent(self)
+        print3 = Print('turned. wait...') .set_name("print3") .set_parent(self)
         print4 = Print('wait...') .set_name("print4") .set_parent(self)
+        print5 = Print('Cannot manual dock from here') .set_name("print5") .set_parent(self)
+        manual_dock2 = self.ManualDock2() .set_name("manual_dock2") .set_parent(self)
+        print6 = Print('wait...') .set_name("print6") .set_parent(self)
         pilot_check_start = PilotCheckStart() .set_name("pilot_check_start") .set_parent(self)
-        print5 = Print('Start collision check passed.') .set_name("print5") .set_parent(self)
-        print6 = Print('Backing up to escape start collision...') .set_name("print6") .set_parent(self)
+        print7 = Print('Start collision check passed.') .set_name("print7") .set_parent(self)
+        print8 = Print('Backing up to escape start collision...') .set_name("print8") .set_parent(self)
         forward1 = Forward(-80) .set_name("forward1") .set_parent(self)
         statenode1 = StateNode() .set_name("statenode1") .set_parent(self)
         pilot_check_start2 = PilotCheckStart() .set_name("pilot_check_start2") .set_parent(self)
-        print7 = Print('Start collision re-check passed.') .set_name("print7") .set_parent(self)
+        print9 = Print('Start collision re-check passed.') .set_name("print9") .set_parent(self)
         check_start2_pilot = ParentPilotEvent() .set_name("check_start2_pilot") .set_parent(self)
         go_side = self.PilotToSide() .set_name("go_side") .set_parent(self)
         go_side_pilot = ParentPilotEvent() .set_name("go_side_pilot") .set_parent(self)
@@ -403,19 +475,19 @@ class GoToCube(StateNode):
         turn_to_cube1 = self.TurnToCube(check_vis=True) .set_name("turn_to_cube1") .set_parent(self)
         reportposition3 = self.ReportPosition('turn_to_cube1_deccel') .set_name("reportposition3") .set_parent(self)
         reportposition4 = self.ReportPosition('turn_to_cube1_stopped') .set_name("reportposition4") .set_parent(self)
-        print8 = Print('wait to approach...') .set_name("print8") .set_parent(self)
+        print10 = Print('wait to approach...') .set_name("print10") .set_parent(self)
         forward2 = Forward(-50) .set_name("forward2") .set_parent(self)
         statenode2 = StateNode() .set_name("statenode2") .set_parent(self)
         approach = self.ForwardToCube(60) .set_name("approach") .set_parent(self)
         statenode3 = StateNode() .set_name("statenode3") .set_parent(self)
         reportposition5 = self.ReportPosition('approach') .set_name("reportposition5") .set_parent(self)
         reportposition6 = self.ReportPosition('approach') .set_name("reportposition6") .set_parent(self)
-        print9 = Print('wait...') .set_name("print9") .set_parent(self)
+        print11 = Print('wait...') .set_name("print11") .set_parent(self)
         turn_to_cube_1a = self.TurnToCube(check_vis=False) .set_name("turn_to_cube_1a") .set_parent(self)
-        print10 = Print('wait...') .set_name("print10") .set_parent(self)
+        print12 = Print('wait...') .set_name("print12") .set_parent(self)
         forward_to_cube_1a = self.ForwardToCube(15) .set_name("forward_to_cube_1a") .set_parent(self)
         turn_to_cube2 = self.TurnToCube(check_vis=True) .set_name("turn_to_cube2") .set_parent(self)
-        print11 = Print("TurnToCube2: Cube Lost") .set_name("print11") .set_parent(self)
+        print13 = Print("TurnToCube2: Cube Lost") .set_name("print13") .set_parent(self)
         invalidatepose1 = self.InvalidatePose() .set_name("invalidatepose1") .set_parent(self)
         forward_to_cube2 = self.ForwardToCube(60) .set_name("forward_to_cube2") .set_parent(self)
         turn_to_cube3 = self.TurnToCube(check_vis=False) .set_name("turn_to_cube3") .set_parent(self)
@@ -423,13 +495,20 @@ class GoToCube(StateNode):
         success = Print('GoToSide has succeeded.') .set_name("success") .set_parent(self)
         parentcompletes1 = ParentCompletes() .set_name("parentcompletes1") .set_parent(self)
         failure = Print('GoToSide has failed.') .set_name("failure") .set_parent(self)
+        try_all_sides = self.TryAllSides() .set_name("try_all_sides") .set_parent(self)
         parentfails1 = ParentFails() .set_name("parentfails1") .set_parent(self)
         
         completiontrans1 = CompletionTrans() .set_name("completiontrans1")
-        completiontrans1 .add_sources(droplift) .add_destinations(looker,waitlift)
+        completiontrans1 .add_sources(droplift) .add_destinations(print1)
+        
+        nulltrans1 = NullTrans() .set_name("nulltrans1")
+        nulltrans1 .add_sources(print1) .add_destinations(looker,waitlift)
         
         failuretrans1 = FailureTrans() .set_name("failuretrans1")
-        failuretrans1 .add_sources(droplift) .add_destinations(looker,waitlift)
+        failuretrans1 .add_sources(droplift) .add_destinations(print2)
+        
+        nulltrans2 = NullTrans() .set_name("nulltrans2")
+        nulltrans2 .add_sources(print2) .add_destinations(looker,waitlift)
         
         timertrans1 = TimerTrans(1) .set_name("timertrans1")
         timertrans1 .add_sources(waitlift) .add_destinations(check_almost_docked)
@@ -447,40 +526,40 @@ class GoToCube(StateNode):
         datatrans1 .add_sources(manual_dock1) .add_destinations(turn1)
         
         completiontrans3 = CompletionTrans() .set_name("completiontrans3")
-        completiontrans3 .add_sources(turn1) .add_destinations(print1)
-        
-        nulltrans1 = NullTrans() .set_name("nulltrans1")
-        nulltrans1 .add_sources(print1) .add_destinations(manual_dock1)
-        
-        completiontrans4 = CompletionTrans() .set_name("completiontrans4")
-        completiontrans4 .add_sources(manual_dock1) .add_destinations(print2)
-        
-        nulltrans2 = NullTrans() .set_name("nulltrans2")
-        nulltrans2 .add_sources(print2) .add_destinations(manual_dock2)
-        
-        timertrans2 = TimerTrans(10) .set_name("timertrans2")
-        timertrans2 .add_sources(manual_dock1) .add_destinations(print3)
+        completiontrans3 .add_sources(turn1) .add_destinations(print3)
         
         nulltrans3 = NullTrans() .set_name("nulltrans3")
-        nulltrans3 .add_sources(print3) .add_destinations(pilot_check_start)
+        nulltrans3 .add_sources(print3) .add_destinations(manual_dock1)
         
-        completiontrans5 = CompletionTrans() .set_name("completiontrans5")
-        completiontrans5 .add_sources(manual_dock2) .add_destinations(print4)
+        completiontrans4 = CompletionTrans() .set_name("completiontrans4")
+        completiontrans4 .add_sources(manual_dock1) .add_destinations(print4)
         
         nulltrans4 = NullTrans() .set_name("nulltrans4")
-        nulltrans4 .add_sources(print4) .add_destinations(turn_to_cube1)
+        nulltrans4 .add_sources(print4) .add_destinations(manual_dock2)
         
-        successtrans2 = SuccessTrans() .set_name("successtrans2")
-        successtrans2 .add_sources(pilot_check_start) .add_destinations(print5)
+        timertrans2 = TimerTrans(10) .set_name("timertrans2")
+        timertrans2 .add_sources(manual_dock1) .add_destinations(print5)
         
         nulltrans5 = NullTrans() .set_name("nulltrans5")
-        nulltrans5 .add_sources(print5) .add_destinations(go_side)
+        nulltrans5 .add_sources(print5) .add_destinations(pilot_check_start)
         
-        failuretrans3 = FailureTrans() .set_name("failuretrans3")
-        failuretrans3 .add_sources(pilot_check_start) .add_destinations(print6)
+        completiontrans5 = CompletionTrans() .set_name("completiontrans5")
+        completiontrans5 .add_sources(manual_dock2) .add_destinations(print6)
         
         nulltrans6 = NullTrans() .set_name("nulltrans6")
-        nulltrans6 .add_sources(print6) .add_destinations(forward1)
+        nulltrans6 .add_sources(print6) .add_destinations(turn_to_cube1)
+        
+        successtrans2 = SuccessTrans() .set_name("successtrans2")
+        successtrans2 .add_sources(pilot_check_start) .add_destinations(print7)
+        
+        nulltrans7 = NullTrans() .set_name("nulltrans7")
+        nulltrans7 .add_sources(print7) .add_destinations(go_side)
+        
+        failuretrans3 = FailureTrans() .set_name("failuretrans3")
+        failuretrans3 .add_sources(pilot_check_start) .add_destinations(print8)
+        
+        nulltrans8 = NullTrans() .set_name("nulltrans8")
+        nulltrans8 .add_sources(print8) .add_destinations(forward1)
         
         completiontrans6 = CompletionTrans() .set_name("completiontrans6")
         completiontrans6 .add_sources(forward1) .add_destinations(statenode1)
@@ -489,10 +568,10 @@ class GoToCube(StateNode):
         timertrans3 .add_sources(statenode1) .add_destinations(pilot_check_start2)
         
         successtrans3 = SuccessTrans() .set_name("successtrans3")
-        successtrans3 .add_sources(pilot_check_start2) .add_destinations(print7)
+        successtrans3 .add_sources(pilot_check_start2) .add_destinations(print9)
         
-        nulltrans7 = NullTrans() .set_name("nulltrans7")
-        nulltrans7 .add_sources(print7) .add_destinations(go_side)
+        nulltrans9 = NullTrans() .set_name("nulltrans9")
+        nulltrans9 .add_sources(print9) .add_destinations(go_side)
         
         pilottrans1 = PilotTrans(StartCollides) .set_name("pilottrans1")
         pilottrans1 .add_sources(pilot_check_start2) .add_destinations(check_start2_pilot)
@@ -500,8 +579,14 @@ class GoToCube(StateNode):
         failuretrans4 = FailureTrans() .set_name("failuretrans4")
         failuretrans4 .add_sources(pilot_check_start2) .add_destinations(failure)
         
-        pilottrans2 = PilotTrans() .set_name("pilottrans2")
-        pilottrans2 .add_sources(go_side) .add_destinations(go_side_pilot)
+        pilottrans2 = PilotTrans(GoalCollides) .set_name("pilottrans2")
+        pilottrans2 .add_sources(go_side) .add_destinations(failure)
+        
+        pilottrans3 = PilotTrans(MaxIterations) .set_name("pilottrans3")
+        pilottrans3 .add_sources(go_side) .add_destinations(failure)
+        
+        pilottrans4 = PilotTrans() .set_name("pilottrans4")
+        pilottrans4 .add_sources(go_side) .add_destinations(go_side_pilot)
         
         failuretrans5 = FailureTrans() .set_name("failuretrans5")
         failuretrans5 .add_sources(go_side) .add_destinations(failure)
@@ -512,8 +597,8 @@ class GoToCube(StateNode):
         timertrans4 = TimerTrans(0.75) .set_name("timertrans4")
         timertrans4 .add_sources(reportposition1) .add_destinations(reportposition2)
         
-        nulltrans8 = NullTrans() .set_name("nulltrans8")
-        nulltrans8 .add_sources(reportposition2) .add_destinations(turn_to_cube1)
+        nulltrans10 = NullTrans() .set_name("nulltrans10")
+        nulltrans10 .add_sources(reportposition2) .add_destinations(turn_to_cube1)
         
         completiontrans8 = CompletionTrans() .set_name("completiontrans8")
         completiontrans8 .add_sources(turn_to_cube1) .add_destinations(reportposition3)
@@ -521,11 +606,11 @@ class GoToCube(StateNode):
         timertrans5 = TimerTrans(0.75) .set_name("timertrans5")
         timertrans5 .add_sources(reportposition3) .add_destinations(reportposition4)
         
-        nulltrans9 = NullTrans() .set_name("nulltrans9")
-        nulltrans9 .add_sources(reportposition4) .add_destinations(print8)
+        nulltrans11 = NullTrans() .set_name("nulltrans11")
+        nulltrans11 .add_sources(reportposition4) .add_destinations(print10)
         
-        nulltrans10 = NullTrans() .set_name("nulltrans10")
-        nulltrans10 .add_sources(print8) .add_destinations(approach)
+        nulltrans12 = NullTrans() .set_name("nulltrans12")
+        nulltrans12 .add_sources(print10) .add_destinations(approach)
         
         failuretrans6 = FailureTrans() .set_name("failuretrans6")
         failuretrans6 .add_sources(turn_to_cube1) .add_destinations(forward2)
@@ -545,29 +630,29 @@ class GoToCube(StateNode):
         timertrans8 = TimerTrans(0.75) .set_name("timertrans8")
         timertrans8 .add_sources(reportposition5) .add_destinations(reportposition6)
         
-        nulltrans11 = NullTrans() .set_name("nulltrans11")
-        nulltrans11 .add_sources(reportposition6) .add_destinations(print9)
+        nulltrans13 = NullTrans() .set_name("nulltrans13")
+        nulltrans13 .add_sources(reportposition6) .add_destinations(print11)
         
-        nulltrans12 = NullTrans() .set_name("nulltrans12")
-        nulltrans12 .add_sources(print9) .add_destinations(turn_to_cube_1a)
+        nulltrans14 = NullTrans() .set_name("nulltrans14")
+        nulltrans14 .add_sources(print11) .add_destinations(turn_to_cube_1a)
         
         completiontrans11 = CompletionTrans() .set_name("completiontrans11")
-        completiontrans11 .add_sources(turn_to_cube_1a) .add_destinations(print10)
+        completiontrans11 .add_sources(turn_to_cube_1a) .add_destinations(print12)
         
-        nulltrans13 = NullTrans() .set_name("nulltrans13")
-        nulltrans13 .add_sources(print10) .add_destinations(forward_to_cube_1a)
+        nulltrans15 = NullTrans() .set_name("nulltrans15")
+        nulltrans15 .add_sources(print12) .add_destinations(forward_to_cube_1a)
         
         completiontrans12 = CompletionTrans() .set_name("completiontrans12")
         completiontrans12 .add_sources(forward_to_cube_1a) .add_destinations(success)
         
         failuretrans7 = FailureTrans() .set_name("failuretrans7")
-        failuretrans7 .add_sources(turn_to_cube2) .add_destinations(print11)
+        failuretrans7 .add_sources(turn_to_cube2) .add_destinations(print13)
         
-        nulltrans14 = NullTrans() .set_name("nulltrans14")
-        nulltrans14 .add_sources(print11) .add_destinations(invalidatepose1)
+        nulltrans16 = NullTrans() .set_name("nulltrans16")
+        nulltrans16 .add_sources(print13) .add_destinations(invalidatepose1)
         
-        nulltrans15 = NullTrans() .set_name("nulltrans15")
-        nulltrans15 .add_sources(invalidatepose1) .add_destinations(failure)
+        nulltrans17 = NullTrans() .set_name("nulltrans17")
+        nulltrans17 .add_sources(invalidatepose1) .add_destinations(failure)
         
         completiontrans13 = CompletionTrans() .set_name("completiontrans13")
         completiontrans13 .add_sources(turn_to_cube2) .add_destinations(forward_to_cube2)
@@ -581,11 +666,17 @@ class GoToCube(StateNode):
         completiontrans16 = CompletionTrans() .set_name("completiontrans16")
         completiontrans16 .add_sources(forward_to_cube3) .add_destinations(success)
         
-        nulltrans16 = NullTrans() .set_name("nulltrans16")
-        nulltrans16 .add_sources(success) .add_destinations(parentcompletes1)
+        nulltrans18 = NullTrans() .set_name("nulltrans18")
+        nulltrans18 .add_sources(success) .add_destinations(parentcompletes1)
         
-        nulltrans17 = NullTrans() .set_name("nulltrans17")
-        nulltrans17 .add_sources(failure) .add_destinations(parentfails1)
+        nulltrans19 = NullTrans() .set_name("nulltrans19")
+        nulltrans19 .add_sources(failure) .add_destinations(try_all_sides)
+        
+        successtrans4 = SuccessTrans() .set_name("successtrans4")
+        successtrans4 .add_sources(try_all_sides) .add_destinations(parentfails1)
+        
+        failuretrans8 = FailureTrans() .set_name("failuretrans8")
+        failuretrans8 .add_sources(try_all_sides) .add_destinations(droplift)
         
         return self
 
@@ -594,14 +685,14 @@ class SetCarrying(StateNode):
         self.objparam = objparam
         self.object = None
         super().__init__()
-        
+
     def start(self, event=None):
         if self.objparam is not None:
             self.object = self.objparam
         else:
             self.object = self.parent.object
         if isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -635,14 +726,14 @@ class SetFetching(StateNode):
         self.objparam = objparam
         self.object = None
         super().__init__()
-        
+
     def start(self, event=None):
         if self.objparam is not None:
             self.object = self.objparam
         else:
             self.object = self.parent.object
         if isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -663,7 +754,7 @@ class SetNotFetching(StateNode):
 class PickUpCube(StateNode):
     """Pick up a cube using our own dock and verify routines.
     Set self.object to indicate the cube to be picked up."""
-    
+
     class VerifyPickup(StateNode):
         def probe_column(self, im, col, row_start, row_end):
             """
@@ -739,7 +830,9 @@ class PickUpCube(StateNode):
             if bad_runs < 2:
                 self.post_success()
             else:
-                self.post_failure()                
+                self.post_failure()
+
+        # end of class VerifyPickup
 
     # PickUpCube methods
 
@@ -755,12 +848,12 @@ class PickUpCube(StateNode):
     def start(self, event=None):
         if isinstance(self.cube, LightCube):
             self.object = self.cube
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.cube, LightCubeObj):
             self.wmobject = self.cube
             self.object = self.cube.sdk_obj
         elif isinstance(self.object, LightCube):
-            self.wmobject = self.robot.world.world_map.objects[self.object]
+            self.wmobject = self.object.wm_obj
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
@@ -820,15 +913,21 @@ class PickUpCube(StateNode):
                                              ignore_lift_track=True) =C=>
             missed_cube: SetNotCarrying() =C=> Forward(-5) =C=> {drop_lift, drop_head_low}
     
-            drop_lift: SetLiftHeight(0) =C=> backupmore: Forward(-5)
+            drop_lift: SetLiftHeight(0)
+            drop_lift =C=> backupmore
+            drop_lift =F=> backupmore
+    
+            backupmore: Forward(-5)
+    
             drop_head_low: SetHeadAngle(-20)
+    
             {backupmore, drop_head_low} =C=> fail
     
             fail: SetNotFetching() =C=> ParentFails()
     
         """
         
-        # Code generated by genfsm on Thu Jun 14 20:36:10 2018:
+        # Code generated by genfsm on Wed Mar  6 12:38:46 2019:
         
         fetch = SetFetching() .set_name("fetch") .set_parent(self)
         check_carry = CheckCarrying() .set_name("check_carry") .set_parent(self)
@@ -867,23 +966,23 @@ class PickUpCube(StateNode):
         completiontrans17 = CompletionTrans() .set_name("completiontrans17")
         completiontrans17 .add_sources(fetch) .add_destinations(check_carry)
         
-        successtrans4 = SuccessTrans() .set_name("successtrans4")
-        successtrans4 .add_sources(check_carry) .add_destinations(dropobject1)
+        successtrans5 = SuccessTrans() .set_name("successtrans5")
+        successtrans5 .add_sources(check_carry) .add_destinations(dropobject1)
         
         completiontrans18 = CompletionTrans() .set_name("completiontrans18")
         completiontrans18 .add_sources(dropobject1) .add_destinations(goto_cube)
         
-        failuretrans8 = FailureTrans() .set_name("failuretrans8")
-        failuretrans8 .add_sources(check_carry) .add_destinations(goto_cube)
-        
-        pilottrans3 = PilotTrans() .set_name("pilottrans3")
-        pilottrans3 .add_sources(goto_cube) .add_destinations(goto_cube_pilot)
-        
-        nulltrans18 = NullTrans() .set_name("nulltrans18")
-        nulltrans18 .add_sources(goto_cube_pilot) .add_destinations(fail)
-        
         failuretrans9 = FailureTrans() .set_name("failuretrans9")
-        failuretrans9 .add_sources(goto_cube) .add_destinations(fail)
+        failuretrans9 .add_sources(check_carry) .add_destinations(goto_cube)
+        
+        pilottrans5 = PilotTrans() .set_name("pilottrans5")
+        pilottrans5 .add_sources(goto_cube) .add_destinations(goto_cube_pilot)
+        
+        nulltrans20 = NullTrans() .set_name("nulltrans20")
+        nulltrans20 .add_sources(goto_cube_pilot) .add_destinations(fail)
+        
+        failuretrans10 = FailureTrans() .set_name("failuretrans10")
+        failuretrans10 .add_sources(goto_cube) .add_destinations(fail)
         
         completiontrans19 = CompletionTrans() .set_name("completiontrans19")
         completiontrans19 .add_sources(goto_cube) .add_destinations(abortheadaction1)
@@ -897,29 +996,29 @@ class PickUpCube(StateNode):
         completiontrans21 = CompletionTrans() .set_name("completiontrans21")
         completiontrans21 .add_sources(raise_lift,raise_head2) .add_destinations(verify)
         
-        successtrans5 = SuccessTrans() .set_name("successtrans5")
-        successtrans5 .add_sources(verify) .add_destinations(set_carrying)
+        successtrans6 = SuccessTrans() .set_name("successtrans6")
+        successtrans6 .add_sources(verify) .add_destinations(set_carrying)
         
-        failuretrans10 = FailureTrans() .set_name("failuretrans10")
-        failuretrans10 .add_sources(verify) .add_destinations(statenode4)
+        failuretrans11 = FailureTrans() .set_name("failuretrans11")
+        failuretrans11 .add_sources(verify) .add_destinations(statenode4)
         
         timertrans10 = TimerTrans(0.5) .set_name("timertrans10")
         timertrans10 .add_sources(statenode4) .add_destinations(verify2)
         
-        successtrans6 = SuccessTrans() .set_name("successtrans6")
-        successtrans6 .add_sources(verify2) .add_destinations(set_carrying)
-        
-        failuretrans11 = FailureTrans() .set_name("failuretrans11")
-        failuretrans11 .add_sources(verify2) .add_destinations(frustrated)
-        
         successtrans7 = SuccessTrans() .set_name("successtrans7")
-        successtrans7 .add_sources(verify3) .add_destinations(set_carrying)
+        successtrans7 .add_sources(verify2) .add_destinations(set_carrying)
         
         failuretrans12 = FailureTrans() .set_name("failuretrans12")
-        failuretrans12 .add_sources(verify3) .add_destinations(frustrated)
+        failuretrans12 .add_sources(verify2) .add_destinations(frustrated)
         
-        nulltrans19 = NullTrans() .set_name("nulltrans19")
-        nulltrans19 .add_sources(set_carrying) .add_destinations(satisfied)
+        successtrans8 = SuccessTrans() .set_name("successtrans8")
+        successtrans8 .add_sources(verify3) .add_destinations(set_carrying)
+        
+        failuretrans13 = FailureTrans() .set_name("failuretrans13")
+        failuretrans13 .add_sources(verify3) .add_destinations(frustrated)
+        
+        nulltrans21 = NullTrans() .set_name("nulltrans21")
+        nulltrans21 .add_sources(set_carrying) .add_destinations(satisfied)
         
         completiontrans22 = CompletionTrans() .set_name("completiontrans22")
         completiontrans22 .add_sources(satisfied) .add_destinations(final_raise,drop_head)
@@ -927,8 +1026,8 @@ class PickUpCube(StateNode):
         completiontrans23 = CompletionTrans() .set_name("completiontrans23")
         completiontrans23 .add_sources(final_raise,drop_head) .add_destinations(parentcompletes2)
         
-        nulltrans20 = NullTrans() .set_name("nulltrans20")
-        nulltrans20 .add_sources(frustrated) .add_destinations(animationtriggernode1)
+        nulltrans22 = NullTrans() .set_name("nulltrans22")
+        nulltrans22 .add_sources(frustrated) .add_destinations(animationtriggernode1)
         
         completiontrans24 = CompletionTrans() .set_name("completiontrans24")
         completiontrans24 .add_sources(animationtriggernode1) .add_destinations(missed_cube)
@@ -941,6 +1040,9 @@ class PickUpCube(StateNode):
         
         completiontrans27 = CompletionTrans() .set_name("completiontrans27")
         completiontrans27 .add_sources(drop_lift) .add_destinations(backupmore)
+        
+        failuretrans14 = FailureTrans() .set_name("failuretrans14")
+        failuretrans14 .add_sources(drop_lift) .add_destinations(backupmore)
         
         completiontrans28 = CompletionTrans() .set_name("completiontrans28")
         completiontrans28 .add_sources(backupmore,drop_head_low) .add_destinations(fail)
@@ -971,7 +1073,7 @@ class DropObject(StateNode):
             SetLiftHeight(0) =C=> check_carrying
     
             check_carrying: CheckCarrying()
-            check_carrying =F=> ParentCompletes()
+            check_carrying =F=> {backup, lookdown}
             check_carrying =S=> self.SetObject() =N=>
               SetNotCarrying() =N=> SetFetching() =N=> {backup, lookdown}
     
@@ -998,11 +1100,10 @@ class DropObject(StateNode):
             wrap_up: SetNotFetching() =N=> ParentCompletes()
         """
         
-        # Code generated by genfsm on Thu Jun 14 20:36:10 2018:
+        # Code generated by genfsm on Wed Mar  6 12:38:46 2019:
         
         setliftheight1 = SetLiftHeight(0) .set_name("setliftheight1") .set_parent(self)
         check_carrying = CheckCarrying() .set_name("check_carrying") .set_parent(self)
-        parentcompletes3 = ParentCompletes() .set_name("parentcompletes3") .set_parent(self)
         setobject1 = self.SetObject() .set_name("setobject1") .set_parent(self)
         setnotcarrying1 = SetNotCarrying() .set_name("setnotcarrying1") .set_parent(self)
         setfetching1 = SetFetching() .set_name("setfetching1") .set_parent(self)
@@ -1012,28 +1113,28 @@ class DropObject(StateNode):
         check_visible = self.CheckCubeVisible() .set_name("check_visible") .set_parent(self)
         lookdown2 = SetHeadAngle(-20) .set_name("lookdown2") .set_parent(self)
         wrap_up = SetNotFetching() .set_name("wrap_up") .set_parent(self)
-        parentcompletes4 = ParentCompletes() .set_name("parentcompletes4") .set_parent(self)
+        parentcompletes3 = ParentCompletes() .set_name("parentcompletes3") .set_parent(self)
         
         completiontrans30 = CompletionTrans() .set_name("completiontrans30")
         completiontrans30 .add_sources(setliftheight1) .add_destinations(check_carrying)
         
-        failuretrans13 = FailureTrans() .set_name("failuretrans13")
-        failuretrans13 .add_sources(check_carrying) .add_destinations(parentcompletes3)
+        failuretrans15 = FailureTrans() .set_name("failuretrans15")
+        failuretrans15 .add_sources(check_carrying) .add_destinations(backup,lookdown)
         
-        successtrans8 = SuccessTrans() .set_name("successtrans8")
-        successtrans8 .add_sources(check_carrying) .add_destinations(setobject1)
-        
-        nulltrans21 = NullTrans() .set_name("nulltrans21")
-        nulltrans21 .add_sources(setobject1) .add_destinations(setnotcarrying1)
-        
-        nulltrans22 = NullTrans() .set_name("nulltrans22")
-        nulltrans22 .add_sources(setnotcarrying1) .add_destinations(setfetching1)
+        successtrans9 = SuccessTrans() .set_name("successtrans9")
+        successtrans9 .add_sources(check_carrying) .add_destinations(setobject1)
         
         nulltrans23 = NullTrans() .set_name("nulltrans23")
-        nulltrans23 .add_sources(setfetching1) .add_destinations(backup,lookdown)
+        nulltrans23 .add_sources(setobject1) .add_destinations(setnotcarrying1)
         
-        failuretrans14 = FailureTrans() .set_name("failuretrans14")
-        failuretrans14 .add_sources(lookdown) .add_destinations(head_angle_wait)
+        nulltrans24 = NullTrans() .set_name("nulltrans24")
+        nulltrans24 .add_sources(setnotcarrying1) .add_destinations(setfetching1)
+        
+        nulltrans25 = NullTrans() .set_name("nulltrans25")
+        nulltrans25 .add_sources(setfetching1) .add_destinations(backup,lookdown)
+        
+        failuretrans16 = FailureTrans() .set_name("failuretrans16")
+        failuretrans16 .add_sources(lookdown) .add_destinations(head_angle_wait)
         
         completiontrans31 = CompletionTrans() .set_name("completiontrans31")
         completiontrans31 .add_sources(backup,lookdown) .add_destinations(head_angle_wait)
@@ -1044,17 +1145,17 @@ class DropObject(StateNode):
         completiontrans32 = CompletionTrans() .set_name("completiontrans32")
         completiontrans32 .add_sources(check_visible) .add_destinations(wrap_up)
         
-        failuretrans15 = FailureTrans() .set_name("failuretrans15")
-        failuretrans15 .add_sources(check_visible) .add_destinations(lookdown2)
+        failuretrans17 = FailureTrans() .set_name("failuretrans17")
+        failuretrans17 .add_sources(check_visible) .add_destinations(lookdown2)
         
-        failuretrans16 = FailureTrans() .set_name("failuretrans16")
-        failuretrans16 .add_sources(lookdown2) .add_destinations(wrap_up)
+        failuretrans18 = FailureTrans() .set_name("failuretrans18")
+        failuretrans18 .add_sources(lookdown2) .add_destinations(wrap_up)
         
         timertrans12 = TimerTrans(0.5) .set_name("timertrans12")
         timertrans12 .add_sources(lookdown2) .add_destinations(wrap_up)
         
-        nulltrans24 = NullTrans() .set_name("nulltrans24")
-        nulltrans24 .add_sources(wrap_up) .add_destinations(parentcompletes4)
+        nulltrans26 = NullTrans() .set_name("nulltrans26")
+        nulltrans26 .add_sources(wrap_up) .add_destinations(parentcompletes3)
         
         return self
 

@@ -195,7 +195,7 @@ class WorldMapViewer():
                 glColorPointer(3, GL_FLOAT, 0, cube_colors_0.tobytes())
         else:
             if not highlight:
-                s = 0.5   # scale down the brightness if necessary
+                s = 0.5   # scale down the brightness
                 color = (color[0]*s, color[1]*s, color[2]*s)
             glColor4f(*color,alpha)
         verts = cube_vertices * 1; # copy the array
@@ -416,8 +416,8 @@ class WorldMapViewer():
         glPushMatrix()
         glTranslatef(doorway.x, doorway.y, wall.door_height/2)
         glRotatef(doorway.theta*180/pi, 0, 0, 1)
-        self.make_cube(size=(1, spec[1]-20, wall.door_height-20), edges=False,
-                       color=color_cyan, alpha=0.7, highlight=True)
+        self.make_cube(size=(1, spec[1]-10, wall.door_height-10), edges=False,
+                       color=color_cyan, alpha=0.2, highlight=True)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -780,7 +780,7 @@ class WorldMapViewer():
             elif isinstance(obj, worldmap.WallObj):
                 self.make_wall(obj)
             elif isinstance(obj, worldmap.DoorwayObj):
-                self.make_doorway(obj)
+                pass  # doorways must come last, due to transparency
             elif isinstance(obj, worldmap.ChipObj):
                 self.make_chip(obj)
             elif isinstance(obj, worldmap.FaceObj):
@@ -795,6 +795,10 @@ class WorldMapViewer():
                 self.make_custom_marker(obj)
             elif isinstance(obj, worldmap.ArucoMarkerObj):
                 self.make_aruco_marker(obj)
+        # Make the doorways last, so transparency works correctly
+        for (key,obj) in items:
+            if isinstance(obj, worldmap.DoorwayObj):
+                self.make_doorway(obj)
 
     def make_memory(self):
         global gl_lists
@@ -837,11 +841,11 @@ class WorldMapViewer():
         gl_lists = []
         self.make_axes()
         self.make_gazepoint()
-        self.make_objects()  # walls, light cubes, custom cubes, and chips
         self.make_charger()
         self.make_cozmo_robot()
         self.make_memory()
         self.make_floor()
+        self.make_objects()  # walls, light cubes, custom cubes, and chips
 
     def del_shapes(self):
         global gl_lists
@@ -861,7 +865,8 @@ class WorldMapViewer():
         glClearColor(*self.bgcolor, 0)
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)
-        # Enable transparency
+        # Enable transparency for doorways: see
+        #    https://www.opengl.org/archives/resources/faq/technical/transparency.htm
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
