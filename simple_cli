@@ -233,6 +233,23 @@ def start_stuff(args):
   start shared_map
 """)
 
+
+def sort_wmobject_ids(ids):
+    preference = ['Charger','Cube','Aruco','Wall','Door','CustomCube','CustomMarker','Room','Face']
+
+    def key(id):
+        index = 0
+        for prefix in preference:
+            if id.startswith(prefix):
+                break
+            else:
+                index += 1
+        return ('%02d' % index) + id
+
+    result = sorted(ids, key=key)
+    return result
+
+
 def show_stuff(args):
     global running_fsm
     running_fsm = cozmo_fsm.program.running_fsm
@@ -248,13 +265,10 @@ def show_stuff(args):
         show_kine(args[1:])
     elif spec == 'cam_viewer' or spec=='viewer':
         if running_fsm:
-            running_fsm.stop()
-        running_fsm = StateMachineProgram(cam_viewer=True,
-                                          simple_cli_callback=simple_cli_callback)
-        running_fsm.set_name("CamViewer")
-        running_fsm.simple_cli_callback = simple_cli_callback
-        cozmo_fsm.program.running_fsm = running_fsm
-        robot.loop.call_soon(running_fsm.start)
+            running_fsm.cam_viewer = True
+        if not robot.world.cam_viewer:
+            robot.world.cam_viewer = CamViewer(robot)
+            robot.world.cam_viewer.start()
     elif spec == "crosshairs":
         if running_fsm:
             running_fsm.viewer_crosshairs = not running_fsm.viewer_crosshairs
@@ -271,12 +285,10 @@ def show_stuff(args):
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
     elif (spec == "all") or (spec == "all_viewers"):
-        running_fsm = StateMachineProgram(cam_viewer=True,
-                                          simple_cli_callback=simple_cli_callback)
-        running_fsm.set_name("CamViewer")
-        running_fsm.simple_cli_callback = simple_cli_callback
-        cozmo_fsm.program.running_fsm = running_fsm
-        robot.loop.call_soon(running_fsm.start)
+        if running_fsm:
+            running_fsm.cam_viewer = True
+        robot.world.cam_viewer = CamViewer(robot)
+        robot.world.cam_viewer.start()
         robot.world.particle_viewer = ParticleViewer(robot)
         robot.world.particle_viewer.start()
         robot.world.path_viewer = PathViewer(robot,world.rrt)
@@ -554,11 +566,6 @@ def cli_loop(robot):
             readline.write_history_file(histfile)
             try:
                 cli_loop._line = cli_loop._console.raw_input('C> ').strip()
-                # if os_version == 'Darwin':   # Tkinter breaks console on Macs
-                #     print('C> ', end='')
-                #     cli_loop._line = sys.stdin.readline().strip()
-                # else:
-                #     cli_loop._line = cli_loop._console.raw_input('C> ').strip()
             except KeyboardInterrupt:
                 process_interrupt()
                 continue

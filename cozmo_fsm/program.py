@@ -26,6 +26,7 @@ from . import opengl
 from . import custom_objs
 from .perched import *
 from .sharedmap import *
+from .cam_viewer import CamViewer
 
 running_fsm = None
 charger_warned = False
@@ -159,16 +160,10 @@ class StateMachineProgram(StateNode):
 
         # Launch viewers
         if self.cam_viewer:
-            self.windowName = self.name
-            cv2.namedWindow(self.windowName)
-            cv2.startWindowThread()
-            # Display a dummy image to prevent glibc complaints when a camera
-            # image doesn't arrive quickly enough after the window opens.
-            dummy = numpy.array([[0]], numpy.int8)
-            cv2.imshow(self.windowName,dummy)
-            cv2.waitKey(1)
-        else:
-            self.viewer = None
+            if self.cam_viewer is True:
+                self.cam_viewer = CamViewer(self.robot)
+            self.cam_viewer.start()
+        self.robot.world.cam_viewer = self.cam_viewer
 
         if self.particle_viewer:
             if self.particle_viewer is True:
@@ -303,46 +298,41 @@ class StateMachineProgram(StateNode):
         return image
 
     def process_image(self,event,**kwargs):
-        curim = numpy.array(event.image.raw_image) #cozmo-raw image
-        gray = cv2.cvtColor(curim,cv2.COLOR_BGR2GRAY)
+        if self.cam_viewer:
+            # if show cam_viewer, run the process_image under cam_viewer
+            pass
+        else:
+            curim = numpy.array(event.image.raw_image) #cozmo-raw image
+            gray = cv2.cvtColor(curim,cv2.COLOR_BGR2GRAY)
 
-        # Aruco image processing
-        if self.aruco:
-            self.robot.world.aruco.process_image(gray)
-        # Other image processors can run here if the user supplies them.
-        self.user_image(curim,gray)
-        # Done with image processing
+            # Aruco image processing
+            if self.aruco:
+                self.robot.world.aruco.process_image(gray)
+            # Other image processors can run here if the user supplies them.
+            self.user_image(curim,gray)
+            # Done with image processing
 
-        # Annotate and display image if requested
-        if self.force_annotation or self.viewer is not None:
-            scale = self.annotated_scale_factor
-            # Apply Cozmo SDK annotations and rescale.
-            if self.annotate_sdk:
-                coz_ann = event.image.annotate_image(scale=scale)
-                annotated_im = numpy.array(coz_ann)
-            elif scale != 1:
-                shape = curim.shape
-                dsize = (scale*shape[1], scale*shape[0])
-                annotated_im = cv2.resize(curim, dsize)
-            else:
-                annotated_im = curim
-            # Yellow viewer crosshairs
-            if self.viewer_crosshairs:
-                shape = annotated_im.shape
-                cv2.line(annotated_im, (int(shape[1]/2),0), (int(shape[1]/2),shape[0]), (255,255,0), 1)
-                cv2.line(annotated_im, (0,int(shape[0]/2)), (shape[1],int(shape[0]/2)), (255,255,0), 1)
-            # Aruco annotation
-            if self.aruco and \
-                   len(self.robot.world.aruco.seen_marker_ids) > 0:
-                annotated_im = self.robot.world.aruco.annotate(annotated_im,scale)
-            # Other annotators can run here if the user supplies them.
-            annotated_im = self.user_annotate(annotated_im)
-            # Done with annotation
-            annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
-            if self.windowName:
-                if True: # os.name == 'nt':
-                    cv2.waitKey(1)
-                cv2.imshow(self.windowName, annotated_im)
+            # Annotate and display image if requested
+            if self.force_annotation or self.viewer is not None:
+                scale = self.annotated_scale_factor
+                # Apply Cozmo SDK annotations and rescale.
+                if self.annotate_sdk:
+                    coz_ann = event.image.annotate_image(scale=scale)
+                    annotated_im = numpy.array(coz_ann)
+                elif scale != 1:
+                    shape = curim.shape
+                    dsize = (scale*shape[1], scale*shape[0])
+                    annotated_im = cv2.resize(curim, dsize)
+                else:
+                    annotated_im = curim
+                # Aruco annotation
+                if self.aruco and \
+                       len(self.robot.world.aruco.seen_marker_ids) > 0:
+                    annotated_im = self.robot.world.aruco.annotate(annotated_im,scale)
+                # Other annotators can run here if the user supplies them.
+                annotated_im = self.user_annotate(annotated_im)
+                # Done with annotation
+                annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
 
         # Use this heartbeat signal to look for new landmarks
         pf = self.robot.world.particle_filter

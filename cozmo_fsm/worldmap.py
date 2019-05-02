@@ -83,6 +83,8 @@ class WorldObject():
 class LightCubeObj(WorldObject):
     light_cube_size = (44., 44., 44.)
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+        if id is None:
+            id = 'Cube-' + str(sdk_obj.cube_id)
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         if sdk_obj:
@@ -102,11 +104,13 @@ class LightCubeObj(WorldObject):
             return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
                 (self.sdk_obj.cube_id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
-            return '<LightCubeObj %d: position unknown>' % self.id
+            return '<LightCubeObj %d: position unknown>' % self.sdk_obj.cube_id
 
 
 class ChargerObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+        if id is None:
+            id = 'Charger'
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         if sdk_obj:
@@ -131,7 +135,10 @@ class ChargerObj(WorldObject):
 
 
 class CustomMarkerObj(WorldObject):
-    def __init__(self, id=None, x=0, y=0, z=0, theta=0):
+    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+        if id is None:
+            custom_type = sdk_obj.object_type.name[-2:]
+            id = 'CustomMarkerObj-' + str(custom_type)
         super().__init__(id,x,y,z)
         self.theta = theta
         self.sdk_obj = sdk_obj
@@ -143,7 +150,10 @@ class CustomMarkerObj(WorldObject):
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        if self.sdk_obj is None:
+            return False
+        else:
+            return self.sdk_obj.is_visible
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
@@ -153,11 +163,14 @@ class CustomMarkerObj(WorldObject):
 
 class CustomCubeObj(WorldObject):
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
-        # id is a CustomObjecType
+        custom_type = sdk_obj.object_type.name[-2:]
+        if id is None:
+            id = 'CustomCubeObj-' + str(custom_type)
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         self.update_from_sdk = True
         self.theta = theta
+        self.custom_type = custom_type
         if (size is None) and isinstance(id, CustomObject):
             self.size = (id.x_size_mm, id.y_size_mm, id.z_size_mm)
         elif size:
@@ -171,29 +184,33 @@ class CustomCubeObj(WorldObject):
 
     def __repr__(self):
         vis = ' visible' if self.is_visible else ''
-        return '<CustomCubeObj %s: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
-               (self.sdk_obj.object_type, self.x, self.y, self.z, self.theta*180/pi, vis)
+        return '<CustomCubeObj-%s %d: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
+               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
+                self.x, self.y, self.z, self.theta*180/pi, vis)
 
 
 class ArucoMarkerObj(WorldObject):
-    def __init__(self, aruco_parent, id=None, x=0, y=0, z=0, theta=0):
+    def __init__(self, aruco_parent, marker_number, id=None, x=0, y=0, z=0, theta=0):
+        if id is None:
+            id = 'Aruco-' + str(marker_number)
         super().__init__(id,x,y,z)
         self.aruco_parent = aruco_parent
+        self.marker_number = marker_number
         self.theta = theta
         self.pose_confidence = +1
 
     @property
     def is_visible(self):
-        return self.id in self.aruco_parent.seen_marker_ids
+        return self.marker_number in self.aruco_parent.seen_marker_ids
 
     def __repr__(self):
         if self.pose_confidence >= 0:
             vis = ' visible' if self.is_visible else ''
             fix = ' fixed' if self.is_fixed else ''
             return '<ArucoMarkerObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s%s>' % \
-                (self.id, self.x, self.y, self.z, self.theta*180/pi, fix, vis)
+                (self.marker_number, self.x, self.y, self.z, self.theta*180/pi, fix, vis)
         else:
-            return '<ArucoMarkerObj %d: position unknown>' % self.id
+            return '<ArucoMarkerObj %d: position unknown>' % self.marker_number
 
 
 class WallObj(WorldObject):
@@ -234,6 +251,7 @@ class WallObj(WorldObject):
         self.door_ids = door_ids
         self.is_foreign = is_foreign
         self.is_fixed = is_fixed
+        self.pose_confidence = +1
 
     def update(self, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
@@ -260,13 +278,11 @@ class WallObj(WorldObject):
             wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
             rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
-            x = self.x + rel_xyz[1][0]
-            y = self.y + rel_xyz[0][0]
-            z = rel_xyz[2][0]
-            theta = wrap_angle(self.theta + s)
-            marker = ArucoMarkerObj(world_map.robot.world.aruco, id=key, x=x, y=y, z=z, theta=theta)
+            marker.x = self.x + rel_xyz[1][0]
+            marker.y = self.y + rel_xyz[0][0]
+            marker.z = rel_xyz[2][0]
+            marker.theta = wrap_angle(self.theta + s)
             marker.is_fixed = self.is_fixed
-            world_map.objects[key] = marker
             if self.is_fixed:
                 world_map.robot.world.particle_filter.add_fixed_landmark(marker)
 
@@ -499,12 +515,14 @@ class WorldMap():
         self.update_perched_cameras()
 
     def update_cube(self, cube):
-        if cube in self.objects:
+        cube_id = 'Cube-' + str(cube.cube_id)
+        if cube_id in self.objects:
             foreign_id = "LightCubeForeignObj-"+str(cube.cube_id)
             if foreign_id in self.objects:
                 # remove foreign cube when local cube seen
                 del self.objects[foreign_id]
-            wmobject = self.objects[cube]
+            wmobject = self.objects[cube_id]
+            wmobject.sdk_obj = cube  # In case created before seen
             if self.robot.carrying is wmobject:
                 if cube.is_visible: # we thought we were carrying it, but we're wrong
                     self.robot.carrying = None
@@ -515,8 +533,8 @@ class WorldMap():
             return None
         else:
             # Cube is not in the worldmap, so add it.
-            wmobject = LightCubeObj(cube, cube.cube_id)
-            self.objects[cube] = wmobject
+            wmobject = LightCubeObj(cube)
+            self.objects[cube_id] = wmobject
         if cube.is_visible:
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1
@@ -533,11 +551,13 @@ class WorldMap():
 
     def update_charger(self):
         charger = self.robot.world.charger
-        if charger in self.objects:
-            wmobject = self.objects[charger]
-        else:
+        if charger is None: return
+        charger_id = 'Charger'
+        wmobject = self.objects.get(charger_id, None)
+        if wmobject is None:
             wmobject = ChargerObj(charger)
-            self.objects[charger] = wmobject
+            self.objects[charger_id] = wmobject
+        wmobject.sdk_obj = charger  # In case we created charger before seeing it
         if charger.is_visible or self.robot.is_on_charger:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
@@ -594,14 +614,14 @@ class WorldMap():
 
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
-            if isinstance(key,str) and 'Wall-' in key:
-                if key in self.objects and isinstance(self.objects[key], WallObj):
+            if key.startswith('Wall-'):
+                if key in self.objects:
                     wall = self.objects[key]
                     if (not wall.is_fixed) and (not wall.is_foreign):
                         wall.update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
                     print('Creating new wall in worldmap:',key)
-                    wall_spec = wall_marker_dict[key[5:]]
+                    wall_spec = wall_marker_dict[key]
                     wall = WallObj(id=key,
                                    x=value[0][0][0],
                                    y=value[0][1][0],
@@ -676,15 +696,17 @@ class WorldMap():
         if not sdk_obj.pose.is_comparable(self.robot.pose):
             print('Should never get here:',sdk_obj.pose,self.robot.pose)
             return
-        if sdk_obj in self.objects:
-            wmobject = self.objects[sdk_obj]
+        id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2:])
+        if id in self.objects:
+            wmobject = self.objects[id]
+            wmobject.sdk_obj = sdk_obj  # In case created marker before seeing it
         else:
-            id = sdk_obj.object_type
-            if id in custom_objs.custom_marker_types:
+            type = sdk_obj.object_type
+            if type in custom_objs.custom_marker_types:
                 wmobject = CustomMarkerObj(sdk_obj,id)
-            elif id in custom_objs.custom_cube_types:
+            elif type in custom_objs.custom_cube_types:
                 wmobject = CustomCubeObj(sdk_obj,id)
-            self.objects[sdk_obj] = wmobject
+            self.objects[id] = wmobject
         wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
         if isinstance(wmobject, CustomMarkerObj):
@@ -770,7 +792,8 @@ class WorldMap():
         if self.robot.fetching and self.robot.fetching.sdk_obj is cube:
             return
         cube.movement_start_time = time.time()
-        wmobject = self.robot.world.world_map.objects[cube]
+        cube_id = 'Cube-' + str(cube.cube_id)
+        wmobject = self.robot.world.world_map.objects[cube_id]
         wmobject.pose_confidence = min(0, wmobject.pose_confidence)
 
     def handle_object_move_stopped(self, evt, **kwargs):

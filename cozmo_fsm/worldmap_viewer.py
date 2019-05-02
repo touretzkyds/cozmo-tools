@@ -126,7 +126,7 @@ color_green  = (0., 1., 0.)
 color_light_green  = (0., 0.5, 0.)
 color_blue   = (0., 0., 1.0)
 color_cyan   = (0., 1.0, 1.0)
-color_yellow = (1., .93, 0.)
+color_yellow = (0.8, 0.8, 0.)
 color_orange = (1., 0.5, .063)
 color_gray =   (0.5, 0.5, 0.5)
 color_light_gray =   (0.65, 0.65, 0.65)
@@ -229,9 +229,10 @@ class WorldMapViewer():
         glDisableClientState(GL_COLOR_ARRAY)
         glDisableClientState(GL_VERTEX_ARRAY)
 
-    def make_light_cube(self,lcube,cube_obj):
+    def make_light_cube(self,cube_obj):
         global gl_lists
-        cube_number = cube_obj.id
+        lcube = cube_obj.sdk_obj
+        cube_number = lcube.cube_id
         pos = (cube_obj.x, cube_obj.y, cube_obj.z)
         color = (None, color_red, color_green, color_blue)[cube_number]
         valid_pose = (lcube.pose.is_valid and cube_obj.pose_confidence >= 0) or \
@@ -361,7 +362,7 @@ class WorldMapViewer():
 
     def make_wall(self,wall_obj):
         global gl_lists
-        wall_spec = worldmap.wall_marker_dict[wall_obj.id[5:]]
+        wall_spec = worldmap.wall_marker_dict[wall_obj.id]
         half_length = wall_obj.length / 2
         half_height = wall_obj.height / 2
         door_height = wall_obj.door_height
@@ -393,7 +394,7 @@ class WorldMapViewer():
             glPushMatrix()
             glTranslatef(*center.flatten()[0:3])
             glRotatef(wall_obj.theta*180/pi, 0, 0, 1)
-            self.make_cube(size=dimensions, color=color)
+            self.make_cube(size=dimensions, color=color, highlight=True)
             glPopMatrix()
         # Make the transom
         glPushMatrix()
@@ -402,7 +403,7 @@ class WorldMapViewer():
         glTranslatef(wall_obj.x, wall_obj.y, z)
         glRotatef(wall_obj.theta*180/pi, 0, 0, 1)
         self.make_cube(size=(wall_thickness, wall_obj.length, transom_height),
-                       edges=False, color=color)
+                       edges=False, color=color, highlight=True)
         glPopMatrix()
         glEndList()
         gl_lists.append(c)
@@ -486,7 +487,7 @@ class WorldMapViewer():
 
     def make_aruco_marker(self,marker):
         global gl_lists
-        marker_number = marker.id if isinstance(marker.id,int) else marker.id.object_id
+        marker_number = marker.marker_number
         s = light_cube_size_mm
         pos = (marker.x, marker.y, marker.z)
         color = (color_red, color_green, color_blue)[marker_number%3]
@@ -774,7 +775,7 @@ class WorldMapViewer():
             items = tuple(self.robot.world.world_map.objects.items())
         for (key,obj) in items:
             if isinstance(obj, worldmap.LightCubeObj):
-                self.make_light_cube(key,obj)
+                self.make_light_cube(obj)
             elif isinstance(obj, worldmap.CustomCubeObj):
                 self.make_custom_cube(key,obj)
             elif isinstance(obj, worldmap.WallObj):
@@ -931,7 +932,6 @@ class WorldMapViewer():
 
 
     def keyPressed(self, key, x, y):
-        # print(str(key), ord(key))
         global DISPLAY_ENABLED, EXCEPTION_COUNTER
         if ord(key) == 27:
             print("Use 'exit' to quit.")
