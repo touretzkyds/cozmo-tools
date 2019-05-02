@@ -8,7 +8,7 @@ from .cozmo_kin import center_of_rotation_offset
 from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, StartCollides, GoalCollides, MaxIterations, InvalidPose
 from .worldmap import LightCubeObj, get_orientation_state
 from .worldmap import ORIENTATION_UPRIGHT, ORIENTATION_INVERTED, ORIENTATION_SIDEWAYS, ORIENTATION_TILTED
-from .doorpass import WallPilotToPose
+#from .doorpass import WallPilotToPose
 from .trace import tracefsm
 
 from math import sin, cos, atan2, pi, sqrt

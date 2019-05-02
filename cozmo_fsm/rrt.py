@@ -51,7 +51,9 @@ class GoalCollides(RRTException): pass
 class MaxIterations(RRTException): pass
 
 class RRT():
-    def __init__(self, robot, max_iter=2000, step_size=10, arc_radius=40,
+    DEFAULT_MAX_ITER = 2000
+
+    def __init__(self, robot, max_iter=DEFAULT_MAX_ITER, step_size=10, arc_radius=40,
                  xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
@@ -228,10 +230,16 @@ class RRT():
         ymin = min(start.y, goal.y)
         ymax = max(start.y, goal.y)
         for obst in self.obstacles:
-            xmin = min(xmin, np.min(obst.vertices[0]))
-            xmax = max(xmax, np.max(obst.vertices[0]))
-            ymin = min(ymin, np.min(obst.vertices[1]))
-            ymax = max(ymax, np.max(obst.vertices[1]))
+            if isinstance(obst,Circle):
+                xmin = obst.center[0] - obst.radius
+                xmax = obst.center[0] + obst.radius
+                ymin = obst.center[1] - obst.radius
+                ymax = obst.center[1] + obst.radius
+            else:
+                xmin = min(xmin, np.min(obst.vertices[0]))
+                xmax = max(xmax, np.max(obst.vertices[0]))
+                ymin = min(ymin, np.min(obst.vertices[1]))
+                ymax = max(ymax, np.max(obst.vertices[1]))
         xmin = xmin - 500
         xmax = xmax + 500
         ymin = ymin - 500
@@ -478,6 +486,7 @@ class RRT():
         last_x = -half_length
         edges = [ [0, -half_length, 0., 1.] ]
         for (center,width) in wall_spec.doorways:
+            width = 2 * width   # *** WIDEN DOORWAYS FOR PATH PLANNING SUCCESS
             left_edge = center - width/2 - half_length
             edges.append([0., left_edge, 0., 1.])
             widths.append(left_edge - last_x)
@@ -498,7 +507,6 @@ class RRT():
                           orient=wall.theta )
             r.obstacle = wall
             obst.append(r)
-        print('wall obst:',obst)
         return obst
 
     def generate_cube_obstacle(self,obj):

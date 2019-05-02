@@ -9,7 +9,7 @@ from math import pi
 import cv2
 
 import cozmo
-from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle
+from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle, Pose
 
 from .base import *
 from .events import *
@@ -359,6 +359,20 @@ class LookAtObject(StateNode):
             pass
 
 
+class SetPose(StateNode):
+    def __init__(self, pose=Pose(0,0,0,angle_z=degrees(0))):
+        super().__init__()
+        self.pose = pose
+
+    def start(self, event=None):
+        super().start(event)
+        if isinstance(event, DataEvent) and isinstance(event.data, Pose):
+            pose = event.data
+        else:
+            pose = self.pose
+        self.robot.world.particle_filter.set_pose(self.pose.x, self.pose.y, self.pose.angle_z.radians)
+
+
 class Print(StateNode):
     "Argument can be a string, or a function to be evaluated at print time."
     def __init__(self,spec=None):
@@ -483,7 +497,7 @@ class CoroutineNode(StateNode):
         super().__init__()
         self.handle = None
 
-    def start(self,event=None):
+    def start(self, event=None):
         super().start(event)
         cor = self.coroutine_launcher()
         if inspect.iscoroutine(cor):
@@ -497,6 +511,17 @@ class CoroutineNode(StateNode):
 
     def coroutine_launcher(self):
         raise Exception('%s lacks a coroutine_launcher() method' % self)
+
+    def post_when_complete(self):
+        "Call this from within start() if the coroutine will signal completion."
+        self.robot.loop.create_task(self.wait_for_completion())
+
+    async def wait_for_completion(self):
+        await self.handle
+        if TRACE.trace_level >= TRACE.await_satisfied:
+            print('TRACE%d:' % TRACE.await_satisfied, self,
+                  'await satisfied:', self.handle)
+        self.post_completion()
 
     def stop(self):
         if not self.running: return
@@ -736,6 +761,23 @@ class DriveArc(DriveWheels):
             self.post_completion()
 
 
+#________________ Cube Disconnect/Reconnect ________________
+
+class DisconnectFromCubes(StateNode):
+    def start(self, event=None):
+        super().start(event)
+        self.robot.world.disconnect_from_cubes()
+
+
+class ConnectToCubes(CoroutineNode):
+    def start(self, event=None):
+        super().start(event)
+        self.post_when_complete()
+
+    def coroutine_launcher(self):
+        return self.robot.world.connect_to_cubes()
+
+
 #________________ Action Nodes ________________
 
 class ActionNode(StateNode):
@@ -924,11 +966,18 @@ class SetHeadAngle(ActionNode):
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
 
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data
+        super().start(event)
+
     def action_launcher(self):
         return self.robot.set_head_angle(self.angle, **self.action_kwargs)
 
 class SetLiftHeight(ActionNode):
     def __init__(self, height=0, abort_on_stop=True, **action_kwargs):
+        """height is a percentage from 0 to 1"""
         self.height = height
         self.action_kwargs = action_kwargs
         super().__init__(abort_on_stop)
@@ -941,15 +990,24 @@ class SetLiftHeight(ActionNode):
 
 class SetLiftAngle(SetLiftHeight):
     def __init__(self, angle, abort_on_stop=True, **action_kwargs):
-        def get_theta(height):
-            return math.asin((height-45)/66)
+
+        #def get_theta(height):
+        #   return math.asin((height-45)/66)
+
         if isinstance(angle, cozmo.util.Angle):
-            angle = angle.radians
-        min_theta = get_theta(cozmo.robot.MIN_LIFT_HEIGHT_MM)
-        max_theta = get_theta(cozmo.robot.MAX_LIFT_HEIGHT_MM)
+            angle = angle.degrees
+        self.angle = angle
+        super().__init__(0, abort_on_stop=abort_on_stop, **action_kwargs)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
+            self.angle = event.data.degrees
+        min_theta = cozmo.robot.MIN_LIFT_ANGLE.degrees
+        max_theta = cozmo.robot.MAX_LIFT_ANGLE.degrees
         angle_range = max_theta - min_theta
-        height_pct = (angle - min_theta) / angle_range
-        super().__init__(height_pct, abort_on_stop=abort_on_stop, **action_kwargs)
+        self.height = (self.angle - min_theta) / angle_range
+        super().start(event)
 
 
 class DockWithCube(ActionNode):

@@ -8,10 +8,10 @@ from cozmo.util import Pose
 from . import evbase
 from . import transform
 from . import custom_objs
-from .transform import wrap_angle, quat2rot
+from .transform import wrap_angle, quat2rot, quaternion_to_euler_angle
 
 import math
-import numpy
+import numpy as np
 
 ORIENTATION_UPRIGHT = 'upright'
 ORIENTATION_INVERTED = 'inverted'
@@ -21,36 +21,17 @@ ORIENTATION_LEFT = 'left'
 ORIENTATION_RIGHT = 'right'
 
 
-def quaternion_to_euler_angle(quaternion):
-    # source: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
-    w, x, y, z = quaternion
-    t0 = +2.0 * (w * x + y * z)
-    t1 = +1.0 - 2.0 * (x * x + y * y)
-    X = math.atan2(t0, t1)
-
-    t2 = +2.0 * (w * y - z * x)
-    t2 = +1.0 if t2 > +1.0 else t2
-    t2 = -1.0 if t2 < -1.0 else t2
-    Y = math.asin(t2)
-
-    t3 = +2.0 * (w * z + x * y)
-    t4 = +1.0 - 2.0 * (y * y + z * z)
-    Z = math.atan2(t3, t4)
-
-    return X, Y, Z
-
-
 def get_orientation_state(quaternion, isPlanar=False):
     q0, q1, q2, q3 = quaternion
     mat_arr = quat2rot(q0, q1, q2, q3)
-    z_vec = numpy.array([0, 0, 1, 1])
+    z_vec = np.array([0, 0, 1, 1])
     z_dot = mat_arr.dot(z_vec)[:3]
-    dot_product = numpy.round(z_dot.dot(numpy.array([0, 0, 1])), decimals=2)
+    dot_product = np.round(z_dot.dot(np.array([0, 0, 1])), decimals=2)
     x, y, z = quaternion_to_euler_angle(quaternion)
     if isPlanar:
         perpendicular = True if -0.5 < y < 0.5 else False
         if not perpendicular:
-            dot_product = numpy.round(z_dot.dot(numpy.array([1, 0, 0])), decimals=2)
+            dot_product = np.round(z_dot.dot(np.array([1, 0, 0])), decimals=2)
             x, y, z = quaternion_to_euler_angle([q0, q2, q3, q1])
             x = -y if x>0 else y+math.pi
             x = x if x < math.pi else (x - 2*math.pi)
@@ -110,7 +91,6 @@ class LightCubeObj(WorldObject):
         # self.theta = theta
         self.size = self.light_cube_size
         self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
-
 
     @property
     def is_visible(self):
@@ -235,7 +215,7 @@ class WallObj(WorldObject):
             if len(marker_specs) > 0:
                 k = list(marker_specs.keys())
                 k.sort()
-                self.wall_label = str(k[0])
+                self.wall_label = k[0][1+k[0].rfind('-'):]
                 id = 'Wall-%s' % self.wall_label
             elif wall_spec and wall_spec.label:
                 self.wall_label = wall_spec.label
@@ -272,14 +252,11 @@ class WallObj(WorldObject):
         "Called by add_fixed_landmark to make fixed aruco markers."
         for key,value in self.marker_specs.items():
             # Project marker onto the wall; move marker if it already exists
-            marker_id = 'Aruco-' + str(key)
-            marker = world_map.objects.get(marker_id, None)
+            marker = world_map.objects.get(key, None)
             if marker is None:
-                marker = ArucoMarkerObj(world_map.robot.world.aruco, marker_number=key)
+                marker_number = int(key[1+key.rfind('-'):])
+                marker = ArucoMarkerObj(world_map.robot.world.aruco, marker_number=marker_number)
                 world_map.objects[marker.id] = marker
-                print('make_arucos made', marker)
-            else:
-                print('make_arucos using',marker)
             wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
             rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
@@ -308,14 +285,15 @@ class WallObj(WorldObject):
             return '<WallObj %s: (%.1f,%.1f) @ %d deg. for %.1f%s%s>' % \
                 (self.id, self.x, self.y, self.theta*180/pi, self.length, fix, vis)
         else:
-            return '<WallObj %s: position unknoown>' % self.id
+            return '<WallObj %s: position unknown>' % self.id
 
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
-        id = 'Doorway-%d' % (wall.door_ids[index])
+        id = 'Doorway-' + str(wall.door_ids[index])
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall
+        self.door_width = wall.door_width
         self.index = index  # which doorway is this?  0, 1, ...
         self.marker_id = wall.door_ids[index]
         self.is_obstacle = False
@@ -332,6 +310,7 @@ class DoorwayObj(WorldObject):
             self.x = (self.y - b) / m
         else:
             self.x = self.wall.x
+        self.pose_confidence = self.wall.pose_confidence
 
     def __repr__(self):
         if self.pose_confidence >= 0:
@@ -339,6 +318,26 @@ class DoorwayObj(WorldObject):
                 (self.id, self.x, self.y, self.theta*180/pi)
         else:
             return '<DoorwayObj %s: position unknown>' % self.id
+
+
+class RoomObj(WorldObject):
+    def __init__(self, name,
+                 points=np.resize(np.array([0,0,0,1]),(4,4)).transpose(),
+                 floor=1, door_ids=[], connections=[]):
+        "points should be four points in homogeneous coordinates forming a convex polygon"
+        id = 'Room-' + name
+        self.name = name
+        x,y,z,s = points.mean(1)
+        super().__init__(id,x,y)
+        self.points = points
+        self.floor = floor
+        self.door_ids = door_ids
+        self.connections = connections
+        self.is_obstacle = False
+        self.is_fixed = True
+
+    def __repr__(self):
+        return '<Room %s: (%.1f,%.1f) floor=%s>' % (self.name, self.x, self.y, self.floor)
 
 
 class ChipObj(WorldObject):
@@ -356,6 +355,7 @@ class FaceObj(WorldObject):
         super().__init__(id, x, y, z)
         self.sdk_obj = sdk_obj
         self.is_obstacle = False
+        self.expression = 'unknown'
 
     @property
     def name(self):
@@ -493,7 +493,7 @@ class WorldMap():
             else:
                 if face in self.robot.world.world_map.objects:
                     del  self.robot.world.world_map.objects[face]
-        self.update_arucos()
+        self.update_aruco_landmarks()
         self.update_walls()
         self.update_doorways()
         self.update_perched_cameras()
@@ -553,14 +553,15 @@ class WorldMap():
             wmobject.orientation, _, _, wmobject.theta = get_orientation_state(charger.pose.rotation.q0_q1_q2_q3)
         return wmobject
 
-    def update_arucos(self):
+    def update_aruco_landmarks(self):
         try:
             seen_marker_objects = self.robot.world.aruco.seen_marker_objects.copy()
         except:
             return
         aruco_parent = self.robot.world.aruco
-        for (id,value) in seen_marker_objects.items():
-            wmobject = self.objects.get(id, None)
+        for (key,value) in seen_marker_objects.items():
+            marker_id = value.id_string
+            wmobject = self.objects.get(marker_id, None)
             if wmobject is None:
                 # TODO: wait to see marker several times before adding.
                 wmobject = ArucoMarkerObj(aruco_parent,key)
@@ -618,11 +619,11 @@ class WorldMap():
                     # Make the doorways
                     wall.make_doorways(self.robot.world.world_map)
                 # Relocate the aruco markers to their predefined positions
-                spec = wall_marker_dict[wall.id]
+                spec = wall_marker_dict.get(wall.id, None)
+                if spec is None: return
                 for key,value in spec.marker_specs.items():
-                    marker_id = 'Aruco-' + str(key)
-                    if marker_id in self.robot.world.world_map.objects:
-                        aruco_marker = self.robot.world.world_map.objects[marker_id]
+                    if key in self.robot.world.world_map.objects:
+                        aruco_marker = self.robot.world.world_map.objects[key]
                         dir = value[0]    # +1 for front side or -1 for back side
                         s = 0 if dir == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
@@ -636,7 +637,6 @@ class WorldMap():
         for key,value in self.robot.world.world_map.objects.items():
             if isinstance(key,str) and  'Doorway' in key:
                 value.update()
-
 
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
@@ -747,6 +747,7 @@ class WorldMap():
                                       z=val[1][0], theta=val[1][2], phi=val[1][1])
 
     def invalidate_poses(self):
+        # *** This medthod is not currently used. ***
         for wmobj in self.robot.world.world_map.objects.values():
             if not wmobj.is_fixed:
                 wmobj.pose_confidence = -1
@@ -795,9 +796,9 @@ class WallSpec():
         self.door_ids = door_ids
         marker_ids = list(marker_specs.keys())
         if len(marker_ids) > 0 and not label:
-            label = str(min(marker_ids))
-        self.id = 'Wall-%s' % label
+            label = min(marker_ids)
+        self.id = 'Wall-' + label[1+label.rfind('-'):]
         global wall_marker_dict
         for id in marker_ids:
             wall_marker_dict[id] = self
-        wall_marker_dict[label] = self
+        wall_marker_dict[self.id] = self

@@ -3,7 +3,7 @@ Transformation matrices for kinematics calculations.
 """
 
 import numpy as np
-from math import sin, cos, tan, pi
+from math import sin, cos, tan, pi, atan2, asin, sqrt
 
 def point(x=0,y=0,z=0):
     return np.array([ [x], [y], [z], [1.] ])
@@ -121,6 +121,8 @@ def tprint(t):
     else:
         print(t)
 
+#---------------- Quaternions ----------------
+
 def quat2rot(q0,q1,q2,q3):
     # formula from http://stackoverflow.com/questions/7938373/from-quaternions-to-opengl-rotations
     q0_sq = q0*q0; q1_sq = q1*q1; q2_sq = q2*q2; q3_sq = q3*q3
@@ -149,6 +151,25 @@ def quat2rot33(q0,q1,q2,q3):
         [ q0_sq+q1_sq-q2_sq-q3_sq, t_q1q2-t_q0q3,           t_q1q3+t_q0q2,         ],
         [ t_q1q2+t_q0q3,           q0_sq-q1_sq+q2_sq-q3_sq, t_q2q3-t_q0q1,         ],
         [ t_q1q3-t_q0q2,           t_q2q3+t_q0q1,           q0_sq-q1_sq-q2_sq+q3_sq]])
+
+
+def quaternion_to_euler_angle(quaternion):
+    # source: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+    w, x, y, z = quaternion
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    X = atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    Y = asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    Z = atan2(t3, t4)
+
+    return X, Y, Z
 
 
 #---------------- General Geometric Calculations ----------------
@@ -189,3 +210,38 @@ def line_intersection(L1,L2):
     y = Dy / D
     return (x,y)
 
+def segment_intersect_test(p1, p2, p3, p4):
+    """Returns True if the line segment from p1 to p2
+    intersects the line segment from p3 to p4. Formula from
+    http://www.cs.swan.ac.uk/~cssimon/line_intersection.html"""
+    (x1,y1) = p1
+    (x2,y2) = p2
+    (x3,y3) = p3
+    (x4,y4) = p4
+    denom = (x4-x3)*(y1-y2) - (x1-x2)*(y4-y3)
+    if abs(denom) < 0.0001:
+        return False
+    numa = (y3-y4)*(x1-x3) + (x4-x3)*(y1-y3)
+    numb = (y1-y2)*(x1-x3) + (x2-x1)*(y1-y3)
+    ta = numa / denom
+    tb = numb / denom
+    if (0 <= ta <= 1) and (0 <= tb <= 1):
+        return True
+    else:
+        return False
+
+
+def rotation_matrix_to_euler_angles(R):
+    "Input R is a 3x3 rotation matrix."
+    sy = sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    singular = sy < 1e-6
+    if  not singular:
+        x = atan2(R[2,1] , R[2,2])
+        y = atan2(-R[2,0], sy)
+        z = atan2(R[1,0], R[0,0])
+    else:
+        x = atan2(-R[1,2], R[1,1])
+        y = atan2(-R[2,0], sy)
+        z = 0
+
+    return np.array([x, y, z])

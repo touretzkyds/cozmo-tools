@@ -40,7 +40,7 @@ class StateMachineProgram(StateNode):
                  viewer_crosshairs = False,  # set to True to draw viewer crosshairs
 
                  particle_filter = True,
-                 landmark_test = SLAMSensorModel.is_aruco,
+                 landmark_test = SLAMSensorModel.is_solo_aruco,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
 
@@ -224,7 +224,6 @@ class StateMachineProgram(StateNode):
     def robot_picked_up(self):
         print('** Robot was picked up!')
         self.robot.stop_all_motors()
-        self.robot.world.world_map.invalidate_poses()
         self.run_picked_up_handler(self)
 
     def run_picked_up_handler(self,node):

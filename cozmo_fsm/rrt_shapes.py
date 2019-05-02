@@ -59,9 +59,9 @@ class Polygon(Shape):
                           for i in range(N) )
       center = vertices.mean(1).resize(4,1)
 
-    def collides_poly(poly): pass
+    def collides_poly(self,poly): pass
 
-    def collides_circle(circle):
+    def collides_circle(self,circle):
         raise ValueError()
 
 class Rectangle(Polygon):
