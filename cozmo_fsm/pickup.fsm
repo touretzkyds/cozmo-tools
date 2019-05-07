@@ -14,6 +14,7 @@ from .trace import tracefsm
 from math import sin, cos, atan2, pi, sqrt
 
 
+
 class GoToCube(StateNode):
     def __init__(self, cube=None):
         self.object = cube
@@ -367,17 +368,45 @@ class GoToCube(StateNode):
                 print('Haven\'t tired out all sides of cube. Going to try the side', self.parent.side_index)
 
 
+    class CheckCubePoseValid(StateNode):
+        def __init__(self):
+            super().__init__()
+
+        def start(self, event=None):
+            super().start(event)
+
+            if isinstance(self.parent.object, LightCube):
+                cube_id = self.parent.object.wm_obj.id
+            elif isinstance(self.parent.object, LightCubeObj):
+                cube_id = self.parent.object.id
+            else:
+                raise ValueError(self.parent.object)
+
+            if 'Cube' not in str(cube_id):
+                cube_id = 'Cube-' + str(cube_id)
+            wmobject = self.robot.world.world_map.objects[cube_id]
+
+            if wmobject.pose_confidence < 0:
+                print('CheckCubePoseValid: %s has invalid pose!' % cube_id)
+                self.post_failure()
+            else:
+                self.post_completion()
+
+
     $setup{
         # GoToCube machine
 
         droplift: SetLiftHeight(0)
-        droplift =C=> Print('droplift succeeded') =N=> {looker, waitlift}
-        droplift =F=> Print('droplift failed') =N=> {looker, waitlift}   # lift motion fails if on charger
+        droplift =C=> Print('droplift succeeded') =N=> {looker, waitlift, check_cube_pose_valid}
+        droplift =F=> Print('droplift failed') =N=> {looker, waitlift, check_cube_pose_valid}   # lift motion fails if on charger
 
         looker: LookAtObject()
 
         waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
            check_almost_docked
+
+        check_cube_pose_valid: self.CheckCubePoseValid() =C=> check_cube_pose_valid
+        check_cube_pose_valid =F=> ParentFails()
 
         check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
         check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
