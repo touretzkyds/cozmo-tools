@@ -97,12 +97,13 @@ class DoorPass(StateNode):
     class TurnToMarker(Turn):
         """Use camera image and native pose to center the door marker."""
         def start(self,event=None):
-            marker_id = self.parent.object.marker_id
-            marker = self.robot.world.aruco.seen_marker_objects.get(marker_id, None)
+            marker_ids = self.parent.object.marker_ids
+            marker = self.robot.world.aruco.seen_marker_objects.get(marker_ids[0], None) or \
+                     self.robot.world.aruco.seen_marker_objects.get(marker_ids[1], None)
             if not marker:
                 self.angle = Angle(0)
                 super().start(event)
-                print("TurnToMarker failed to find marker %s!" % marker_id)
+                print("TurnToMarker failed to find marker %s or %s!" % marker_ids)
                 self.post_failure()
                 return
             sensor_dist = marker.camera_distance
@@ -119,7 +120,7 @@ class DoorPass(StateNode):
                 self.angle = Angle(0)
             else:
                 self.angle = Angle(radians=turn)
-            print("TurnTOMarker %s turning by %.1f degrees" % (self.name, self.angle.degrees))
+            print("TurnToMarker %s turning by %.1f degrees" % (self.name, self.angle.degrees))
             super().start(event)
 
     $setup{
@@ -142,10 +143,18 @@ class DoorPass(StateNode):
 
         turn_to_gate2: self.TurnToGate(70) =C=> StateNode() =T(0.2)=> turn_to_marker1
 
-        turn_to_marker1: self.TurnToMarker() =C=>
-            self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=> StateNode() =T(0.2)=> turn_to_marker2
+        turn_to_marker1: self.TurnToMarker()
+        turn_to_marker1 =C=> marker_forward1
+        turn_to_marker1 =F=> marker_forward1
 
-        turn_to_marker2: self.TurnToMarker() =C=> StateNode() =T(0.2)=>  {lower_head, through_door}
+        marker_forward1: self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=>
+            StateNode() =T(0.2)=> turn_to_marker2
+
+        turn_to_marker2: self.TurnToMarker()
+        turn_to_marker2 =C=> marker_forward2
+        turn_to_marker2 =F=> marker_forward2
+
+        marker_forward2: StateNode() =T(0.2)=>  {lower_head, through_door}
 
         lower_head: SetHeadAngle(0)
 

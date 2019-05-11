@@ -304,7 +304,7 @@ class WallObj(WorldObject):
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
         self.marker_ids = wall.door_ids[index]
-        id = 'Doorway-' + str(marker_ids[0])
+        id = 'Doorway-' + str(self.marker_ids[0])
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall

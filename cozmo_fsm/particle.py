@@ -1083,7 +1083,7 @@ class SLAMParticleFilter(ParticleFilter):
                    self.get_aruco_landmark_specs(seen_marker_objects) + \
                    self.get_wall_landmark_specs(seen_marker_objects)
         if not lm_specs: return False
-        print('**** lm_specs:', lm_specs)
+        #print('**** lm_specs:', lm_specs)
         num_specs = len(lm_specs)
         particles = self.particles
         phi_jitter = np.random.normal(0.0, self.angle_jitter, size=self.num_particles)
@@ -1094,7 +1094,7 @@ class SLAMParticleFilter(ParticleFilter):
             (obj, sensor_dist, sensor_bearing, sensor_orient, lm_pose) = lm_specs[i % num_specs]
             # phi is our bearing relative to the landmark, independent of our orientation
             phi = wrap_angle(lm_pose[1] - sensor_orient + sensor_bearing + phi_jitter[i])
-            if i == 1:
+            if i == -1: # change to i==1 to re-enable
                 print('phi=', phi*180/pi, '  lm_pose[1]=', lm_pose[1]*180/pi,
                       '  sensor_bearing=',sensor_bearing*180/pi,
                       '  sensor_orient=', sensor_orient*180/pi)
