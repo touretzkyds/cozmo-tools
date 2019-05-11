@@ -39,7 +39,7 @@ class StateMachineProgram(StateNode):
                  viewer_crosshairs = False,  # set to True to draw viewer crosshairs
 
                  particle_filter = True,
-                 landmark_test = SLAMSensorModel.is_solo_aruco,
+                 landmark_test = SLAMSensorModel.is_solo_aruco_landmark,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
 
