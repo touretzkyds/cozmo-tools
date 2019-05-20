@@ -158,6 +158,57 @@ def quaternion_to_euler_angle(quaternion):
     return X, Y, Z
 
 
+#---------------- Orientation state from quaternion ----------------
+
+ORIENTATION_UPRIGHT = 'upright'
+ORIENTATION_INVERTED = 'inverted'
+ORIENTATION_SIDEWAYS = 'sideways'
+ORIENTATION_TILTED = 'tilted'
+ORIENTATION_LEFT = 'left'
+ORIENTATION_RIGHT = 'right'
+
+def get_orientation_state(quaternion, isPlanar=False):
+    """Utility used by light cubes, charger, and custom markers."""
+    q0, q1, q2, q3 = quaternion
+    mat_arr = quat2rot(q0, q1, q2, q3)
+    z_vec = np.array([0, 0, 1, 1])
+    z_dot = mat_arr.dot(z_vec)[:3]
+    dot_product = np.round(z_dot.dot(np.array([0, 0, 1])), decimals=2)
+    x, y, z = quaternion_to_euler_angle(quaternion)
+    if isPlanar:
+        perpendicular = True if -0.5 < y < 0.5 else False
+        if not perpendicular:
+            dot_product = np.round(z_dot.dot(np.array([1, 0, 0])), decimals=2)
+            x, y, z = quaternion_to_euler_angle([q0, q2, q3, q1])
+            x = -y if x>0 else y+math.pi
+            x = x if x < math.pi else (x - 2*math.pi)
+    if dot_product >= 0.9:
+        orientation = ORIENTATION_UPRIGHT
+    elif dot_product <= -0.9:
+        orientation = ORIENTATION_INVERTED
+        z -= math.pi
+    elif -0.1 <= dot_product <= 0.1:
+        if isPlanar:
+            # Markers
+            if 0 < x < math.pi:
+                orientation = ORIENTATION_RIGHT
+            else:
+                orientation = ORIENTATION_LEFT
+        else:
+            # Cubes
+            orientation = ORIENTATION_SIDEWAYS
+            if round(y, 1) == 0:
+                z = z-math.pi/2 if x>0 else z+math.pi/2
+            else:
+                w, x, y, z = quaternion
+                x, y, z = quaternion_to_euler_angle([w, y, x, z])
+                z = -y if x>0 else y+math.pi
+    else:
+        orientation = ORIENTATION_TILTED
+
+    return orientation, x, y, z
+
+
 #---------------- General Geometric Calculations ----------------
 
 def project_to_line(x0,y0,theta0,x1,y1):
@@ -195,6 +246,27 @@ def line_intersection(L1,L2):
     x = Dx / D
     y = Dy / D
     return (x,y)
+
+def segment_intersect_test(p1, p2, p3, p4):
+    """Returns True if the line segment from p1 to p2
+    intersects the line segment from p3 to p4. Formula from
+    http://www.cs.swan.ac.uk/~cssimon/line_intersection.html"""
+    (x1,y1) = p1
+    (x2,y2) = p2
+    (x3,y3) = p3
+    (x4,y4) = p4
+    denom = (x4-x3)*(y1-y2) - (x1-x2)*(y4-y3)
+    if abs(denom) < 0.0001:
+        return False
+    numa = (y3-y4)*(x1-x3) + (x4-x3)*(y1-y3)
+    numb = (y1-y2)*(x1-x3) + (x2-x1)*(y1-y3)
+    ta = numa / denom
+    tb = numb / denom
+    if (0 <= ta <= 1) and (0 <= tb <= 1):
+        return True
+    else:
+        return False
+    
 
 def rotation_matrix_to_euler_angles(R):
     "Input R is a 3x3 rotation matrix."
