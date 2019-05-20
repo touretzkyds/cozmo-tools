@@ -8,59 +8,10 @@ from cozmo.util import Pose
 from . import evbase
 from . import transform
 from . import custom_objs
-from .transform import wrap_angle, quat2rot, quaternion_to_euler_angle
+from .transform import wrap_angle, quat2rot, quaternion_to_euler_angle, get_orientation_state
 
 import math
 import numpy as np
-
-ORIENTATION_UPRIGHT = 'upright'
-ORIENTATION_INVERTED = 'inverted'
-ORIENTATION_SIDEWAYS = 'sideways'
-ORIENTATION_TILTED = 'tilted'
-ORIENTATION_LEFT = 'left'
-ORIENTATION_RIGHT = 'right'
-
-
-def get_orientation_state(quaternion, isPlanar=False):
-    q0, q1, q2, q3 = quaternion
-    mat_arr = quat2rot(q0, q1, q2, q3)
-    z_vec = np.array([0, 0, 1, 1])
-    z_dot = mat_arr.dot(z_vec)[:3]
-    dot_product = np.round(z_dot.dot(np.array([0, 0, 1])), decimals=2)
-    x, y, z = quaternion_to_euler_angle(quaternion)
-    if isPlanar:
-        perpendicular = True if -0.5 < y < 0.5 else False
-        if not perpendicular:
-            dot_product = np.round(z_dot.dot(np.array([1, 0, 0])), decimals=2)
-            x, y, z = quaternion_to_euler_angle([q0, q2, q3, q1])
-            x = -y if x>0 else y+math.pi
-            x = x if x < math.pi else (x - 2*math.pi)
-    if dot_product >= 0.9:
-        orientation = ORIENTATION_UPRIGHT
-    elif dot_product <= -0.9:
-        orientation = ORIENTATION_INVERTED
-        z -= math.pi
-    elif -0.1 <= dot_product <= 0.1:
-        if isPlanar:
-            # Markers
-            if 0 < x < math.pi:
-                orientation = ORIENTATION_RIGHT
-            else:
-                orientation = ORIENTATION_LEFT
-        else:
-            # Cubes
-            orientation = ORIENTATION_SIDEWAYS
-            if round(y, 1) == 0:
-                z = z-math.pi/2 if x>0 else z+math.pi/2
-            else:
-                w, x, y, z = quaternion
-                x, y, z = quaternion_to_euler_angle([w, y, x, z])
-                z = -y if x>0 else y+math.pi
-    else:
-        orientation = ORIENTATION_TILTED
-
-    return orientation, x, y, z
-
 
 class WorldObject():
     def __init__(self, id=None, x=0, y=0, z=0, is_visible=None):
@@ -283,8 +234,6 @@ class WallObj(WorldObject):
             marker.z = rel_xyz[2][0]
             marker.theta = wrap_angle(self.theta + s)
             marker.is_fixed = self.is_fixed
-            if self.is_fixed:
-                world_map.robot.world.particle_filter.add_fixed_landmark(marker)
 
     @property
     def is_visible(self):
@@ -305,13 +254,13 @@ class WallObj(WorldObject):
 
 class DoorwayObj(WorldObject):
     def __init__(self, wall, index):
-        id = 'Doorway-' + str(wall.door_ids[index])
+        self.marker_ids = wall.door_ids[index]
+        id = 'Doorway-' + str(self.marker_ids[0])
         super().__init__(id,0,0)
         self.theta = wall.theta
         self.wall = wall
         self.door_width = wall.door_width
         self.index = index  # which doorway is this?  0, 1, ...
-        self.marker_id = wall.door_ids[index]
         self.is_obstacle = False
         self.update()
 
@@ -321,7 +270,7 @@ class DoorwayObj(WorldObject):
         m = max(-bignum, min(bignum, tan(self.theta+pi/2)))
         b = self.wall.y - m*self.wall.x
         dy =  (self.wall.length/2 - self.wall.doorways[self.index][0]) * cos(self.theta)
-        self.y = self.wall.y + dy
+        self.y = self.wall.y - dy
         if abs(m) > 1/bignum:
             self.x = (self.y - b) / m
         else:
@@ -468,13 +417,14 @@ class WorldMap():
     def add_fixed_landmark(self,landmark):
         landmark.is_fixed = True
         self.objects[landmark.id] = landmark
-        self.robot.world.particle_filter.add_fixed_landmark(landmark)
         if isinstance(landmark,WallObj):
             wall = landmark
+            if wall.marker_specs:
+                self.robot.world.particle_filter.add_fixed_landmark(landmark)
             wall.make_doorways(self)
             wall.make_arucos(self)
-            for key in wall.marker_specs.keys():
-                self.robot.world.particle_filter.add_fixed_landmark(self.objects[key])
+        else:
+            self.robot.world.particle_filter.add_fixed_landmark(landmark)
 
     def delete_wall(self,wall_id):
         "Delete a wall, its markers, and its doorways, so we can predefine a new one."
@@ -584,7 +534,7 @@ class WorldMap():
             wmobject = self.objects.get(marker_id, None)
             if wmobject is None:
                 # TODO: wait to see marker several times before adding.
-                wmobject = ArucoMarkerObj(aruco_parent,key)
+                wmobject = ArucoMarkerObj(aruco_parent,key)  # coordinates will be filled in below
                 self.objects[marker_id] = wmobject
                 landmark_spec = None
             else:
@@ -603,14 +553,26 @@ class WorldMap():
                 wmobject.elevation = elevation
                 wmobject.cam_pos = cam_pos
                 wmobject.base_pos = base_pos
-            elif isinstance(landmark_spec, Pose):
+            elif isinstance(landmark_spec, Pose):  # Hard-coded landmark pose for laboratory exercises
                 wmobject.x = landmark_spec.position.x
                 wmobject.y = landmark_spec.position.y
                 wmobject.theta = landmark_spec.rotation.angle_z.radians
             else:
-                # TODO: convert aruco sensor values to pf coordinates and update
-                # Right now we never get here because of HACK above.
-                pass
+                # Non-landmark: convert aruco sensor values to pf coordinates and update
+                elevation = atan2(value.camera_coords[1], value.camera_coords[2])
+                cam_pos = transform.point(0,
+                                          value.camera_distance * sin(elevation),
+                                          value.camera_distance * cos(elevation))
+                base_pos = self.robot.kine.joint_to_base('camera').dot(cam_pos)
+                wmobject.x = base_pos[0,0]
+                wmobject.y = base_pos[1,0]
+                wmobject.z = base_pos[2,0]
+                wmobject.theta = wrap_angle(self.robot.world.particle_filter.pose[2] +
+                                            value.euler_rotation[1]*(pi/180) + pi)
+                wmobject.elevation = elevation
+                wmobject.cam_pos = cam_pos
+                wmobject.base_pos = base_pos
+
 
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
@@ -647,7 +609,7 @@ class WorldMap():
                         dir = value[0]    # +1 for front side or -1 for back side
                         s = 0 if dir == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
-                        wall_xyz = transform.point(dir*(wall.length/2 - value[1][0]), 0, value[1][1])
+                        wall_xyz = transform.point(-dir*(wall.length/2 - value[1][0]), 0, value[1][1])
                         rel_xyz = transform.aboutZ(aruco_marker.theta + pi/2).dot(wall_xyz)
                         aruco_marker.x = wall.x + rel_xyz[0][0]
                         aruco_marker.y = wall.y + rel_xyz[1][0]

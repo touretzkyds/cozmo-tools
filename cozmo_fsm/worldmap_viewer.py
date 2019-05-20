@@ -495,7 +495,7 @@ class WorldMapViewer():
         glNewList(c, GL_COMPILE)
         glPushMatrix()
         glTranslatef(*pos)
-        glRotatef(marker.theta*180/pi, 0., 0., 1.)
+        glRotatef(marker.theta*180/pi+180, 0., 0., 1.)
         highlight = marker.is_visible
         marker_thickness = 5 # must be thicker than wall
         self.make_cube((marker_thickness,s,s), color=color, highlight=highlight)

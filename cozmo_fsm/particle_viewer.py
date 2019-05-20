@@ -43,6 +43,7 @@ Particle viewer commands:
 """
 
 help_text_mac = """
+Particle viewer commands:
   option + w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
   option + W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
   option + i/k        Head up/down 5 degrees
@@ -185,14 +186,16 @@ class ParticleViewer():
         glPopMatrix()
 
     def draw_landmarks(self):
-        landmarks = self.robot.world.particle_filter.sensor_model.landmarks
+        landmarks = self.robot.world.particle_filter.sensor_model.landmarks.copy()
         if not landmarks: return
-        # Extract keys and values as quickly as we can because
+        # Extract values as quickly as we can because
         # dictionary can change while we're iterating.
+        objs = self.robot.world.world_map.objects.copy()
         arucos = [(marker.id, (np.array([[marker.x], [marker.y]]), marker.theta, None))
-                  for marker in self.robot.world.world_map.objects.values()
+                  for marker in objs.values()
                   if isinstance(marker, ArucoMarkerObj)]
-        for (id,specs) in list(landmarks.items()) + arucos:
+        for (id,specs) in list(landmarks.items()) + \
+            [marker for marker in arucos if marker[0] not in landmarks]:
             if not isinstance(id,str):
                 raise TypeError("Landmark id's must be strings: %r" % id)
             color = None
@@ -233,16 +236,18 @@ class ParticleViewer():
     def draw_landmark_from_pose(self, id, specs, label, color):
         coords = (specs.position.x, specs.position.y)
         angle = specs.rotation.angle_z.degrees
-        if isinstance(id, cozmo.objects.LightCube):
+        if id.startswith('LightCube'):
             size = (44,44)
-        else:
+            angle_adjust = 0
+        else:  # Aruco
             size = (20,50)
+            angle_adjust = 90
         glPushMatrix()
         glColor4f(*color)
         self.draw_rectangle(coords, size=size, angle=angle, color=color)
         glColor4f(0., 0., 0., 1.)
         glTranslatef(*coords,0)
-        glRotatef(angle-90, 0., 0., 1.)
+        glRotatef(angle + angle_adjust, 0., 0., 1.)
         label_str = ascii(label)
         glTranslatef(3.-7*len(label_str), -5., 0.)
         glScalef(0.1,0.1,0.1)
@@ -257,29 +262,39 @@ class ParticleViewer():
         glColor4f(*color)
         if isinstance(id, cozmo.objects.LightCube):
             size = (44,44)
+            angle_offset = -90
+            translate = 0
         elif isinstance(id,str) and 'Wall' in id:
             try:
                 wall = self.robot.world.world_map.objects[id]
             except KeyError:  # race condition: not in worldmap yet
                 return
             size = (20, wall.length)
+            angle_offset = 90
+            translate = 0
         else: # Aruco
             size = (20,50)
+            angle_offset = 90
+            translate = 15
         if isinstance(id,str) and 'Video' in id:
             self.draw_triangle(coords, height=75, angle=lm_orient[1]*(180/pi),
                                color=color, fill=True)
             glColor4f(0., 0., 0., 1.)
             glTranslatef(*coords,0)
-            glRotatef(lm_orient[1]*(180/pi)-90, 0., 0., 1.)
+            glRotatef(lm_orient[1]*(180/pi)+angle_offset, 0., 0., 1.)
         else:
-            self.draw_rectangle(coords, size=size, angle=lm_orient*(180/pi), color=color)
+            glTranslatef(*coords,0.)
+            glRotatef(lm_orient*180/pi, 0., 0., 1.)
+            glTranslatef(translate, 0., 0.)
+            self.draw_rectangle([0,0], size=size, angle=0, color=color)
+            #self.draw_rectangle(coords, size=size, angle=lm_orient*(180/pi), color=color)
             glColor4f(0., 0., 0., 1.)
-            glTranslatef(*coords,0)
-            glRotatef(lm_orient*(180/pi)-90, 0., 0., 1.)
-        label_str = ascii(label)
-        glTranslatef(3.-7*len(label_str), -5., 0.)
-        glScalef(0.1,0.1,0.1)
-        for char in label_str:
+            #glTranslatef(*coords,0)
+            #glRotatef(lm_orient*(180/pi)+angle_offset, 0., 0., 1.)
+            glRotatef(angle_offset, 0., 0., 1.)
+        glTranslatef(3.0-7*len(label), -5.0, 0.0)
+        glScalef(0.1, 0.1, 0.1)
+        for char in label:
             glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
         glPopMatrix()
         ellipse_color = (color[1], color[2], color[0], 1)
@@ -417,6 +432,12 @@ class ParticleViewer():
             self.robot.loop.create_task(self.look(ang))
         elif key == b'k':     # head down
             ang = self.robot.head_angle.degrees - 5
+            self.robot.loop.create_task(self.look(ang))
+        elif key == b'I':     # head up
+            ang = self.robot.head_angle.degrees + 20
+            self.robot.loop.create_task(self.look(ang))
+        elif key == b'K':     # head down
+            ang = self.robot.head_angle.degrees - 20
             self.robot.loop.create_task(self.look(ang))
         elif key == b'z':     # delocalize
             pf.delocalize()
