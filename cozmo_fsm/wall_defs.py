@@ -114,4 +114,6 @@ def make_walls():
     
     wA = WallSpec(label='A', length=300, height=80)
 
+    wB = WallSpec(label='B', length=400, height=80)
+
 make_walls()
