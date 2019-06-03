@@ -39,7 +39,7 @@ class StateMachineProgram(StateNode):
                  viewer_crosshairs = False,  # set to True to draw viewer crosshairs
 
                  particle_filter = True,
-                 landmark_test = SLAMSensorModel.is_aruco,
+                 landmark_test = SLAMSensorModel.is_solo_aruco_landmark,
                  particle_viewer = False,
                  particle_viewer_scale = 1.0,
 
@@ -69,6 +69,8 @@ class StateMachineProgram(StateNode):
         if not hasattr(self.robot, 'erouter'):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
+        else:
+            self.robot.erouter.clear()
 
         # Reset custom objects
         cor = self.robot.world.undefine_all_custom_marker_objects()
@@ -223,7 +225,6 @@ class StateMachineProgram(StateNode):
     def robot_picked_up(self):
         print('** Robot was picked up!')
         self.robot.stop_all_motors()
-        self.robot.world.world_map.invalidate_poses()
         self.run_picked_up_handler(self)
 
     def run_picked_up_handler(self,node):

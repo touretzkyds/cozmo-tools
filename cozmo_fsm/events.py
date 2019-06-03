@@ -11,11 +11,13 @@ class CompletionEvent(Event):
     """Signals completion of a state node's action."""
     pass
 
+
 class SuccessEvent(Event):
     """Signals success of a state node's action."""
     def __init__(self,source,details):
         super().__init__(source)
         self.details = details
+
 
 class FailureEvent(Event):
     """Signals failure of a state node's action."""

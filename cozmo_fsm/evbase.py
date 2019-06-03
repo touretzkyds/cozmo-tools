@@ -44,6 +44,12 @@ class EventRouter:
         # event generator objects
         self.event_generators = dict()
 
+    def clear(self):
+        self.dispatch_table.clear()
+        self.listener_registry.clear()
+        self.wildcard_registry.clear()
+        self.event_generators.clear()
+
     def add_listener(self, listener, event_class, source):
         if not issubclass(event_class, Event):
             raise TypeError('% is not an Event' % event_type)
@@ -68,10 +74,11 @@ class EventRouter:
         reg_entry.append((event_class,source))
         self.listener_registry[listener] = reg_entry
 
-    # Transitions like =Hear('\w')=> must use None as a source because
-    # they do the matching themselves instead of relying on the event
-    # router. So to distinguish a wildcard =Hear=> transition from
-    # all the other Hear transitions, we must register it specially.
+    # Transitions like =Hear('foo')=> must use None as the source
+    # value because they do the matching themselves instead of relying
+    # on the event router. So to distinguish a wildcard =Hear=>
+    # transition, which must be invoked last, from all the other Hear
+    # transitions, we must register it specially.
     def add_wildcard_listener(self, listener, event_class, source):
         self.add_listener(listener, event_class, source)
         self.wildcard_registry[listener.handle_event] = True

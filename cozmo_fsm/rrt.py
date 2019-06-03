@@ -486,6 +486,7 @@ class RRT():
         last_x = -half_length
         edges = [ [0, -half_length, 0., 1.] ]
         for (center,width) in wall_spec.doorways:
+            width = 2 * width   # *** WIDEN DOORWAYS FOR PATH PLANNING SUCCESS
             left_edge = center - width/2 - half_length
             edges.append([0., left_edge, 0., 1.])
             widths.append(left_edge - last_x)

@@ -632,10 +632,10 @@ def suppress_filter(log_record):
         return False
     if message.startswith("Invalidating pose for") or \
        message.startswith("Robot delocalized") or \
-       message.startswith("ObjectPowerLevel event") or \
-       message.startswith("ObjectConnectionState event") or \
        message.startswith("Object connected") or \
        message.startswith("Object disconnected"):
+        return False
+    if message.find("event received for unknown object ID") >= 0:
         return False
     return True
 
