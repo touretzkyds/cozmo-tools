@@ -11,13 +11,13 @@ Available commands:
         Executable statements are directly passed to python's interpreter.
         The magic global variables ans holds the results of evaluating the
         last expression.
-        
-    exit    
+
+    exit
         Quit the CLI; return to Python.
 
     monitor(robot[, Event])
         Monitor all event types in the dispatch table, or a specified type of Event
-    
+
     unmonitor(robot[, Event])
         Turn off monitoring
 
@@ -39,8 +39,6 @@ Available commands:
     show cam_viewer | path_viewer | particle_viewer | worldmap_viewer
         Displays OpenCV viewer of the specified type.
 
-    show objects | landmarks | pose | particle [n]
-
     !cmd
         Runs 'cmd' in a shell and prints the result.
 *********
@@ -54,15 +52,15 @@ Author:     David S. Touretzky, Carnegie Mellon University
 """
 
 # All that stuff we really need in order to get going.
-import atexit 
+import atexit
 import code
 import datetime
 import logging
 import os
 import platform
 import re
-import readline 
-import rlcompleter 
+import readline
+import rlcompleter
 import subprocess
 import sys
 import time
@@ -92,7 +90,7 @@ from cozmo_fsm import *
 from cozmo_fsm.worldmap import ArucoMarkerObj, CustomMarkerObj, WallObj
 
 # tab completion
-readline.parse_and_bind('tab: complete') 
+readline.parse_and_bind('tab: complete')
 # history file
 if 'HOME' in os.environ:  # Linux
     histfile = os.path.join(os.environ['HOME'], '.pythonhistory')
@@ -101,11 +99,11 @@ elif 'USERPROFILE' in os.environ:  # Windows
 else:
     histfile = '.pythonhistory'
 
-try: 
-    readline.read_history_file(histfile) 
-except IOError: 
-    pass 
-atexit.register(readline.write_history_file, histfile) 
+try:
+    readline.read_history_file(histfile)
+except IOError:
+    pass
+atexit.register(readline.write_history_file, histfile)
 del rlcompleter
 
 os_version = platform.system()
@@ -179,7 +177,7 @@ def runfsm(module_name, running_modules=dict()):
     if not isinstance(the_class,type) or not issubclass(the_class,StateNode):
         cprint("Module %s does not contain a StateNode class named %s.\n" %
               (module_name, module_name), color="red")
-        return       
+        return
     the_module.robot = robot
     the_module.world = robot.world
     the_module.charger = robot.world.charger
@@ -235,6 +233,7 @@ def start_stuff(args):
   start shared_map
 """)
 
+
 def sort_wmobject_ids(ids):
     preference = ['Charger','Cube','Aruco','Wall','Door','CustomCube','CustomMarker','Room','Face']
 
@@ -246,9 +245,10 @@ def sort_wmobject_ids(ids):
             else:
                 index += 1
         return ('%02d' % index) + id
-    
+
     result = sorted(ids, key=key)
     return result
+
 
 def show_stuff(args):
     global running_fsm
@@ -265,13 +265,10 @@ def show_stuff(args):
         show_kine(args[1:])
     elif spec == 'cam_viewer' or spec=='viewer':
         if running_fsm:
-            running_fsm.stop()
-        running_fsm = StateMachineProgram(cam_viewer=True,
-                                          simple_cli_callback=simple_cli_callback)
-        running_fsm.set_name("CamViewer")
-        running_fsm.simple_cli_callback = simple_cli_callback
-        cozmo_fsm.program.running_fsm = running_fsm
-        robot.loop.call_soon(running_fsm.start)
+            running_fsm.cam_viewer = True
+        if not robot.world.cam_viewer:
+            robot.world.cam_viewer = CamViewer(robot)
+            robot.world.cam_viewer.start()
     elif spec == "crosshairs":
         if running_fsm:
             running_fsm.viewer_crosshairs = not running_fsm.viewer_crosshairs
@@ -288,12 +285,10 @@ def show_stuff(args):
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
     elif (spec == "all") or (spec == "all_viewers"):
-        running_fsm = StateMachineProgram(cam_viewer=True,
-                                          simple_cli_callback=simple_cli_callback)
-        running_fsm.set_name("CamViewer")
-        running_fsm.simple_cli_callback = simple_cli_callback
-        cozmo_fsm.program.running_fsm = running_fsm
-        robot.loop.call_soon(running_fsm.start)
+        if running_fsm:
+            running_fsm.cam_viewer = True
+        robot.world.cam_viewer = CamViewer(robot)
+        robot.world.cam_viewer.start()
         robot.world.particle_viewer = ParticleViewer(robot)
         robot.world.particle_viewer.start()
         robot.world.path_viewer = PathViewer(robot,world.rrt)
@@ -385,7 +380,7 @@ def show_kine_joint(name):
                 return '(' + (', '.join(['%9.5g' % x for x in val])) + ')'
         else:
             raise ValueError(type)
-        
+
     print(fmt % 'Name:', name)
     print(fmt % 'Type:', joint.type)
     print(fmt % 'Parent:', joint.parent.name if joint.parent else '')
@@ -400,7 +395,7 @@ def show_kine_joint(name):
     print(fmt % 'Link in base frame:')
     tprint(robot.kine.link_to_base(name))
     print()
-    
+
 def show_pose():
     print('robot.pose is:   %6.1f %6.1f @ %6.1f deg.' %
           (robot.pose.position.x, robot.pose.position.y, robot.pose_angle.degrees))
@@ -444,21 +439,43 @@ def show_landmarks_helper(landmarks):
         print(' at (%6.1f, %6.1f) @ %4.1f deg    +/- (%4.1f,%4.1f)  +/- %3.1f deg' %
               (x, y, theta, sigma_x, sigma_y, sigma_theta))
     print()
-    
+
 
 def show_objects():
     objs = robot.world.world_map.objects
     print('%d object%s in the world map:' %
           (len(objs), '' if len(objs) == 1 else 's'))
-    sorted_keys = sort_wmobject_ids(objs.keys())
-    for key in sorted_keys:
+    basics = [charger, cube1, cube2, cube3]
+    ordered_keys = []
+    for key in basics:
+        if key in objs:
+            ordered_keys.append(key)
+    customs = []
+    arucos = []
+    walls = []
+    misc = []
+    for (key,value) in objs.items():
+        if key in basics:
+            pass
+        elif isinstance(value, CustomMarkerObj):
+            customs.append(key)
+        elif isinstance(value, ArucoMarkerObj):
+            arucos.append(key)
+        elif isinstance(value, WallObj):
+            walls.append(key)
+        else:
+            misc.append(key)
+    arucos.sort()
+    walls.sort()
+    ordered_keys = ordered_keys + customs + arucos + walls + misc
+    for key in ordered_keys:
         print('  ', objs[key])
     print()
 
 def show_particle(args):
     if len(args) == 0:
+        particle_number = '(best=%d)' % robot.world.particle_filter.best_particle_index
         particle = robot.world.particle_filter.best_particle
-        particle_number = particle.index
     elif len(args) > 1:
         print('Usage:  show particle [number]')
         return
@@ -548,11 +565,7 @@ def cli_loop(robot):
         while cli_loop._line == '':
             readline.write_history_file(histfile)
             try:
-                if os_version == 'Darwin':   # Tkinter breaks console on Macs
-                    print('C> ', end='')
-                    cli_loop._line = sys.stdin.readline().strip()
-                else:
-                    cli_loop._line = cli_loop._console.raw_input('C> ').strip()
+                cli_loop._line = cli_loop._console.raw_input('C> ').strip()
             except KeyboardInterrupt:
                 process_interrupt()
                 continue

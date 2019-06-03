@@ -16,6 +16,7 @@ from .path_viewer import PathViewer
 from .speech import *
 from .worldmap import WorldMap
 from .worldmap_viewer import WorldMapViewer
+from .cam_viewer import CamViewer
 from .pilot import *
 from .pickup import *
 from .doorpass import *
@@ -23,4 +24,3 @@ from . import wall_defs
 from . import custom_objs
 
 del base
-

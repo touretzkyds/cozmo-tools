@@ -59,7 +59,7 @@ class RobotPosition(ParticleInitializer):
         self.x = x
         self.y = y
         self.theta = theta
-        
+
     def initialize(self, robot):
         if self.x is None:
             x = robot.pose.position.x
@@ -77,7 +77,7 @@ class RobotPosition(ParticleInitializer):
             p.weight = 1.0
         self.pf.pose = (x, y, theta)
         self.pf.motion_model.old_pose = robot.pose
-    
+
 
 #================ Motion Model ================
 
@@ -508,7 +508,7 @@ class ParticleFilter():
         particles = self.particles
         for i in range(self.num_particles):
             p = particles[i]
-            p.log_weight += wt_inc            
+            p.log_weight += wt_inc
             exp_weights[i] = p.weight = exp(p.log_weight)
         variance = np.var(exp_weights)
         return variance
@@ -742,7 +742,7 @@ class SLAMSensorModel(SensorModel):
         #return False # **** DEBUG HACK
         "True for independent Aruco landmarks not associated with any wall."
         return isinstance(x, ArucoMarker) and x.id_string not in wall_marker_dict
-    
+
     def __init__(self, robot, landmark_test=None, landmarks=None,
                  distance_variance=200):
         if landmarks is None:
@@ -916,7 +916,7 @@ class SLAMSensorModel(SensorModel):
                 del self.candidate_arucos[id]
 
         return evaluated
-    
+
     def process_landmark(self, id, data, just_looking, seen_marker_objects):
         particles = self.robot.world.particle_filter.particles
         if id.startswith('Aruco-'):
