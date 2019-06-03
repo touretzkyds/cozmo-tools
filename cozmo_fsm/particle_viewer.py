@@ -14,6 +14,7 @@ import math
 from math import sin, cos, pi, atan2, sqrt
 import array
 import numpy as np
+import platform
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees
@@ -23,6 +24,41 @@ from .worldmap import ArucoMarkerObj
 
 REDISPLAY = True   # toggle this to suspend constant redisplay
 WINDOW = None
+
+help_text = """
+Particle viewer commands:
+  w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
+  W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
+  i/k        Head up/down 5 degrees
+  e          Evaluate particles using current sensor info
+  r          Resample particles (evaluates first)
+  z          Reset particle positions (randomize, or all 0 for SLAM)
+  c          Clear landmarks (for SLAM)
+  arrows     Translate the view up/down/left/right
+  Home       Center the view (zero translation)
+  <          Zoom in
+  >          Zoom out
+  $          Toggle redisplay (for debugging)
+  h          Print this help text
+"""
+
+help_text_mac = """
+Particle viewer commands:
+  option + w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
+  option + W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
+  option + i/k        Head up/down 5 degrees
+  option + e          Evaluate particles using current sensor info
+  option + r          Resample particles (evaluates first)
+  option + z          Reset particle positions (randomize, or all 0 for SLAM)
+  option + c          Clear landmarks (for SLAM)
+  arrows              Translate the view up/down/left/right
+  fn + left-arrow     Center the view (zero translation)
+  option + <          Zoom in
+  option + >          Zoom out
+  option + $          Toggle redisplay (for debugging)
+  option + h          Print this help text
+"""
+
 
 class ParticleViewer():
     def __init__(self, robot,
@@ -58,7 +94,10 @@ class ParticleViewer():
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)
-        print("Type 'h' in the particle viewer window for help.")
+        if platform.system() == 'Darwin':
+            print("Type 'option' + 'h' in the particle viewer window for help.")
+        else:
+            print("Type 'h' in the particle viewer window for help.")
 
     def draw_rectangle(self, center, size=(10,10),
                        angle=0, color=(1,1,1), fill=True):
@@ -160,35 +199,30 @@ class ParticleViewer():
             if not isinstance(id,str):
                 raise TypeError("Landmark id's must be strings: %r" % id)
             color = None
-            if id.startswith('Aruco-'):
-                label = id[6:]
-                num = int(label)
-                seen = num in self.robot.world.aruco.seen_marker_ids
-            elif id.startswith('Cube-'):
-                label = id[5:]
-                num = int(label)
-                cube = self.robot.world.light_cubes[num]
-                seen = cube.is_visible
-                if seen:
+            if isinstance(id, cozmo.objects.LightCube):
+                label = id.cube_id
+                if id.is_visible:
                     color = (0.5, 0.3, 1, 0.75)
                 else:
                     color = (0, 0, 0.5, 0.75)
-            elif id.startswith('Wall-'):
-                label = 'W' + id[id.find('-')+1:]
-                try:
-                    seen = self.robot.world.world_map.objects[id].is_visible
-                except:
-                    seen = False
-                if seen:
-                    color = (1, 0.5, 0.3, 0.75)
-                else:
-                    color = (0.5, 0, 0, 0.75)
-            elif id.startswith('Video'):
-                seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
-                       id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
-                label = id
+            elif isinstance(id, str):
+                if 'Video' in id:
+                    seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
+                           id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
+                    label = id
+                elif 'Wall' in id:
+                    label = 'W' + id[id.find('-')+1:]
+                    try:
+                        seen = self.robot.world.world_map.objects[id].is_visible
+                    except:
+                        seen = False
+                    if seen:
+                        color = (1, 0.5, 0.3, 0.75)
+                    else:
+                        color = (0.5, 0, 0, 0.75)
             else:
-                raise ValueError('Unrecognized landmark id: %s' % id)
+                seen = id in self.robot.world.aruco.seen_marker_ids
+                label = id
             if color is None:
                 if seen:
                     color = (0.5, 1, 0.3, 0.75)
@@ -333,7 +367,7 @@ class ParticleViewer():
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
         (xy_var,theta_var) = pf.variance
         print ('xy_var=', xy_var, '  theta_var=', theta_var)
-        
+
     def report_pose(self):
         (x,y,theta) = self.robot.world.particle_filter.pose
         hdg = math.degrees(theta)
@@ -415,11 +449,11 @@ class ParticleViewer():
             print('Landmarks cleared.')
         elif key == b'V':     # display weight variance
             self.report_variance(pf)
-        elif key == b'+':     # zoom in
+        elif key == b'<':     # zoom in
             self.scale *= 1.25
             self.print_display_params()
             return
-        elif key == b'-':     # zoom out
+        elif key == b'>':     # zoom out
             self.scale /= 1.25
             self.print_display_params()
             return
@@ -464,23 +498,7 @@ class ParticleViewer():
         glutPostRedisplay()
 
     def print_help(self):
-        print("""
-Particle viewer commands:
-  w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
-  W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
-   i/k       Head up/down 5 degrees
-   I/K       Head up/down 20 degrees
-    e        Evaluate particles using current sensor info
-    r        Resample particles (evaluates first)
-    z        Delocalize
-
-    c        Clear landmarks (for SLAM)
-  arrows     Translate the view up/down/left/right
-   Home      Center the view (zero translation)
-    +        Zoom in
-    -        Zoom out
-    $        Toggle redisplay (for debugging)
-    v        Toggle verbosity
-    V        Display weight variance
-    h        Print this help text
-""")
+        if platform.system() == 'Darwin':
+            print(help_text_mac)
+        else:
+            print(help_text)

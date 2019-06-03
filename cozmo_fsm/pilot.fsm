@@ -121,7 +121,7 @@ class PilotToPose(StateNode):
                 self.robot.world.path_viewer.clear()
 
             try:
-                (treeA, treeB, path) = self.planner(start_node, goal_node)                    
+                (treeA, treeB, path) = self.planner(start_node, goal_node)
             except StartCollides as e:
                 print('PilotPlanner: Start collides!',e)
                 self.parent.post_event(PilotEvent(StartCollides, e.args))
@@ -183,7 +183,7 @@ class PilotToPose(StateNode):
                 step = self.parent.navplan.steps[self.parent.index]
                 print('nav step', step)
                 self.post_event(DataEvent(self,step.type))
-                    
+
         class ExecuteDrive(DriveContinuous):
             def start(self, event=None):
                 step = self.parent.navplan.steps[self.parent.index]
@@ -203,7 +203,7 @@ class PilotToPose(StateNode):
                     self.post_success()
                 else:
                     self.post_completion()
-                    
+
         $setup{
             dispatch: self.DispatchStep()
             dispatch =D(NavStep.DRIVE)=> drive
@@ -327,7 +327,7 @@ class PilotBase(StateNode):
         dir = +1 if direct_turn_angle >=0 else -1
         cx = cur_x + self.arc_radius * cos(cur_q + dir*pi/2)
         cy = cur_y + self.arc_radius * sin(cur_q + dir*pi/2)
-        dx = cx - dest_x 
+        dx = cx - dest_x
         dy = cy - dest_y
         center_dist = sqrt(dx*dx + dy*dy)
         if center_dist < self.arc_radius:  # turn would be too wide: punt
@@ -405,7 +405,7 @@ class PilotToPoseOld(PilotBase):
         if self.robot.world.path_viewer:
             self.robot.world.path_viewer.clear()
         try:
-            (treeA, treeB, path) = self.planner(start_node, goal_node)                    
+            (treeA, treeB, path) = self.planner(start_node, goal_node)
         except StartCollides as e:
             print('Start collides!',e)
             self.post_event(PilotEvent(StartCollides, e.args))
