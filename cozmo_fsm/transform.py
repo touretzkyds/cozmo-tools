@@ -138,6 +138,20 @@ def quat2rot(q0,q1,q2,q3):
         [ t_q1q3-t_q0q2,           t_q2q3+t_q0q1,           q0_sq-q1_sq-q2_sq+q3_sq, 0. ],
         [             0.,                     0.,                      0.,           1.  ]])
 
+def quat2rot33(q0,q1,q2,q3):
+    # formula from http://stackoverflow.com/questions/7938373/from-quaternions-to-opengl-rotations
+    q0_sq = q0*q0; q1_sq = q1*q1; q2_sq = q2*q2; q3_sq = q3*q3
+    t_q0q1 = 2. * q0 * q1
+    t_q0q2 = 2. * q0 * q2
+    t_q0q3 = 2. * q0 * q3
+    t_q1q2 = 2. * q1 * q2
+    t_q1q3 = 2. * q1 * q3
+    t_q2q3 = 2. * q2 * q3
+    return np.array([
+        [ q0_sq+q1_sq-q2_sq-q3_sq, t_q1q2-t_q0q3,           t_q1q3+t_q0q2,         ],
+        [ t_q1q2+t_q0q3,           q0_sq-q1_sq+q2_sq-q3_sq, t_q2q3-t_q0q1,         ],
+        [ t_q1q3-t_q0q2,           t_q2q3+t_q0q1,           q0_sq-q1_sq-q2_sq+q3_sq]])
+
 
 def quaternion_to_euler_angle(quaternion):
     # source: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
@@ -266,7 +280,7 @@ def segment_intersect_test(p1, p2, p3, p4):
         return True
     else:
         return False
-    
+
 
 def rotation_matrix_to_euler_angles(R):
     "Input R is a 3x3 rotation matrix."

@@ -39,8 +39,6 @@ Available commands:
     show cam_viewer | path_viewer | particle_viewer | worldmap_viewer
         Displays OpenCV viewer of the specified type.
 
-    show objects | landmarks | pose | particle [n]
-
     !cmd
         Runs 'cmd' in a shell and prints the result.
 *********
@@ -235,6 +233,7 @@ def start_stuff(args):
   start shared_map
 """)
 
+
 def sort_wmobject_ids(ids):
     preference = ['Charger','Cube','Aruco','Wall','Door','CustomCube','CustomMarker','Room','Face']
 
@@ -249,6 +248,7 @@ def sort_wmobject_ids(ids):
 
     result = sorted(ids, key=key)
     return result
+
 
 def show_stuff(args):
     global running_fsm
@@ -265,13 +265,10 @@ def show_stuff(args):
         show_kine(args[1:])
     elif spec == 'cam_viewer' or spec=='viewer':
         if running_fsm:
-            running_fsm.stop()
-        running_fsm = StateMachineProgram(cam_viewer=True,
-                                          simple_cli_callback=simple_cli_callback)
-        running_fsm.set_name("CamViewer")
-        running_fsm.simple_cli_callback = simple_cli_callback
-        cozmo_fsm.program.running_fsm = running_fsm
-        robot.loop.call_soon(running_fsm.start)
+            running_fsm.cam_viewer = True
+        if not robot.world.cam_viewer:
+            robot.world.cam_viewer = CamViewer(robot)
+            robot.world.cam_viewer.start()
     elif spec == "crosshairs":
         if running_fsm:
             running_fsm.viewer_crosshairs = not running_fsm.viewer_crosshairs
@@ -288,12 +285,10 @@ def show_stuff(args):
             robot.world.worldmap_viewer = WorldMapViewer(robot)
             robot.world.worldmap_viewer.start()
     elif (spec == "all") or (spec == "all_viewers"):
-        running_fsm = StateMachineProgram(cam_viewer=True,
-                                          simple_cli_callback=simple_cli_callback)
-        running_fsm.set_name("CamViewer")
-        running_fsm.simple_cli_callback = simple_cli_callback
-        cozmo_fsm.program.running_fsm = running_fsm
-        robot.loop.call_soon(running_fsm.start)
+        if running_fsm:
+            running_fsm.cam_viewer = True
+        robot.world.cam_viewer = CamViewer(robot)
+        robot.world.cam_viewer.start()
         robot.world.particle_viewer = ParticleViewer(robot)
         robot.world.particle_viewer.start()
         robot.world.path_viewer = PathViewer(robot,world.rrt)
@@ -478,8 +473,8 @@ def show_objects():
 
 def show_particle(args):
     if len(args) == 0:
-        particle = robot.world.particle_filter.best_particle
         particle_number = '(best=%d)' % robot.world.particle_filter.best_particle_index
+        particle = robot.world.particle_filter.best_particle
     elif len(args) > 1:
         print('Usage:  show particle [number]')
         return
@@ -569,11 +564,7 @@ def cli_loop(robot):
         while cli_loop._line == '':
             readline.write_history_file(histfile)
             try:
-                if os_version == 'Darwin':   # Tkinter breaks console on Macs
-                    print('C> ', end='')
-                    cli_loop._line = sys.stdin.readline().strip()
-                else:
-                    cli_loop._line = cli_loop._console.raw_input('C> ').strip()
+                cli_loop._line = cli_loop._console.raw_input('C> ').strip()
             except KeyboardInterrupt:
                 process_interrupt()
                 continue

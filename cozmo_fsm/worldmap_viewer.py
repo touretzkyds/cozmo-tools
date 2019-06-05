@@ -6,6 +6,7 @@ from math import sin, cos, atan2, pi, radians
 import time
 import array
 import numpy as np
+import platform as pf
 
 try:
     from OpenGL.GLUT import *
@@ -47,6 +48,30 @@ World viewer keyboard commands:
   v            Toggle display of viewing parameters
   #            Disable/enable automatic redisplay
   h            Print help
+"""
+
+help_text_mac = """
+World viewer keyboard commands:
+  option + a       Translate gazepoint left
+  option + d       Translate gazepoint right
+  option + w       Translate gazepoint forward
+  option + s       Translate gazepoint backward
+  option + <       Zoom in
+  option + >       Zoom out
+  fn + up-arrow    Translate gazepoint up
+  fn + down-arrow  Translate gazepoint down
+
+  left-arrow       Orbit camera left
+  right-arrow      Orbit camera right
+  up-arrow         Orbit camera upward
+  down-arrow       Orbit camera downward
+
+  option + m       Toggle memory map
+  option + x       Toggle axes
+  option + z       Reset to initial view
+  option + v       Toggle display of viewing parameters
+  #                Disable/enable automatic redisplay
+  option + h       Print help
 """
 
 cube_vertices = array.array('f', [ \
@@ -301,7 +326,7 @@ class WorldMapViewer():
             theta = i * (360/num_slices) * (pi/180)
             glVertex3f(r * cos(theta), r*sin(theta), 0.)
         glEnd()
-            
+
 
     def make_chip(self,chip):
         global gl_lists
@@ -832,7 +857,7 @@ class WorldMapViewer():
 
     def window_creator(self):
         global WINDOW
-        WINDOW = opengl.create_window(bytes(self.windowName,'utf-8'), (self.width,self.height))        
+        WINDOW = opengl.create_window(bytes(self.windowName,'utf-8'), (self.width,self.height))
         glutDisplayFunc(self.display)
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
@@ -853,7 +878,10 @@ class WorldMapViewer():
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)
-        print("Type 'h' in the world map window for help.")
+        if pf.system() == 'Darwin':
+            print("Type 'option' + 'h' in the world map window for help.")
+        else:
+            print("Type 'h' in the world map window for help.")
 
     def display(self):
         global DISPLAY_ENABLED, EXCEPTION_COUNTER
@@ -897,11 +925,11 @@ class WorldMapViewer():
             print('Worldmap viewer exception:',e)
             EXCEPTION_COUNTER += 1
             if EXCEPTION_COUNTER >= 2:
-                print('\n\nworldmap_viewer:  Too many errors.  Stopping redisplay.') 
+                print('\n\nworldmap_viewer:  Too many errors.  Stopping redisplay.')
                 DISPLAY_ENABLED = False
             else:
                 raise
-                
+
 
     def keyPressed(self, key, x, y):
         global DISPLAY_ENABLED, EXCEPTION_COUNTER
@@ -940,7 +968,10 @@ class WorldMapViewer():
         elif key == b'm':
             self.show_memory_map = not self.show_memory_map
         elif key == b'h':
-            print(help_text)
+            if pf.system() == 'Darwin':
+                print(help_text_mac)
+            else:
+                print(help_text)
         elif key == b'v':
             print_camera = not print_camera
             if not print_camera:

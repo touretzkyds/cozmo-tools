@@ -100,7 +100,10 @@ class ParticleViewer():
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)
-        print("Type 'h' in the particle viewer window for help.")
+        if platform.system() == 'Darwin':
+            print("Type 'option' + 'h' in the particle viewer window for help.")
+        else:
+            print("Type 'h' in the particle viewer window for help.")
 
     def draw_rectangle(self, center, size=(10,10),
                        angle=0, color=(1,1,1), fill=True):
@@ -202,35 +205,30 @@ class ParticleViewer():
             if not isinstance(id,str):
                 raise TypeError("Landmark id's must be strings: %r" % id)
             color = None
-            if id.startswith('Aruco-'):
-                label = id[6:]
-                num = int(label)
-                seen = num in self.robot.world.aruco.seen_marker_ids
-            elif id.startswith('Cube-'):
-                label = id[5:]
-                num = int(label)
-                cube = self.robot.world.light_cubes[num]
-                seen = cube.is_visible
-                if seen:
+            if isinstance(id, cozmo.objects.LightCube):
+                label = id.cube_id
+                if id.is_visible:
                     color = (0.5, 0.3, 1, 0.75)
                 else:
                     color = (0, 0, 0.5, 0.75)
-            elif id.startswith('Wall-'):
-                label = 'W' + id[id.find('-')+1:]
-                try:
-                    seen = self.robot.world.world_map.objects[id].is_visible
-                except:
-                    seen = False
-                if seen:
-                    color = (1, 0.5, 0.3, 0.75)
-                else:
-                    color = (0.5, 0, 0, 0.75)
-            elif id.startswith('Video'):
-                seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
-                       id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
-                label = id
+            elif isinstance(id, str):
+                if 'Video' in id:
+                    seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
+                           id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
+                    label = id
+                elif 'Wall' in id:
+                    label = 'W' + id[id.find('-')+1:]
+                    try:
+                        seen = self.robot.world.world_map.objects[id].is_visible
+                    except:
+                        seen = False
+                    if seen:
+                        color = (1, 0.5, 0.3, 0.75)
+                    else:
+                        color = (0.5, 0, 0, 0.75)
             else:
-                raise ValueError('Unrecognized landmark id: %s' % id)
+                seen = id in self.robot.world.aruco.seen_marker_ids
+                label = id
             if color is None:
                 if seen:
                     color = (0.5, 1, 0.3, 0.75)
@@ -375,7 +373,7 @@ class ParticleViewer():
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
         (xy_var,theta_var) = pf.variance
         print ('xy_var=', xy_var, '  theta_var=', theta_var)
-        
+
     def report_pose(self):
         (x,y,theta) = self.robot.world.particle_filter.pose
         hdg = math.degrees(theta)
