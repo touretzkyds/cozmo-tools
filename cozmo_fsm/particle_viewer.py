@@ -14,6 +14,7 @@ import math
 from math import sin, cos, pi, atan2, sqrt
 import array
 import numpy as np
+import platform
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees
@@ -23,6 +24,47 @@ from .worldmap import ArucoMarkerObj
 
 REDISPLAY = True   # toggle this to suspend constant redisplay
 WINDOW = None
+
+help_text = """
+Particle viewer commands:
+  w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
+  W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
+  i/k        Head up/down 5 degrees
+  I/K        Head up/down 20 degrees
+  e          Evaluate particles using current sensor info
+  r          Resample particles (evaluates first)
+  z          Reset particle positions (randomize, or all 0 for SLAM)
+  c          Clear landmarks (for SLAM)
+  arrows     Translate the view up/down/left/right
+  Home       Center the view (zero translation)
+  <          Zoom in
+  >          Zoom out
+  $          Toggle redisplay (for debugging)
+  v          Toggle verbosity
+  V          Display weight variance
+  h          Print this help text
+"""
+
+help_text_mac = """
+Particle viewer commands:
+  option + w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
+  option + W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
+  option + i/k        Head up/down 5 degrees
+  option + I/K        Head up/down 20 degrees
+  option + e          Evaluate particles using current sensor info
+  option + r          Resample particles (evaluates first)
+  option + z          Reset particle positions (randomize, or all 0 for SLAM)
+  option + c          Clear landmarks (for SLAM)
+  arrows              Translate the view up/down/left/right
+  fn + left-arrow     Center the view (zero translation)
+  option + <          Zoom in
+  option + >          Zoom out
+  option + $          Toggle redisplay (for debugging)
+  option + v          Toggle verbosity
+  option + V          Display weight variance
+  option + h          Print this help text
+"""
+
 
 class ParticleViewer():
     def __init__(self, robot,
@@ -415,11 +457,11 @@ class ParticleViewer():
             print('Landmarks cleared.')
         elif key == b'V':     # display weight variance
             self.report_variance(pf)
-        elif key == b'+':     # zoom in
+        elif key == b'<':     # zoom in
             self.scale *= 1.25
             self.print_display_params()
             return
-        elif key == b'-':     # zoom out
+        elif key == b'>':     # zoom out
             self.scale /= 1.25
             self.print_display_params()
             return
@@ -435,7 +477,8 @@ class ParticleViewer():
             REDISPLAY = not REDISPLAY
             print('Redisplay ',('off','on')[REDISPLAY],'.',sep='')
         elif key == b'q':     #kill window
-            glutDestroyWindow(self.window)
+            global WINDOW
+            glutDestroyWindow(WINDOW)
             glutLeaveMainLoop()
         glutPostRedisplay()
         self.report_pose()
@@ -464,23 +507,7 @@ class ParticleViewer():
         glutPostRedisplay()
 
     def print_help(self):
-        print("""
-Particle viewer commands:
-  w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
-  W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
-   i/k       Head up/down 5 degrees
-   I/K       Head up/down 20 degrees
-    e        Evaluate particles using current sensor info
-    r        Resample particles (evaluates first)
-    z        Delocalize
-
-    c        Clear landmarks (for SLAM)
-  arrows     Translate the view up/down/left/right
-   Home      Center the view (zero translation)
-    +        Zoom in
-    -        Zoom out
-    $        Toggle redisplay (for debugging)
-    v        Toggle verbosity
-    V        Display weight variance
-    h        Print this help text
-""")
+        if platform.system() == 'Darwin':
+            print(help_text_mac)
+        else:
+            print(help_text)
