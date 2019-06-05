@@ -205,29 +205,32 @@ class ParticleViewer():
             if not isinstance(id,str):
                 raise TypeError("Landmark id's must be strings: %r" % id)
             color = None
-            if isinstance(id, cozmo.objects.LightCube):
-                label = id.cube_id
-                if id.is_visible:
+            if id.startswith('Aruco-'):
+                label = id[6:]
+                num = int(label)
+                seen = num in self.robot.world.aruco.seen_marker_ids
+            elif id.startswith('Cube-'):
+                label = id[5:]
+                num = int(label)
+                cube = self.robot.world.light_cubes[num]
+                seen = cube.is_visible
+                if seen:
                     color = (0.5, 0.3, 1, 0.75)
                 else:
                     color = (0, 0, 0.5, 0.75)
-            elif isinstance(id, str):
-                if 'Video' in id:
-                    seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
-                           id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
-                    label = id
-                elif 'Wall' in id:
-                    label = 'W' + id[id.find('-')+1:]
-                    try:
-                        seen = self.robot.world.world_map.objects[id].is_visible
-                    except:
-                        seen = False
-                    if seen:
-                        color = (1, 0.5, 0.3, 0.75)
-                    else:
-                        color = (0.5, 0, 0, 0.75)
-            else:
-                seen = id in self.robot.world.aruco.seen_marker_ids
+            elif id.startswith('Wall-'):
+                label = 'W' + id[id.find('-')+1:]
+                try:
+                    seen = self.robot.world.world_map.objects[id].is_visible
+                except:
+                    seen = False
+                if seen:
+                    color = (1, 0.5, 0.3, 0.75)
+                else:
+                    color = (0.5, 0, 0, 0.75)
+            elif id.startswith('Video'):
+                seen = self.robot.aruco_id in self.robot.world.perched.camera_pool and \
+                       id in self.robot.world.perched.camera_pool[self.robot.aruco_id]
                 label = id
             if color is None:
                 if seen:
