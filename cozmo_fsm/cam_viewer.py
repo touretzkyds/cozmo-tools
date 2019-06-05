@@ -1,33 +1,22 @@
 """
 OpenGL based CamViewer
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-# from __future__ import unicode_literals
+
 import numpy as np
-from PIL import Image, ImageEnhance
+import math
+import random
 import time
-import argparse
-
-# import random as rng
-
-from scipy.ndimage.measurements import label
-
-nRange = 1.0
-
+from PIL import Image
 import cv2
 import cozmo
 from cozmo.util import degrees, distance_mm, speed_mmps
+
 try:
     from OpenGL.GLUT import *
     from OpenGL.GL import *
     from OpenGL.GLU import *
 except:
     pass
-
-import math
-import random
 
 from . import opengl
 from . import transform
@@ -40,52 +29,41 @@ path = 'snap/'
 
 WINDOW = None
 
-
 class CamViewer():
     prog_start = False
-    #Incoming image stream as nparray
-    incom_image = None
 
-    def __init__(self, robot, image=None, width=640, height=480,
+    def __init__(self, robot, width=640, height=480,
                  windowName="Cozmo's World",
                  bgcolor=(0, 0, 0)):
         self.robot = robot
-        self.image = image
-        self.is_incom_image = True if CamViewer.incom_image is not None else False
         self.width = width
         self.height = height
         self.aspect = self.width/self.height
         self.windowName = windowName
         self.bgcolor = bgcolor
-        self.translation = [0., 0.]  # Translation in mm
         self.scale = 1
         self.show_axes = True
         self.show_memory_map = False
 
-
     def process_image(self):
-        if not self.is_incom_image and CamViewer.incom_image is None:
-            image = cv2.resize(np.array(self.robot.world.latest_image.raw_image), (self.width, self.height))
-        else:
-            image = CamViewer.incom_image
-        self.image = image.copy()
-
-        cozmo_fsm = program.running_fsm
-        curim = np.array(self.image) #cozmo-raw image
+        raw = self.robot.world.latest_image.raw_image
+        curim = np.array(raw)
         gray = cv2.cvtColor(curim,cv2.COLOR_BGR2GRAY)
 
+        running_fsm = program.running_fsm
+
         # Aruco image processing
-        if cozmo_fsm.aruco:
-            cozmo_fsm.robot.world.aruco.process_image(gray)
+        if running_fsm.aruco:
+            running_fsm.robot.world.aruco.process_image(gray)
         # Other image processors can run here if the user supplies them.
-        cozmo_fsm.user_image(curim,gray)
+        running_fsm.user_image(curim,gray)
         # Done with image processing
 
         # Annotate and display image if requested
-        if cozmo_fsm.force_annotation or cozmo_fsm.cam_viewer is not None:
-            scale = cozmo_fsm.annotated_scale_factor
+        if running_fsm.force_annotation or running_fsm.cam_viewer is not None:
+            scale = running_fsm.annotated_scale_factor
             # Apply Cozmo SDK annotations and rescale.
-            if cozmo_fsm.annotate_sdk:
+            if running_fsm.annotate_sdk:
                 coz_ann = self.robot.world.latest_image.annotate_image(scale=scale)
                 annotated_im = np.array(coz_ann)
             elif scale != 1:
@@ -94,22 +72,19 @@ class CamViewer():
                 annotated_im = cv2.resize(curim, dsize)
             else:
                 annotated_im = curim
-            # Yellow viewer crosshairs
-            if cozmo_fsm.viewer_crosshairs:
-                shape = annotated_im.shape
-                cv2.line(annotated_im, (int(shape[1]/2),0), (int(shape[1]/2),shape[0]), (255,255,0), 1)
-                cv2.line(annotated_im, (0,int(shape[0]/2)), (shape[1],int(shape[0]/2)), (255,255,0), 1)
             # Aruco annotation
-            if cozmo_fsm.aruco and \
-                   len(cozmo_fsm.robot.world.aruco.seen_marker_ids) > 0:
-                scale = 1
-                annotated_im = cozmo_fsm.robot.world.aruco.annotate(annotated_im,scale)
+            if running_fsm.aruco and \
+                   len(running_fsm.robot.world.aruco.seen_marker_ids) > 0:
+                annotated_im = running_fsm.robot.world.aruco.annotate(annotated_im,scale)
             # Other annotators can run here if the user supplies them.
-            annotated_im = cozmo_fsm.user_annotate(annotated_im)
+            annotated_im = running_fsm.user_annotate(annotated_im)
             # Done with annotation
-            annotated_im = cv2.cvtColor(annotated_im,cv2.COLOR_RGB2BGR)
+            # Yellow viewer crosshairs
+            if running_fsm.viewer_crosshairs:
+                shape = annotated_im.shape
+                cv2.line(annotated_im, (int(shape[1]/2),0), (int(shape[1]/2),shape[0]), (0,255,255), 1)
+                cv2.line(annotated_im, (0,int(shape[0]/2)), (shape[1],int(shape[0]/2)), (0,255,255), 1)
             image = annotated_im
-
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.width, self.height,0,GL_RGB, GL_UNSIGNED_BYTE, image)
         glutPostRedisplay()
 
@@ -126,7 +101,6 @@ class CamViewer():
         glutDisplayFunc(self.display)
         glutReshapeFunc(self.reshape)
         glutKeyboardFunc(self.keyPressed)
-        glutKeyboardUpFunc(self.keyPressedUp)
         glutSpecialFunc(self.specialKeyPressed)
         glutSpecialUpFunc(self.specialKeyUp)
 
@@ -176,7 +150,7 @@ class CamViewer():
         glMatrixMode(GL_PROJECTION)
 
         glLoadIdentity()
-
+        nRange = 1.0
         if w <= h:
             glOrtho(-nRange, nRange, -nRange*h/w, nRange*h/w, -nRange, nRange)
         else:
@@ -192,19 +166,7 @@ class CamViewer():
         if key == b'c':
             print("Taking a snap")
             self.capture()
-        if key == b'q':
-            self.robot.move_head(0.5)
-        if key == b'a':
-            self.robot.move_head(-0.5)
         self.display()
-
-    def keyPressedUp(self, key, x, y):
-        if key == b'q':
-            self.robot.move_head(0)
-        if key == b'a':
-            self.robot.move_head(0)
-        self.display()
-
 
     def specialKeyPressed(self, key, x, y):
         global leftorrightindicate, globthres
@@ -233,17 +195,11 @@ class CamViewer():
         go_forward = GLUT_KEY_UP
         glutPostRedisplay()
 
-    def capture(self, img=None, name='cozmo_snap'):
+    def capture(self, name='cozmo_snap'):
         global snapno, path
         if not os.path.exists(path):
                 os.makedirs(path)
 
-        if not self.is_incom_image and CamViewer.incom_image is None:
-            image = cv2.resize(np.array(self.image), (self.width, self.height))
-        else:
-            image = CamViewer.incom_image
-
-        if img is not None:
-            image = img
+        image = np.array(self.robot.world.latest_image.raw_image)
         Image.fromarray(image).save(path + '/' + name + str(snapno) + '.jpg')
         snapno +=1

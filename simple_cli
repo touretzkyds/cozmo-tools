@@ -473,8 +473,8 @@ def show_objects():
 
 def show_particle(args):
     if len(args) == 0:
-        particle_number = '(best=%d)' % robot.world.particle_filter.best_particle_index
         particle = robot.world.particle_filter.best_particle
+        particle_number = '(best=%d)' % particle.index
     elif len(args) > 1:
         print('Usage:  show particle [number]')
         return
