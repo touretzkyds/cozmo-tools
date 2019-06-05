@@ -9,7 +9,7 @@ from cozmo_fsm import *
 
 class CV_OpticalFlow(StateMachineProgram):
     def __init__(self):
-        super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
+        super().__init__(aruco=False, particle_filter=False, cam_viewer=False,
                          annotate_sdk = False)
 
     def start(self):
@@ -28,13 +28,13 @@ class CV_OpticalFlow(StateMachineProgram):
 
         self.prev_gray = None
         self.good_new = None
+        self.mask = None
 
         super().start()
+        cv2.namedWindow('OpticalFlow')
 
     def user_image(self,image,gray):
-        maxFeat = cv2.getTrackbarPos('maxFeatures','features')
-        quality = cv2.getTrackbarPos('qualityLevel','features') / 1000
-        minDist = cv2.getTrackbarPos('minDistance','features')
+        cv2.waitKey(1)
         if self.prev_gray is None:
             self.prev_gray = gray
             self.prev_feat = cv2.goodFeaturesToTrack(gray, mask=None,
@@ -51,10 +51,11 @@ class CV_OpticalFlow(StateMachineProgram):
         self.prev_gray = gray
         self.prev_feat = self.good_new.reshape(-1,1,2)
 
-    def user_annotate(self,image):
-        if self.good_new is None:
+        (x,y,_) = image.shape
+        image = cv2.resize(image,(y*2,x*2))
+        if self.mask is None:
             self.mask = np.zeros_like(image)
-            return image
+
         for i,(new,old) in enumerate(zip(self.good_new, self.good_old)):
             a,b = new.ravel()
             c,d = old.ravel()
@@ -62,4 +63,4 @@ class CV_OpticalFlow(StateMachineProgram):
                                  self.colors[i].tolist(), 2)
             cv2.circle(image,(a+a,b+b),5,self.colors[i].tolist(),-1)
         image = cv2.add(image,self.mask)
-        return image
+        cv2.imshow('OpticalFlow', image)

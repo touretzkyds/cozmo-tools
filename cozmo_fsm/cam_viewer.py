@@ -109,7 +109,6 @@ class CamViewer():
             opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
             CamViewer.prog_start = True
-            self.robot.set_head_angle(cozmo.util.Angle(0)).wait_for_completed()
             while not WINDOW:
                 time.sleep(0.1)
 
