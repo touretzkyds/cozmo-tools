@@ -194,17 +194,17 @@ def get_orientation_state(quaternion, isPlanar=False):
         if not perpendicular:
             dot_product = np.round(z_dot.dot(np.array([1, 0, 0])), decimals=2)
             x, y, z = quaternion_to_euler_angle([q0, q2, q3, q1])
-            x = -y if x>0 else y+math.pi
-            x = x if x < math.pi else (x - 2*math.pi)
+            x = -y if x>0 else y+pi
+            x = x if x < pi else (x - 2*pi)
     if dot_product >= 0.9:
         orientation = ORIENTATION_UPRIGHT
     elif dot_product <= -0.9:
         orientation = ORIENTATION_INVERTED
-        z -= math.pi
+        z -= pi
     elif -0.1 <= dot_product <= 0.1:
         if isPlanar:
             # Markers
-            if 0 < x < math.pi:
+            if 0 < x < pi:
                 orientation = ORIENTATION_RIGHT
             else:
                 orientation = ORIENTATION_LEFT
@@ -212,11 +212,11 @@ def get_orientation_state(quaternion, isPlanar=False):
             # Cubes
             orientation = ORIENTATION_SIDEWAYS
             if round(y, 1) == 0:
-                z = z-math.pi/2 if x>0 else z+math.pi/2
+                z = z-pi/2 if x>0 else z+pi/2
             else:
                 w, x, y, z = quaternion
                 x, y, z = quaternion_to_euler_angle([w, y, x, z])
-                z = -y if x>0 else y+math.pi
+                z = -y if x>0 else y+pi
     else:
         orientation = ORIENTATION_TILTED
 
