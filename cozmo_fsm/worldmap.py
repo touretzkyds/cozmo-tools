@@ -190,7 +190,7 @@ class WallObj(WorldObject):
                 id = 'Wall-%s' % wall_spec.label
             else:
                 raise ValueError('id (e.g., "A") must be supplied if wall has no markers')
-        super().__init__(id,x,y)
+        super().__init__(id, x, y, is_visible=False)
         self.z = height/2
         self.theta = theta
         self.length = length
@@ -204,11 +204,20 @@ class WallObj(WorldObject):
         self.is_fixed = is_fixed
         self.pose_confidence = +1
 
-    def update(self, x=0, y=0, theta=0):
+    def update(self, world_map, x=0, y=0, theta=0):
         # Used instead of making new object for efficiency
         self.x = x
         self.y = y
         self.theta = theta
+        self.update_visibility(world_map)
+
+    def update_visibility(self, world_map):
+        for marker_id in self.marker_specs.keys():
+            marker = world_map.objects.get(marker_id, None)
+            if marker and marker.is_visible:
+                self.is_visible = True
+                return
+        self.is_visible = False
 
     def make_doorways(self, world_map):
         index = 0
@@ -234,14 +243,6 @@ class WallObj(WorldObject):
             marker.z = rel_xyz[2][0]
             marker.theta = wrap_angle(self.theta + s)
             marker.is_fixed = self.is_fixed
-
-    @property
-    def is_visible(self):
-        seen_marker_ids = evbase.robot_for_loading.world.aruco.seen_marker_ids.copy()
-        for m in self.marker_specs.keys():
-            if m in seen_marker_ids:
-                return True
-        return False
 
     def __repr__(self):
         if self.pose_confidence >= 0:
@@ -557,6 +558,7 @@ class WorldMap():
                 wmobject.x = landmark_spec.position.x
                 wmobject.y = landmark_spec.position.y
                 wmobject.theta = landmark_spec.rotation.angle_z.radians
+                wmobject.is_fixed = True
             else:
                 # Non-landmark: convert aruco sensor values to pf coordinates and update
                 elevation = atan2(value.camera_coords[1], value.camera_coords[2])
@@ -573,14 +575,15 @@ class WorldMap():
                 wmobject.cam_pos = cam_pos
                 wmobject.base_pos = base_pos
 
-
     def update_walls(self):
         for key, value in self.robot.world.particle_filter.sensor_model.landmarks.items():
             if key.startswith('Wall-'):
                 if key in self.objects:
                     wall = self.objects[key]
-                    if (not wall.is_fixed) and (not wall.is_foreign):
-                        wall.update(x=value[0][0][0], y=value[0][1][0], theta=value[1])
+                    if wall.is_fixed:
+                        wall.update_visibility(self)
+                    elif not wall.is_foreign:
+                        wall.update(self,x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
                     print('Creating new wall in worldmap:',key)
                     wall_spec = wall_marker_dict[key]
@@ -614,10 +617,11 @@ class WorldMap():
                         aruco_marker.x = wall.x + rel_xyz[0][0]
                         aruco_marker.y = wall.y + rel_xyz[1][0]
                         aruco_marker.z = rel_xyz[2][0]
+                        aruco_marker.is_fixed = wall.is_fixed
 
     def update_doorways(self):
         for key,value in self.robot.world.world_map.objects.items():
-            if isinstance(key,str) and  'Doorway' in key:
+            if key.startswith('Doorway'):
                 value.update()
 
     def lookup_face_obj(self,face):
@@ -709,7 +713,7 @@ class WorldMap():
         if self.robot.world.server.started:
             pool = self.robot.world.server.camera_landmark_pool
             for key, val in pool.get(self.robot.aruco_id,{}).items():
-                if isinstance(key,str) and 'Video' in key:
+                if key.startswith('Video'):
                     if key in self.objects:
                         self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
                                                  theta=val[1][2], phi=val[1][1])
@@ -720,7 +724,7 @@ class WorldMap():
                                       z=val[1][0], theta=val[1][2], phi=val[1][1])
         else:
             for key, val in self.robot.world.particle_filter.sensor_model.landmarks.items():
-                if isinstance(key,str) and 'Video' in key:
+                if key.startswith('Video'):
                     if key in self.objects:
                         self.objects[key].update(x=val[0][0,0], y=val[0][1,0], z=val[1][0],
                                                  theta=val[1][2], phi=val[1][1])
@@ -735,6 +739,37 @@ class WorldMap():
         for wmobj in self.robot.world.world_map.objects.values():
             if not wmobj.is_fixed:
                 wmobj.pose_confidence = -1
+
+    def show_objects(self):
+        objs = self.objects
+        print('%d object%s in the world map:' %
+              (len(objs), '' if len(objs) == 1 else 's'))
+        basics = ['Charger', 'Cube-1', 'Cube-2', 'Cube-3']
+        ordered_keys = []
+        for key in basics:
+            if key in objs:
+                ordered_keys.append(key)
+        customs = []
+        arucos = []
+        walls = []
+        misc = []
+        for (key,value) in objs.items():
+            if key in basics:
+                pass
+            elif isinstance(value, CustomMarkerObj):
+                customs.append(key)
+            elif isinstance(value, ArucoMarkerObj):
+                arucos.append(key)
+            elif isinstance(value, WallObj):
+                walls.append(key)
+            else:
+                misc.append(key)
+        arucos.sort()
+        walls.sort()
+        ordered_keys = ordered_keys + customs + arucos + walls + misc
+        for key in ordered_keys:
+            print('  ', objs[key])
+        print()
 
 #================ Event Handlers ================
 

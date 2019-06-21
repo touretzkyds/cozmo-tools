@@ -300,7 +300,7 @@ def show_stuff(args):
     elif spec == "landmarks":
         show_landmarks()
     elif spec == "objects":
-        show_objects()
+        robot.world.world_map.show_objects()
     elif spec == "particle":
         show_particle(args[1:])
     elif spec == "camera":
@@ -438,37 +438,6 @@ def show_landmarks_helper(landmarks):
             print('  %r' % key, end='')
         print(' at (%6.1f, %6.1f) @ %4.1f deg    +/- (%4.1f,%4.1f)  +/- %3.1f deg' %
               (x, y, theta, sigma_x, sigma_y, sigma_theta))
-    print()
-
-def show_objects():
-    objs = robot.world.world_map.objects
-    print('%d object%s in the world map:' %
-          (len(objs), '' if len(objs) == 1 else 's'))
-    basics = [charger, cube1, cube2, cube3]
-    ordered_keys = []
-    for key in basics:
-        if key in objs:
-            ordered_keys.append(key)
-    customs = []
-    arucos = []
-    walls = []
-    misc = []
-    for (key,value) in objs.items():
-        if key in basics:
-            pass
-        elif isinstance(value, CustomMarkerObj):
-            customs.append(key)
-        elif isinstance(value, ArucoMarkerObj):
-            arucos.append(key)
-        elif isinstance(value, WallObj):
-            walls.append(key)
-        else:
-            misc.append(key)
-    arucos.sort()
-    walls.sort()
-    ordered_keys = ordered_keys + customs + arucos + walls + misc
-    for key in ordered_keys:
-        print('  ', objs[key])
     print()
 
 def show_particle(args):

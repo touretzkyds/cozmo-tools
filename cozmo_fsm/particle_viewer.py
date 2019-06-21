@@ -35,6 +35,7 @@ Particle viewer commands:
   r          Resample particles (evaluates first)
   z          Reset particle positions (randomize, or all 0 for SLAM)
   c          Clear landmarks (for SLAM)
+  o          Show objects
   arrows     Translate the view up/down/left/right
   Home       Center the view (zero translation)
   <          Zoom in
@@ -200,8 +201,9 @@ class ParticleViewer():
         arucos = [(marker.id, (np.array([[marker.x], [marker.y]]), marker.theta, None))
                   for marker in objs.values()
                   if isinstance(marker, ArucoMarkerObj)]
-        for (id,specs) in list(landmarks.items()) + \
-            [marker for marker in arucos if marker[0] not in landmarks]:
+        all_specs = list(landmarks.items()) + \
+            [marker for marker in arucos if marker[0] not in landmarks]
+        for (id,specs) in all_specs:
             if not isinstance(id,str):
                 raise TypeError("Landmark id's must be strings: %r" % id)
             color = None
@@ -269,11 +271,11 @@ class ParticleViewer():
         coords = (lm_mu[0,0], lm_mu[1,0])
         glPushMatrix()
         glColor4f(*color)
-        if isinstance(id, cozmo.objects.LightCube):
+        if id.startswith('Cube'):
             size = (44,44)
             angle_offset = -90
             translate = 0
-        elif isinstance(id,str) and 'Wall' in id:
+        elif id.startswith('Wall'):
             try:
                 wall = self.robot.world.world_map.objects[id]
             except KeyError:  # race condition: not in worldmap yet
@@ -285,7 +287,7 @@ class ParticleViewer():
             size = (20,50)
             angle_offset = 90
             translate = 15
-        if isinstance(id,str) and 'Video' in id:
+        if id.startswith('Video'):
             self.draw_triangle(coords, height=75, angle=lm_orient[1]*(180/pi),
                                color=color, fill=True)
             glColor4f(0., 0., 0., 1.)
@@ -347,6 +349,8 @@ class ParticleViewer():
                            color=(1,1,0,0.7))
 
         # Draw the error ellipse and heading error wedge
+        if xy_var.shape != (2,2):
+            raise ValueError('Bad xy_var:', xy_var)
         (w,v) = np.linalg.eigh(xy_var)
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse((rx,ry), abs(w)**0.5, alpha/pi*180, color=(0,1,1))
@@ -456,6 +460,8 @@ class ParticleViewer():
         elif key == b'c':     # clear landmarks
             pf.clear_landmarks()
             print('Landmarks cleared.')
+        elif key == b'o':     # show objects
+            self.robot.world.world_map.show_objects()
         elif key == b'V':     # display weight variance
             self.report_variance(pf)
         elif key == b'<':     # zoom in

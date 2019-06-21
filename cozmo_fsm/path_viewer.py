@@ -32,6 +32,7 @@ Path viewer commands:
   Home     Center the view (zero translation)
   <        Zoom in
   >        Zoom out
+  o        Show objects
   space    Toggle redisplay (for debugging)
   h        Print this help text
 """
@@ -42,6 +43,7 @@ Path viewer commands:
   fn + left-arrow  Center the view (zero translation)
   option + <       Zoom in
   option + >       Zoom out
+  o                Show objects
   space            Toggle redisplay (for debugging)
   option + h       Print this help text
 """
@@ -274,13 +276,16 @@ class PathViewer():
 
     def keyPressed(self,key,mouseX,mouseY):
         # print(str(key), ord(key))
-        if key == b'<':     # zoom in
+        if key == b'<':       # zoom in
             self.scale *= 1.25
             self.print_display_params()
             return
         elif key == b'>':     # zoom out
             self.scale /= 1.25
             self.print_display_params()
+            return
+        elif key == b'o':     # show objects
+            self.robot.world.world_map.show_objects()
             return
         elif key == b'h':     # print help
             self.print_help()

@@ -128,6 +128,8 @@ class StateMachineProgram(StateNode):
         # Create a particle filter
         if not isinstance(self.particle_filter,ParticleFilter):
             self.particle_filter = SLAMParticleFilter(self.robot, landmark_test=self.landmark_test)
+        else:
+            self.particle_filter.clear_landmarks()
         pf = self.particle_filter
         self.robot.world.particle_filter = pf
 
