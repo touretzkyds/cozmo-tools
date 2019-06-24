@@ -9,10 +9,14 @@ from cozmo.util import Distance, Angle, Pose
 from .cozmo_kin import CozmoKinematics
 
 from .particle import SLAMParticleFilter
-from .rrt import RRT
+from .rrt import RRT, RRTNode
 from .worldmap import WorldMap
 
 class SimWorld(): pass
+
+class SimServer():
+    def __init__(self):
+        self.started = False
 
 class SimRobot():
     def __init__(self):
@@ -24,8 +28,20 @@ class SimRobot():
         robot.pose = Pose(0,0,0,angle_z=Angle(degrees=0))
 
         robot.world = SimWorld()
+        robot.world.light_cubes = dict()
+        robot.world._faces = dict()
+        robot.world.charger = None
+        robot.world.server = SimServer()
+
         robot.world.particle_filter = SLAMParticleFilter(robot)
         robot.kine = CozmoKinematics(robot)  # depends on particle filter
         robot.world.rrt = RRT(robot) # depends on kine
         robot.world.world_map = WorldMap(robot)
 
+"""
+robot = SimRobot()
+start_node = RRTNode(None,0,0,0)
+goal_node = RRTNode(None,100,0,0)
+treeA, treeB, plan = robot.world.rrt.plan_path(start_node, goal_node)
+print(plan)
+"""
