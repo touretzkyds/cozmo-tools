@@ -22,5 +22,6 @@ from .pickup import *
 from .doorpass import *
 from . import wall_defs
 from . import custom_objs
+from .sim_robot import SimRobot
 
 del base
