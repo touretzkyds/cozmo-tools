@@ -32,6 +32,7 @@ class SimRobot():
         robot.world._faces = dict()
         robot.world.charger = None
         robot.world.server = SimServer()
+        robot.world.path_viewer = None
 
         robot.world.particle_filter = SLAMParticleFilter(robot)
         robot.kine = CozmoKinematics(robot)  # depends on particle filter
