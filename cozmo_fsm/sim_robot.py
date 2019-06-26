@@ -39,10 +39,3 @@ class SimRobot():
         robot.world.rrt = RRT(robot) # depends on kine
         robot.world.world_map = WorldMap(robot)
 
-"""
-robot = SimRobot()
-start_node = RRTNode(None,0,0,0)
-goal_node = RRTNode(None,100,0,0)
-treeA, treeB, plan = robot.world.rrt.plan_path(start_node, goal_node)
-print(plan)
-"""
