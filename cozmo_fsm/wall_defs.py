@@ -4,25 +4,25 @@ def make_walls():
 
     # ~12 inch walls
 
-    w1 = WallSpec(length=600, height=190, door_width = 77, door_height=110,
+    w1 = WallSpec(length=600, height=190, door_width=77, door_height=110,
                   marker_specs={
-                      'Aruco-1' : (+1, ( 65., 50.)),
-                      'Aruco-2' : (+1, (153.,150.)),
-                      'Aruco-3' : (+1, (241., 50.)),
-                      'Aruco-4' : (+1, (359., 50.)),
-                      'Aruco-5' : (+1, (447.,150.)),
-                      'Aruco-6' : (+1, (535., 50.)),
+                      'Aruco-1' :  (+1, ( 65., 50.)),
+                      'Aruco-2' :  (+1, (153.,150.)),
+                      'Aruco-3' :  (+1, (241., 50.)),
+                      'Aruco-4' :  (+1, (359., 50.)),
+                      'Aruco-5' :  (+1, (447.,150.)),
+                      'Aruco-6' :  (+1, (535., 50.)),
                       'Aruco-12' : (-1, ( 65., 50.)),
                       'Aruco-11' : (-1, (153.,150.)),
                       'Aruco-10' : (-1, (241., 50.)),
-                      'Aruco-9' : (-1, (359., 50.)),
-                      'Aruco-8' : (-1, (447.,150.)),
-                      'Aruco-7' : (-1, (535., 50.))
+                      'Aruco-9' :  (-1, (359., 50.)),
+                      'Aruco-8' :  (-1, (447.,150.)),
+                      'Aruco-7' :  (-1, (535., 50.))
                   },
                   doorways = [ (153., 77.), (447., 77.) ],
                   door_ids = [ (2, 8), (5, 11) ])
 
-    w13 = WallSpec(length=600, height=190, door_width = 77, door_height=110,
+    w13 = WallSpec(length=600, height=190, door_width=77, door_height=110,
                    marker_specs={
                        'Aruco-13' : (+1, ( 65., 50.)),
                        'Aruco-14' : (+1, (153.,150.)),
@@ -40,7 +40,7 @@ def make_walls():
                    doorways = [ (153., 77.), (447., 77.) ],
                    door_ids = [ (14, 20), (17, 23) ])
 
-    w25 = WallSpec(length=600, height=190, door_width = 77, door_height=110,
+    w25 = WallSpec(length=600, height=190, door_width=77, door_height=110,
                    marker_specs={
                        'Aruco-25' : (+1, ( 65., 50.)),
                        'Aruco-26' : (+1, (153.,150.)),
@@ -60,7 +60,7 @@ def make_walls():
 
     
     # ~9 inch walls
-    w49 = WallSpec(length=400, height=190, door_width = 77, door_height=110,
+    w49 = WallSpec(length=400, height=190, door_width=77, door_height=110,
                    marker_specs={
                        'Aruco-49' : (+1, (112., 50.)),
                        'Aruco-50' : (+1, (200.,150.)),
@@ -72,7 +72,7 @@ def make_walls():
                    doorways = [ (200., 77.) ],
                    door_ids = [ (50, 53) ])
 
-    w55 = WallSpec(length=400, height=190, door_width = 77, door_height=110,
+    w55 = WallSpec(length=400, height=190, door_width=77, door_height=110,
                    marker_specs={
                        'Aruco-55' : (+1, (112., 50.)),
                        'Aruco-56' : (+1, (200.,150.)),
@@ -87,7 +87,7 @@ def make_walls():
     
     # ~6 inch walls
 
-    w37 = WallSpec(length=300, height=190, door_width = 77, door_height=110,
+    w37 = WallSpec(length=300, height=190, door_width=77, door_height=110,
                    marker_specs={
                        'Aruco-37' : (+1, ( 62., 50.)),
                        'Aruco-38' : (+1, (150.,150.)),
@@ -99,7 +99,7 @@ def make_walls():
                    doorways = [ (150., 77.) ],
                    door_ids = [ (38, 41) ])
 
-    w43 = WallSpec(length=300, height=190, door_width = 77, door_height=110,
+    w43 = WallSpec(length=300, height=190, door_width=77, door_height=110,
                    marker_specs={
                        'Aruco-43' : (+1, ( 62., 50.)),
                        'Aruco-44' : (+1, (150.,150.)),
@@ -112,8 +112,8 @@ def make_walls():
                    door_ids = [ (44, 47) ])
 
     
-    wA = WallSpec(label='A', length=300, height=80)
+    wA = WallSpec(label='A', length=300, height=190)
 
-    wB = WallSpec(label='B', length=400, height=80)
+    wB = WallSpec(label='B', length=400, height=190)
 
 make_walls()
