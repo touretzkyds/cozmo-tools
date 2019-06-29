@@ -480,7 +480,7 @@ class RRT():
         self.obstacles = obstacles
 
     def generate_wall_obstacles(self,wall):
-        wall_spec = wall_marker_dict[wall.id]
+        wall_spec = wall_marker_dict['Wall-' + wall.spec_id]
         half_length = wall.length / 2
         widths = []
         last_x = -half_length
