@@ -168,8 +168,9 @@ class WallObj(WorldObject):
     def __init__(self, id=None, x=0, y=0, theta=0, length=100, height=150,
                  door_width=75, door_height=105, marker_specs=dict(),
                  doorways=[], door_ids=[], is_foreign=False, is_fixed=False,
-                 wall_spec=None):
+                 wall_spec=None, spec_id=None):
         if wall_spec:
+            spec_id = wall_spec.spec_id
             length = wall_spec.length
             height = wall_spec.height
             door_width = wall_spec.door_width
@@ -193,6 +194,7 @@ class WallObj(WorldObject):
         super().__init__(id, x, y, is_visible=False)
         self.z = height/2
         self.theta = theta
+        self.spec_id = spec_id
         self.length = length
         self.height = height
         self.door_width = door_width
@@ -243,6 +245,14 @@ class WallObj(WorldObject):
             marker.z = rel_xyz[2][0]
             marker.theta = wrap_angle(self.theta + s)
             marker.is_fixed = self.is_fixed
+
+    @property
+    def is_visible(self):
+        seen_marker_keys = [('Aruco-%d' % id) for id in evbase.robot_for_loading.world.aruco.seen_marker_ids]
+        for m in self.marker_specs.keys():
+            if m in seen_marker_keys:
+                return True
+        return False
 
     def __repr__(self):
         if self.pose_confidence >= 0:
@@ -806,7 +816,6 @@ wall_marker_dict = dict()
 class WallSpec():
     def __init__(self, label=None, length=100, height=210, door_width=77, door_height=105,
                  marker_specs=dict(), doorways=[], door_ids=[]):
-        self.label = label
         self.length = length
         self.height = height
         self.door_width = door_width
@@ -814,11 +823,18 @@ class WallSpec():
         self.marker_specs = marker_specs
         self.doorways = doorways
         self.door_ids = door_ids
-        marker_ids = list(marker_specs.keys())
-        if len(marker_ids) > 0 and not label:
-            label = min(marker_ids)
-        self.id = 'Wall-' + label[1+label.rfind('-'):]
+        marker_id_numbers = [int(marker_id[1+marker_id.rfind('-'):]) for marker_id in marker_specs.keys()]
+        if label and len(marker_id_numbers) == 0:
+            self.spec_id = 'Wall-' + label  # 'Wall-A' for 'A'
+            label = 'Wall-' + label
+        elif len(marker_id_numbers) > 0 and not label:
+            lowest_marker_id = 'Aruco-%d' % min(marker_id_numbers)
+            self.spec_id = 'Wall-%d' % min(marker_id_numbers)
+            label = self.spec_id  # 'Wall-37' for 'Aruco-37'
+        else:
+            raise ValueError("Don't know how to label wall '%s'" % label)
+        self.label = label
         global wall_marker_dict
-        for id in marker_ids:
+        for id in marker_specs.keys():
             wall_marker_dict[id] = self
-        wall_marker_dict[self.id] = self
+        wall_marker_dict[label] = self

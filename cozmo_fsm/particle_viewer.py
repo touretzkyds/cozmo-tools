@@ -349,8 +349,6 @@ class ParticleViewer():
                            color=(1,1,0,0.7))
 
         # Draw the error ellipse and heading error wedge
-        if xy_var.shape != (2,2):
-            raise ValueError('Bad xy_var:', xy_var)
         (w,v) = np.linalg.eigh(xy_var)
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse((rx,ry), abs(w)**0.5, alpha/pi*180, color=(0,1,1))
@@ -378,7 +376,7 @@ class ParticleViewer():
         var = np.var(weights)
         print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
-        (xy_var,theta_var) = pf.variance
+        (xy_var, theta_var) = pf.variance
         print ('xy_var=', xy_var, '  theta_var=', theta_var)
 
     def report_pose(self):

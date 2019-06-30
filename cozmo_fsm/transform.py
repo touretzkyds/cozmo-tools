@@ -68,22 +68,18 @@ def translation(t):
 
 def wrap_angle(angle_rads):
     """Keep angle between -pi and pi."""
+    if isinstance(angle_rads, np.ndarray):
+        raise ValueError("Argument not a scalar: %s", angle_rads)
     while angle_rads <= -pi:
         angle_rads += 2*pi
     while angle_rads > pi:
         angle_rads -= 2*pi
     return angle_rads
-    # if angle_rads <= -pi:
-    #     return 2*pi + angle_rads
-    # elif angle_rads > pi:
-    #     return angle_rads - 2*pi
-    # else:
-    #     return angle_rads
 
 def wrap_selected_angles(angle_rads, index):
-    """Keep angle between -pi and pi for list"""
+    """Keep angle between -pi and pi for column vector of angles"""
     for i in index:
-       angle_rads[i] =  wrap_angle(angle_rads[i])
+       angle_rads[i,0] =  wrap_angle(angle_rads[i,0])
     return angle_rads
 
 def tprint(t):
