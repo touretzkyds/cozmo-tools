@@ -174,8 +174,11 @@ def runfsm(module_name, running_modules=dict()):
     the_module = running_modules[module_name]
     the_class = the_module.__getattribute__(module_name) \
                 if module_name in dir(the_module) else None
-    if not isinstance(the_class,type) or not issubclass(the_class,StateNode):
-        cprint("Module %s does not contain a StateNode class named %s.\n" %
+    if issubclass(the_class,StateNode) and not issubclass(the_class,StateMachineProgram):
+        cprint("%s is not an instance of StateMachineProgram.\n" % module_name, color="red")
+        return
+    if not isinstance(the_class,type) or not issubclass(the_class,StateMachineProgram):
+        cprint("Module %s does not contain a StateMachineProgram named %s.\n" %
               (module_name, module_name), color="red")
         return
     the_module.robot = robot
