@@ -191,7 +191,7 @@ class WallObj(WorldObject):
                 id = 'Wall-%s' % wall_spec.label
             else:
                 raise ValueError('id (e.g., "A") must be supplied if wall has no markers')
-        super().__init__(id, x, y, is_visible=False)
+        super().__init__(id, x, y)
         self.z = height/2
         self.theta = theta
         self.spec_id = spec_id
@@ -211,15 +211,6 @@ class WallObj(WorldObject):
         self.x = x
         self.y = y
         self.theta = theta
-        self.update_visibility(world_map)
-
-    def update_visibility(self, world_map):
-        for marker_id in self.marker_specs.keys():
-            marker = world_map.objects.get(marker_id, None)
-            if marker and marker.is_visible:
-                self.is_visible = True
-                return
-        self.is_visible = False
 
     def make_doorways(self, world_map):
         index = 0
@@ -590,9 +581,7 @@ class WorldMap():
             if key.startswith('Wall-'):
                 if key in self.objects:
                     wall = self.objects[key]
-                    if wall.is_fixed:
-                        wall.update_visibility(self)
-                    elif not wall.is_foreign:
+                    if not wall.is_fixed and not wall.is_foreign:
                         wall.update(self,x=value[0][0][0], y=value[0][1][0], theta=value[1])
                 else:
                     print('Creating new wall in worldmap:',key)
