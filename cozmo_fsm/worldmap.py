@@ -239,9 +239,9 @@ class WallObj(WorldObject):
 
     @property
     def is_visible(self):
-        seen_marker_ids = evbase.robot_for_loading.world.aruco.seen_marker_ids.copy()
+        seen_marker_keys = [('Aruco-%d' % id) for id in evbase.robot_for_loading.world.aruco.seen_marker_ids]
         for m in self.marker_specs.keys():
-            if m in seen_marker_ids:
+            if m in seen_marker_keys:
                 return True
         return False
 
@@ -786,8 +786,8 @@ class WallSpec():
             label = 'Wall-' + label
         elif len(marker_id_numbers) > 0 and not label:
             lowest_marker_id = 'Aruco-%d' % min(marker_id_numbers)
-            self.spec_id = lowest_marker_id
-            label = 'Wall-' + str(min(marker_id_numbers))  # 'Wall-37' for 'Aruco-37'
+            self.spec_id = 'Wall-%d' % min(marker_id_numbers)
+            label = self.spec_id  # 'Wall-37' for 'Aruco-37'
         else:
             raise ValueError("Don't know how to label wall '%s'" % label)
         self.label = label

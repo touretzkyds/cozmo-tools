@@ -347,7 +347,13 @@ class ParticleViewer():
                            color=(1,1,0,0.7))
 
         # Draw the error ellipse and heading error wedge
-        (w,v) = np.linalg.eigh(xy_var)
+        try:
+            (w,v) = np.linalg.eigh(xy_var)
+        except Exception as e:
+            print('=========>',e)
+            print('var=', self.robot.world.particle_filter.variance)
+            print(xy_var)
+            w = 0
         alpha = atan2(v[1,0],v[0,0])
         self.draw_ellipse((rx,ry), abs(w)**0.5, alpha/pi*180, color=(0,1,1))
         self.draw_wedge((rx,ry), 75, hdg, max(5, sqrt(theta_var)*360),
@@ -374,7 +380,7 @@ class ParticleViewer():
         var = np.var(weights)
         print('weights:  min = %3.3e  max = %3.3e med = %3.3e  variance = %3.3e' %
               (weights[0], weights[-1], weights[pf.num_particles//2], var))
-        (xy_var,theta_var) = pf.variance
+        (xy_var, theta_var) = pf.variance
         print ('xy_var=', xy_var, '  theta_var=', theta_var)
 
     def report_pose(self):

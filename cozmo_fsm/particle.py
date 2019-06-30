@@ -474,7 +474,7 @@ class ParticleFilter():
         return self.pose
 
     def variance_estimate(self):
-        weight = var_xx = var_xy = var_yy = r_sin = r_cos = 0
+        weight = var_xx = var_xy = var_yy = r_sin = r_cos = 0.0
         (mu_x, mu_y, mu_theta) = self.pose_estimate()
         for p in self.particles:
             dx = (p.x - mu_x)
@@ -485,9 +485,6 @@ class ParticleFilter():
             r_sin += sin(p.theta) * p.weight
             r_cos += cos(p.theta) * p.weight
             weight += p.weight
-        if weight == 0:
-            print('*** weight is zero in variance_estimate() !!!')
-            weight = self.num_particles
         xy_var = np.array([[var_xx, var_xy],
                            [var_xy, var_yy]]) / weight
         Rsq = r_sin**2 + r_cos**2
@@ -677,7 +674,7 @@ class SLAMParticle(Particle):
             # Error not too large: refine current estimate using EKF
             new_mu = np.append(old_mu,[old_orient]).reshape([3,1]) + K.dot(delta_sensor)
             new_sigma = (I - K.dot(H)).dot(old_sigma)
-        # landmark tuple is ( [x,y], [orient], covariance_matrix )
+        # landmark tuple is ( [x,y], orient, covariance_matrix )
         if self.index == -1:  # NOOP: should be == 0
             print('id=',id,'  old_mu=',[old_mu[0,0],old_mu[1,0]],'@',old_orient*180/pi,
                   '  new_mu=',[new_mu[0][0],new_mu[1][0]],'@',new_mu[2][0]*180/pi)
@@ -687,6 +684,17 @@ class SLAMParticle(Particle):
                   ' sensor_orient=',sensor_orient*180/pi,
                   ' delta_sensor=',delta_sensor)
         self.landmarks[id] = (new_mu[0:2], wrap_angle(new_mu[2][0]), new_sigma)
+        if not isinstance(self.landmarks[id][1],(float, np.float64)):
+            print('ORIENT FAIL', self.landmarks[id])
+            print('new_mu=',new_mu)
+            print('   ','dx,dy=',[dx,dy],'  ex,ey=',[ex,ey],
+                  ' sensor_dist=',sensor_dist,
+                  ' sensor_bearing=',sensor_bearing*180/pi,
+                  ' sensor_orient=',sensor_orient*180/pi,
+                  ' delta_sensor=',delta_sensor)
+            print('old_mu=',old_mu,'\nold_orient=',old_orient,'\nold_sigma=',old_sigma)
+            print('z=',z, 'h=',h)
+            input()
 
     def add_cam_landmark(self, lm_id, sensor_dist, sensor_bearing, sensor_height, sensor_phi, sensor_theta):
         direction = self.theta + sensor_bearing
@@ -695,7 +703,7 @@ class SLAMParticle(Particle):
         lm_x = self.x + dx
         lm_y = self.y + dy
 
-        lm_height = (sensor_height,wrap_angle(sensor_phi+self.theta), sensor_theta)
+        lm_height = (sensor_height, wrap_angle(sensor_phi+self.theta), sensor_theta)
 
         lm_mu =  np.array([[lm_x], [lm_y]])
         H = self.sensor_jacobian_H_cam(dx, dy, sensor_dist)
@@ -804,7 +812,7 @@ class SLAMSensorModel(SensorModel):
         wall_y = (transformed[0]-wall_spec.length/2)*cos(wall_orient) - -transformed[2]*sin(wall_orient)
         # Flip wall orientation to match ArUcos for worldmap
         wm_wall_orient = wrap_angle(pi - wall_orient)
-        wall = WallObj(id=wall_spec.id, x=wall_x, y=wall_y, theta=wm_wall_orient,
+        wall = WallObj(id=wall_spec.spec_id, x=wall_x, y=wall_y, theta=wm_wall_orient,
                        length=wall_spec.length)
         return wall
 
@@ -817,7 +825,7 @@ class SLAMSensorModel(SensorModel):
             marker = seen_marker_objects[num]
             wall_spec = wall_marker_dict.get(marker.id_string,None)
             if wall_spec is None: continue  # marker not part of a known wall
-            wall_id = wall_spec.id
+            wall_id = wall_spec.spec_id
             markers = wall_markers.get(wall_id, list())
             markers.append((marker.id_string, marker.bbox[0]))
             wall_markers[wall_id] = markers
@@ -920,7 +928,9 @@ class SLAMSensorModel(SensorModel):
     def process_landmark(self, id, data, just_looking, seen_marker_objects):
         particles = self.robot.world.particle_filter.particles
         if id.startswith('Aruco-'):
-            marker = seen_marker_objects[data.id]
+            marker_number = int(id[6:])
+            print('data=',data,'seen_marker_objects=',seen_marker_objects)
+            marker = seen_marker_objects[marker_number]
             sensor_dist = marker.camera_distance
             sensor_bearing = atan2(marker.camera_coords[0],
                                    marker.camera_coords[2])
@@ -963,8 +973,8 @@ class SLAMSensorModel(SensorModel):
                     # add 2 because we're going to subtract 1 later
                     self.candidate_arucos[id] = seen_count + 2
                     return False
-            print('  *** PF ADDING LANDMARK %s at:  distance=%6.1f  bearing=%5.1f deg.' %
-                  (id, sensor_dist, sensor_bearing*180/pi))
+            print('  *** PF ADDING LANDMARK %s at:  distance=%6.1f  bearing=%5.1f deg.  orient=%5.1f deg.' %
+                  (id, sensor_dist, sensor_bearing*180/pi, sensor_orient*180/pi))
             for p in particles:
                 if not id.startswith('Video'):
                     p.add_regular_landmark(id, sensor_dist, sensor_bearing, sensor_orient)
@@ -1049,7 +1059,7 @@ class SLAMParticleFilter(ParticleFilter):
 
     def add_fixed_landmark(self,landmark):
         mu = np.array([[landmark.x], [landmark.y]])
-        theta = np.array([landmark.theta])
+        theta = landmark.theta
         sigma = np.zeros([3,3])
         mu_theta_sigma = (mu, theta, sigma)
         for p in self.particles:
@@ -1083,7 +1093,6 @@ class SLAMParticleFilter(ParticleFilter):
                    self.get_aruco_landmark_specs(seen_marker_objects) + \
                    self.get_wall_landmark_specs(seen_marker_objects)
         if not lm_specs: return False
-        #print('**** lm_specs:', lm_specs)
         num_specs = len(lm_specs)
         particles = self.particles
         phi_jitter = np.random.normal(0.0, self.angle_jitter, size=self.num_particles)
@@ -1103,10 +1112,11 @@ class SLAMParticleFilter(ParticleFilter):
             p.y = lm_pose[0][1,0] - sensor_dist * sin(phi) + y_jitter[i]
             p.theta = wrap_angle(phi - sensor_bearing + phi_jitter[i] + theta_jitter[i])
             p_landmarks = self.sensor_model.landmarks.copy()
-            if False: # i<3:
+            if False: #i<3:
                 print('NEW PARTICLE %d: ' % i, p.x, p.y, p.theta*180/pi)
                 print('    lm_pose[1]=',lm_pose[1]*180/pi, '  sensor_orient=',sensor_orient*180/pi,
                       '  phi=',phi*180/pi)
+                print('lm_pose = ', lm_pose)
         return True
 
     def get_cube_landmark_specs(self):
