@@ -239,7 +239,10 @@ class WallObj(WorldObject):
 
     @property
     def is_visible(self):
-        seen_marker_keys = [('Aruco-%d' % id) for id in evbase.robot_for_loading.world.aruco.seen_marker_ids]
+        try:
+            seen_marker_keys = [('Aruco-%d' % id) for id in evbase.robot_for_loading.world.aruco.seen_marker_ids]
+        except:
+            return True
         for m in self.marker_specs.keys():
             if m in seen_marker_keys:
                 return True
@@ -597,7 +600,8 @@ class WorldMap():
                                    marker_specs=wall_spec.marker_specs,
                                    doorways=wall_spec.doorways,
                                    door_ids=wall_spec.door_ids,
-                                   is_foreign=False)
+                                   is_foreign=False,
+                                   spec_id=key)
                     self.objects[key] = wall
                     wall.pose_confidence = +1
                     # Make the doorways
