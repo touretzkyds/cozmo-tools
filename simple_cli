@@ -236,23 +236,6 @@ def start_stuff(args):
   start shared_map
 """)
 
-
-def sort_wmobject_ids(ids):
-    preference = ['Charger','Cube','Aruco','Wall','Door','CustomCube','CustomMarker','Room','Face']
-
-    def key(id):
-        index = 0
-        for prefix in preference:
-            if id.startswith(prefix):
-                break
-            else:
-                index += 1
-        return ('%02d' % index) + id
-
-    result = sorted(ids, key=key)
-    return result
-
-
 def show_stuff(args):
     global running_fsm
     running_fsm = cozmo_fsm.program.running_fsm
@@ -301,11 +284,11 @@ def show_stuff(args):
     elif spec == "pose":
         show_pose()
     elif spec == "landmarks":
-        show_landmarks()
+        robot.world.particle_filter.show_landmarks()
     elif spec == "objects":
         robot.world.world_map.show_objects()
     elif spec == "particle":
-        show_particle(args[1:])
+        robot.world.particle_filter.show_particle(args[1:])
     elif spec == "camera":
         show_camera(args[1:])
     else:

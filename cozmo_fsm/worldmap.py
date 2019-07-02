@@ -513,7 +513,16 @@ class WorldMap():
             wmobject = ChargerObj(charger)
             self.objects[charger_id] = wmobject
         wmobject.sdk_obj = charger  # In case we created charger before seeing it
-        if charger.is_visible or self.robot.is_on_charger:
+        if self.robot.is_on_charger:
+            wmobject.update_from_sdk = False
+            theta = wrap_angle(self.robot.world.particle_filter.pose[2] + pi)
+            charger_offset = np.array([[-30], [0], [0], [1]])
+            offset = transform.aboutZ(theta) * charger_offset
+            wmobject.x = self.robot.world.particle_filter.pose[0] + offset[0,0]
+            wmobject.y = self.robot.world.particle_filter.pose[1] + offset[1,0]
+            wmobject.theta = theta
+            wmobject.pose_confidence = +1
+        elif charger.is_visible:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
         elif (charger.pose is None) or not charger.pose.is_comparable(self.robot.pose):

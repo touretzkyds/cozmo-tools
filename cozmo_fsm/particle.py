@@ -6,7 +6,9 @@ import math, array, random
 from math import pi, sqrt, sin, cos, atan2, exp
 import numpy as np
 import cv2
+
 import cozmo
+from cozmo.util import Pose
 
 from .transform import wrap_angle, wrap_selected_angles, tprint, rotation_matrix_to_euler_angles
 from .aruco import ArucoMarker
@@ -879,7 +881,8 @@ class SLAMSensorModel(SensorModel):
             seen_marker_objects = dict()
         for marker in seen_marker_objects.values():
             if self.landmark_test(marker):
-                evaluated = self.process_landmark(marker.id_string, marker, just_looking, seen_marker_objects) or evaluated
+                evaluated = self.process_landmark(marker.id_string, marker,
+                                                  just_looking, seen_marker_objects) or evaluated
 
         # Evaluate walls.  First find the set of "good" markers.
         # Good markers have been seen consistently enough to be deemed reliable.
@@ -907,6 +910,7 @@ class SLAMSensorModel(SensorModel):
             if wmax > -5.0 and self.pf.state != ParticleFilter.LOCALIZED:
                 print('::: LOCALIZED :::')
                 self.pf.state = ParticleFilter.LOCALIZED
+            elif self.pf.state != ParticleFilter.LOCALIZED: pass
             min_log_weight = self.robot.world.particle_filter.min_log_weight
             if wmax < min_log_weight:
                 wt_inc = min_log_weight - wmax
@@ -1149,9 +1153,7 @@ class SLAMParticleFilter(ParticleFilter):
             lm_pose = self.sensor_model.landmarks.get(wall.id,None)
             if lm_pose is None: continue  # not a familiar landmark
             sensor_dist = sqrt(wall.x**2 + wall.y**2)
-            dx = wall.x - self.pose[0]
-            dy = wall.y - self.pose[1]
-            sensor_bearing = wrap_angle(atan2(dy, dx) - self.pose[2])
+            sensor_bearing = atan2(wall.y, wall.x)
             sensor_orient = wall.theta
             lm_specs.append((wall, sensor_dist, sensor_bearing, sensor_orient, lm_pose))
         return lm_specs
@@ -1161,3 +1163,85 @@ class SLAMParticleFilter(ParticleFilter):
         Also updates existing landmarks."""
         self.sensor_model.evaluate(self.particles, force=True, just_looking=True)
         self.sensor_model.landmarks = self.best_particle.landmarks
+
+    #================ "show" commands that can be used by simple_cli
+
+    def show_landmarks(self):
+        landmarks = self.sensor_model.landmarks
+        print('The particle filter has %d landmark%s:' %
+              (len(landmarks), '' if (len(landmarks) == 1) else 's'))
+        self.show_landmarks_workhorse(landmarks)
+
+    def show_landmarks_workhorse(self,landmarks):
+        "Also called by show_particle"
+        sorted_keys = self.sort_wmobject_ids(landmarks)
+        for key in sorted_keys:
+            value = landmarks[key]
+            if isinstance(value, Pose):
+                x = value.position.x
+                y = value.position.y
+                theta = value.rotation.angle_z.degrees
+                sigma_x = 0
+                sigma_y = 0
+                sigma_theta = 0
+            else:
+                x = value[0][0,0]
+                y = value[0][1,0]
+                theta = value[1] * 180/pi
+                sigma_x = sqrt(value[2][0,0])
+                sigma_y = sqrt(value[2][1,1])
+                sigma_theta = sqrt(value[2][2,2])*180/pi
+            if key.startswith('Aruco-'):
+                print('  Aruco marker %s' % key[6:], end='')
+            elif key.startswith('Wall-'):
+                print('  Wall %s' % key[5:], end='')
+            elif key.startswith('Cube-'):
+                print('  Cube %s' % key[5:], end='')
+            else:
+                print('  %r' % key, end='')
+            print(' at (%6.1f, %6.1f) @ %4.1f deg    +/- (%4.1f,%4.1f)  +/- %3.1f deg' %
+                  (x, y, theta, sigma_x, sigma_y, sigma_theta))
+        print()
+
+    def sort_wmobject_ids(self,ids):
+        preference = ['Charger','Cube','Aruco','Wall','Doorway','CustomCube','CustomMarker','Room','Face']
+
+        def key(id):
+            index = 0
+            for prefix in preference:
+                if id.startswith(prefix):
+                    break
+                else:
+                    index += 1
+            return ('%02d' % index) + id
+
+        result = sorted(ids, key=key)
+        return result
+
+    def show_particle(self,args=[]):
+        if len(args) == 0:
+            particle = self.best_particle
+            particle_number = '(best=%d)' % particle.index
+        elif len(args) > 1:
+            print('Usage:  show particle [number]')
+            return
+        else:
+            try:
+                particle_number = int(args[0])
+                particle = self.particles[particle_number]
+            except ValueError:
+                print('Usage:  show particle [number]')
+                return
+            except IndexError:
+                print('Particle number must be between 0 and',
+                      len(self.particles)-1)
+                return
+        print ('Particle %s:  x=%6.1f  y=%6.1f  theta=%6.1f deg   log wt=%f [%.25f]' %
+               (particle_number, particle.x, particle.y, particle.theta*180/pi,
+                particle.log_weight, particle.weight))
+        if len(particle.landmarks) > 0:
+            print('Landmarks:')
+            self.show_landmarks_workhorse(particle.landmarks)
+        else:
+            print()
+

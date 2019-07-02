@@ -36,6 +36,7 @@ Particle viewer commands:
   z          Reset particle positions (randomize, or all 0 for SLAM)
   c          Clear landmarks (for SLAM)
   o          Show objects
+  p          Show best particle
   arrows     Translate the view up/down/left/right
   Home       Center the view (zero translation)
   <          Zoom in
@@ -56,6 +57,8 @@ Particle viewer commands:
   option + r          Resample particles (evaluates first)
   option + z          Reset particle positions (randomize, or all 0 for SLAM)
   option + c          Clear landmarks (for SLAM)
+  option + o          Show objects
+  option + p          Show best particle
   arrows              Translate the view up/down/left/right
   fn + left-arrow     Center the view (zero translation)
   option + <          Zoom in
@@ -460,6 +463,10 @@ class ParticleViewer():
             print('Landmarks cleared.')
         elif key == b'o':     # show objects
             self.robot.world.world_map.show_objects()
+        elif key == b'p':     # show particle
+            self.robot.world.particle_filter.show_particle()
+        elif key == b'l':     # show landmarks
+            self.robot.world.particle_filter.show_landmarks()
         elif key == b'V':     # display weight variance
             self.report_variance(pf)
         elif key == b'<':     # zoom in
