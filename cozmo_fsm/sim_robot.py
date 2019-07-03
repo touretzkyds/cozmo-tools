@@ -26,6 +26,7 @@ class SimRobot():
         robot.shoulder_angle = Angle(radians=0)
         robot.lift_height = Distance(distance_mm=0)
         robot.pose = Pose(0,0,0,angle_z=Angle(degrees=0))
+        robot.carrying = None
 
         robot.world = SimWorld()
         robot.world.light_cubes = dict()
@@ -38,4 +39,3 @@ class SimRobot():
         robot.kine = CozmoKinematics(robot)  # depends on particle filter
         robot.world.rrt = RRT(robot) # depends on kine
         robot.world.world_map = WorldMap(robot)
-

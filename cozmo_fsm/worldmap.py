@@ -43,7 +43,11 @@ class LightCubeObj(WorldObject):
             self.update_from_sdk = True
         # self.theta = theta
         self.size = self.light_cube_size
-        self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
+        self.theta = theta
+        try:
+            self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
+        except AttributeError:
+            pass
 
     @property
     def is_visible(self):
