@@ -52,7 +52,8 @@ class CozmoKinematics(Kinematics):
                   getter=self.get_lift_attach, r=66.,
                   qmax = - cozmo.robot.MIN_LIFT_ANGLE.radians,
                   qmin = - cozmo.robot.MAX_LIFT_ANGLE.radians,
-                  collision_model=Circle(transform.point(), radius=10))
+                  #collision_model=Circle(transform.point(), radius=10))
+            )
 
         # Positive head angle is up, so z must point to the right.
         # With x pointing forward, y must point up.

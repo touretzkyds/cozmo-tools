@@ -57,7 +57,9 @@ class Aruco(object):
         self.ids = []
         self.corners = []
 
-        #added for pose estimation
+        if robot.camera is None: return  # robot is a SimRobot
+
+        # Added for pose estimation
         self.marker_size = marker_size #these units will be pose est units!!
         self.image_size = (320,240)
         focal_len = robot.camera._config._focal_length
