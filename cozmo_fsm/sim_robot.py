@@ -14,7 +14,11 @@ from .particle import SLAMParticleFilter
 from .rrt import RRT, RRTNode
 from .worldmap import WorldMap
 
-class SimWorld(): pass
+class SimWorld():
+    def __init__(self):
+        self.path_viewer = None
+        self.particle_viewer = None
+        self.worldmap_viewer = None
 
 class SimServer():
     def __init__(self):
