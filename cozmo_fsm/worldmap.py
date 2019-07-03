@@ -70,7 +70,8 @@ class ChargerObj(WorldObject):
         self.orientation = ''
         self.theta = theta
         self.size = (104, 98, 10)
-        self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
+        if self.sdk_obj.pose:
+            self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     @property
     def is_visible(self):
@@ -517,7 +518,7 @@ class WorldMap():
             wmobject.update_from_sdk = False
             theta = wrap_angle(self.robot.world.particle_filter.pose[2] + pi)
             charger_offset = np.array([[-30], [0], [0], [1]])
-            offset = transform.aboutZ(theta) * charger_offset
+            offset = transform.aboutZ(theta).dot(charger_offset)
             wmobject.x = self.robot.world.particle_filter.pose[0] + offset[0,0]
             wmobject.y = self.robot.world.particle_filter.pose[1] + offset[1,0]
             wmobject.theta = theta
