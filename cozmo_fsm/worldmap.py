@@ -308,7 +308,7 @@ class RoomObj(WorldObject):
         self.is_fixed = True
 
     def __repr__(self):
-        return '<Room %s: (%.1f,%.1f) floor=%s>' % (self.name, self.x, self.y, self.floor)
+        return '<RoomObj %s: (%.1f,%.1f) floor=%s>' % (self.id, self.x, self.y, self.floor)
 
 
 class ChipObj(WorldObject):
