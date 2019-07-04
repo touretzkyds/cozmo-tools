@@ -37,13 +37,15 @@ class LightCubeObj(WorldObject):
         if id is None:
             id = 'Cube-' + str(sdk_obj.cube_id)
         super().__init__(id,x,y,z)
+        self.orientation = transform.ORIENTATION_UPRIGHT
         self.sdk_obj = sdk_obj
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
-        # self.theta = theta
+            self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
+        else:
+            self.theta = theta
         self.size = self.light_cube_size
-        self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     @property
     def is_visible(self):
@@ -51,11 +53,11 @@ class LightCubeObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            vis = ' visible' if self.is_visible else ''
-            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
-                (self.sdk_obj.cube_id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
+            vis = ' visible' if self.sdk_obj and self.is_visible else ''
+            return '<LightCubeObj %s: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
+                (self.id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
-            return '<LightCubeObj %d: position unknown>' % self.sdk_obj.cube_id
+            return '<LightCubeObj %s: position unknown>' % self.id
 
 
 class ChargerObj(WorldObject):
@@ -79,7 +81,7 @@ class ChargerObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            vis = ' visible' if self.is_visible else ''
+            vis = ' visible' if self.sdk_obj and self.is_visible else ''
             return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
                 (self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
@@ -92,25 +94,27 @@ class CustomMarkerObj(WorldObject):
             custom_type = sdk_obj.object_type.name[-2:]
             id = 'CustomMarkerObj-' + str(custom_type)
         super().__init__(id,x,y,z)
-        self.theta = theta
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
-        self.orientation = ''
-        self.theta = theta
         if self.sdk_obj:
             self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
+        else:
+            self.theta = theta
+            self.orientation = transform.ORIENTATION_UPRIGHT
 
     @property
     def is_visible(self):
-        if self.sdk_obj is None:
-            return False
-        else:
-            return self.sdk_obj.is_visible
+        return self.sdk_obj.is_visible
 
     def __repr__(self):
-        vis = ' visible' if self.is_visible else ''
-        return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s %s>' % \
-               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id, self.x, self.y, vis, self.orientation)
+        if self.sdk_obj:
+            vis = ' visible' if self.is_visible else ''
+            return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s %s>' % \
+                (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
+                 self.x, self.y, vis, self.orientation)
+        else:
+            return '<CustomMarkerObj %s (%.1f,%.1f) %s>' % \
+                (self.id, self.x, self.y, self.orientation)
 
 
 class CustomCubeObj(WorldObject):
@@ -135,7 +139,7 @@ class CustomCubeObj(WorldObject):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        vis = ' visible' if self.is_visible else ''
+        vis = ' visible' if self.sdk_obj and self.is_visible else ''
         return '<CustomCubeObj-%s %d: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
                (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
                 self.x, self.y, self.z, self.theta*180/pi, vis)
