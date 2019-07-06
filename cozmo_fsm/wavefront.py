@@ -162,4 +162,4 @@ def wf_test():
     print(wf.grid[75:85, 75:85])
     return result2
 
-wf_test()
+# wf_test()
