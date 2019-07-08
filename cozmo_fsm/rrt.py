@@ -8,6 +8,7 @@ from .transform import wrap_angle
 
 from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
+from .wavefront import WaveFront
 from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, ChargerObj, ChipObj, RobotForeignObj
 
 # *** TODO: Collision checking needs to use opposite headings
