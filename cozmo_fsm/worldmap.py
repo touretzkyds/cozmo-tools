@@ -41,13 +41,11 @@ class LightCubeObj(WorldObject):
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
-        # self.theta = theta
-        self.size = self.light_cube_size
-        self.theta = theta
-        try:
             self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
-        except AttributeError:
-            pass
+        else:
+            self.theta = theta
+            self.orientation = transform.ORIENTATION_UPRIGHT
+        self.size = self.light_cube_size
 
     @property
     def is_visible(self):
@@ -55,11 +53,11 @@ class LightCubeObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            vis = ' visible' if self.is_visible else ''
-            return '<LightCubeObj %d: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
-                (self.sdk_obj.cube_id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
+            vis = ' visible' if self.sdk_obj and self.is_visible else ''
+            return '<LightCubeObj %s: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
+                (self.id, self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
-            return '<LightCubeObj %d: position unknown>' % self.sdk_obj.cube_id
+            return '<LightCubeObj %s: position unknown>' % self.id
 
 
 class ChargerObj(WorldObject):
@@ -71,10 +69,11 @@ class ChargerObj(WorldObject):
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
-        self.orientation = ''
+        self.orientation = transform.ORIENTATION_UPRIGHT
         self.theta = theta
         self.size = (104, 98, 10)
-        self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
+        if self.sdk_obj and self.sdk_obj.pose:
+            self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     @property
     def is_visible(self):
@@ -82,7 +81,7 @@ class ChargerObj(WorldObject):
 
     def __repr__(self):
         if self.pose_confidence >= 0:
-            vis = ' visible' if self.is_visible else ''
+            vis = ' visible' if self.sdk_obj and self.is_visible else ''
             return '<ChargerObj: (%.1f, %.1f, %.1f) @ %d deg.%s %s>' % \
                 (self.x, self.y, self.z, self.theta*180/pi, vis, self.orientation)
         else:
@@ -95,25 +94,27 @@ class CustomMarkerObj(WorldObject):
             custom_type = sdk_obj.object_type.name[-2:]
             id = 'CustomMarkerObj-' + str(custom_type)
         super().__init__(id,x,y,z)
-        self.theta = theta
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
-        self.orientation = ''
-        self.theta = theta
         if self.sdk_obj:
             self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
+        else:
+            self.theta = theta
+            self.orientation = transform.ORIENTATION_UPRIGHT
 
     @property
     def is_visible(self):
-        if self.sdk_obj is None:
-            return False
-        else:
-            return self.sdk_obj.is_visible
+        return self.sdk_obj.is_visible
 
     def __repr__(self):
-        vis = ' visible' if self.is_visible else ''
-        return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s %s>' % \
-               (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id, self.x, self.y, vis, self.orientation)
+        if self.sdk_obj:
+            vis = ' visible' if self.is_visible else ''
+            return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s %s>' % \
+                (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
+                 self.x, self.y, vis, self.orientation)
+        else:
+            return '<CustomMarkerObj %s (%.1f,%.1f) %s>' % \
+                (self.id, self.x, self.y, self.orientation)
 
 
 class CustomCubeObj(WorldObject):
@@ -138,7 +139,7 @@ class CustomCubeObj(WorldObject):
         return self.sdk_obj.is_visible
 
     def __repr__(self):
-        vis = ' visible' if self.is_visible else ''
+        vis = ' visible' if self.sdk_obj and self.is_visible else ''
         return '<CustomCubeObj-%s %d: (%.1f,%.1f, %.1f) @ %d deg.%s>' % \
                (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
                 self.x, self.y, self.z, self.theta*180/pi, vis)
@@ -311,7 +312,7 @@ class RoomObj(WorldObject):
         self.is_fixed = True
 
     def __repr__(self):
-        return '<Room %s: (%.1f,%.1f) floor=%s>' % (self.name, self.x, self.y, self.floor)
+        return '<RoomObj %s: (%.1f,%.1f) floor=%s>' % (self.id, self.x, self.y, self.floor)
 
 
 class ChipObj(WorldObject):
@@ -517,7 +518,16 @@ class WorldMap():
             wmobject = ChargerObj(charger)
             self.objects[charger_id] = wmobject
         wmobject.sdk_obj = charger  # In case we created charger before seeing it
-        if charger.is_visible or self.robot.is_on_charger:
+        if self.robot.is_on_charger:
+            wmobject.update_from_sdk = False
+            theta = wrap_angle(self.robot.world.particle_filter.pose[2] + pi)
+            charger_offset = np.array([[-30], [0], [0], [1]])
+            offset = transform.aboutZ(theta).dot(charger_offset)
+            wmobject.x = self.robot.world.particle_filter.pose[0] + offset[0,0]
+            wmobject.y = self.robot.world.particle_filter.pose[1] + offset[1,0]
+            wmobject.theta = theta
+            wmobject.pose_confidence = +1
+        elif charger.is_visible:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
         elif (charger.pose is None) or not charger.pose.is_comparable(self.robot.pose):
