@@ -2,6 +2,7 @@ from math import pi, sin, cos, inf, asin, atan2, nan, isnan, ceil
 import numpy as np
 import random
 import time
+import math
 
 import cozmo_fsm.transform
 from .transform import wrap_angle
@@ -164,28 +165,22 @@ class RRT():
         self.goal = goal
         self.target_heading = goal.q
 
-        # wavefront
+        # Use WaveFront
         if use_wf:
-            self.wf.grid[:,:] = 0
+            self.wf.clear()
             wf_start = (start.x, start.y)
             wf_goal = (goal.x, goal.y)
             self.wf.set_goal(*wf_goal)
             for obstacle in self.obstacles:
-                safety_dis = 20
-                centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
-                width, height = obstacle.dimensions[0]+safety_dis, obstacle.dimensions[1]+safety_dis
-                theta = wrap_angle(obstacle.orient)
-                for i in range(int(round(centerX-width/2)), int(ceil(centerX+width/2))):
-                    for j in range(int(round(centerY-height/2)), int(ceil(centerY+height/2))):
-                        new_i = ((i - centerX) * cos(theta) - (j - centerY) * sin(theta)) + centerX
-                        new_j = ((i - centerX) * sin(theta) + (j - centerY) * cos(theta)) + centerY
-                        self.wf.set_obstacle(new_i, new_j)
-            result1 = self.wf.propagate(*wf_start)
-            if result1:
-                result2 = self.wf.extract(result1)
+                self.wf.add_obstacle(obstacle, 20)
+            result = self.wf.propagate(*wf_start)
+            if result:
+                path = self.wf.extract(result)
+                self.path = self.transform_path(path)
+                self.smooth_path()
             else:
-                result2 = []
-            return result2
+                self.path = []
+            return self.path
 
         # Set up start node
         collider = self.collides(start)
@@ -484,6 +479,19 @@ class RRT():
         (tang_x, tang_y, tang_q, radius) = arc_spec
         turn_node = RRTNode(next_node, tang_x, tang_y, tang_q, radius=radius)
         return (next_node, turn_node)
+
+    def transform_path(self, path):
+        """
+        Transform a path with coordinates to RRTNode
+        """
+        for i in range(len(path)):
+            if i==0:
+                path[i] = RRTNode(x=path[i][0], y=path[i][1], q=math.nan)
+            else:
+                path[i] = RRTNode(parent=path[i-1], x=path[i][0], y=path[i][1], q=math.nan)
+                path[i-1].q = atan2(path[i].y - path[i-1].y, path[i].x - path[i-1].x)
+        return path
+
 
     #---------------- Obstacle Representation ----------------
 

@@ -4,6 +4,9 @@ Wavefront path planning algorithm.
 
 import numpy as np
 import heapq
+from math import ceil, cos, sin
+from .transform import wrap_angle
+from .rrt_shapes import *
 
 class WaveFront():
     def __init__(self, square_size=10, grid_size=(100,100)):
@@ -11,6 +14,9 @@ class WaveFront():
         self.grid_size = grid_size
         self.grid = np.ndarray(grid_size, dtype=np.int32)
         self.goal_marker = 2**31 - 1
+
+    def clear(self):
+        self.grid[:,:] = 0
 
     def convert_coords(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
@@ -26,6 +32,25 @@ class WaveFront():
         (x,y) = self.convert_coords(xcoord,ycoord)
         if x:
             self.grid[x,y] = -1
+
+    def add_obstacle(self, obstacle, inflate_size):
+        if isinstance(obstacle, Rectangle):
+            centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
+            width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
+            theta = wrap_angle(obstacle.orient)
+            for x in range(int(round(centerX-width/2)), int(ceil(centerX+width/2))):
+                for y in range(int(round(centerY-height/2)), int(ceil(centerY+height/2))):
+                    new_x = ((x - centerX) * cos(theta) - (y - centerY) * sin(theta)) + centerX
+                    new_y = ((x - centerX) * sin(theta) + (y - centerY) * cos(theta)) + centerY
+                    self.set_obstacle(new_x, new_y)
+        elif isinstance(obstacle, Polygon):
+            pass
+        elif isinstance(obstacle, Circle):
+            pass
+        elif isinstance(obstacle, Compound):
+            pass
+        else:
+            raise Exception("%s has no add_obstacle() method defined for %s." % (self, obstacle))
 
     def set_goal(self,xcoord,ycoord):
         (x,y) = self.convert_coords(xcoord,ycoord)
