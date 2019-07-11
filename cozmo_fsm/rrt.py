@@ -1,4 +1,4 @@
-from math import pi, sin, cos, inf, asin, atan2, nan, isnan
+from math import pi, sin, cos, inf, asin, atan2, nan, isnan, ceil
 import numpy as np
 import random
 import time
@@ -72,9 +72,10 @@ class RRT():
         self.treeB = []
         self.start = None
         self.goal = None
+        self.wf = WaveFront()
 
     REACHED = 'reached'
-    COLLISION = 'collision' 
+    COLLISION = 'collision'
     INTERPOLATE = 'interpolate'
 
     def set_obstacles(self,obstacles):
@@ -149,12 +150,12 @@ class RRT():
             for obstacle in self.obstacles:
                 if part.collides(obstacle):
                     return obstacle
-        return False        
+        return False
 
     def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
         return self.plan_path(start, goal, max_turn, arc_radius)
 
-    def plan_path(self, start, goal, max_turn=pi, arc_radius=40):
+    def plan_path(self, start, goal, max_turn=pi, arc_radius=40, use_wf=False):
         self.max_turn = max_turn
         self.arc_radius = arc_radius
         if self.auto_obstacles:
@@ -162,6 +163,29 @@ class RRT():
         self.start = start
         self.goal = goal
         self.target_heading = goal.q
+
+        # wavefront
+        if use_wf:
+            self.wf.grid[:,:] = 0
+            wf_start = (start.x, start.y)
+            wf_goal = (goal.x, goal.y)
+            self.wf.set_goal(*wf_goal)
+            for obstacle in self.obstacles:
+                safety_dis = 20
+                centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
+                width, height = obstacle.dimensions[0]+safety_dis, obstacle.dimensions[1]+safety_dis
+                theta = wrap_angle(obstacle.orient)
+                for i in range(int(round(centerX-width/2)), int(ceil(centerX+width/2))):
+                    for j in range(int(round(centerY-height/2)), int(ceil(centerY+height/2))):
+                        new_i = ((i - centerX) * cos(theta) - (j - centerY) * sin(theta)) + centerX
+                        new_j = ((i - centerX) * sin(theta) + (j - centerY) * cos(theta)) + centerY
+                        self.wf.set_obstacle(new_i, new_j)
+            result1 = self.wf.propagate(*wf_start)
+            if result1:
+                result2 = self.wf.extract(result1)
+            else:
+                result2 = []
+            return result2
 
         # Set up start node
         collider = self.collides(start)
@@ -245,7 +269,7 @@ class RRT():
         xmax = xmax + 500
         ymin = ymin - 500
         ymax = ymax + 500
-        self.bounds = (range(int(xmin), int(xmax)), range(int(ymin), int(ymax)))        
+        self.bounds = (range(int(xmin), int(xmax)), range(int(ymin), int(ymax)))
 
     def get_path(self, treeA, treeB):
         nodeA = treeA[-1]
@@ -370,7 +394,7 @@ class RRT():
             smoothed_path = smoothed_path[:i+1] + \
                             [turn_node1, next_node, turn_node2] + \
                             smoothed_path[j+1:]
-        return smoothed_path        
+        return smoothed_path
 
     def calculate_arc(self, node_i, node_j):
         # Compute arc node parameters to get us on a heading toward node_j.
@@ -384,7 +408,7 @@ class RRT():
         dir = +1 if direct_turn_angle >=0 else -1
         cx = cur_x + self.arc_radius * cos(cur_q + dir*pi/2)
         cy = cur_y + self.arc_radius * sin(cur_q + dir*pi/2)
-        dx = cx - dest_x 
+        dx = cx - dest_x
         dy = cy - dest_y
         center_dist = sqrt(dx*dx + dy*dy)
         if center_dist < self.arc_radius:  # turn would be too wide: punt
@@ -538,4 +562,3 @@ class RRT():
                 robot_obst = joint.collision_model.instantiate(tmat)
                 result.append(robot_obst)
         return result
-

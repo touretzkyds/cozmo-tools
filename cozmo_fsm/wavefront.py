@@ -14,8 +14,8 @@ class WaveFront():
 
     def convert_coords(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
-        x = round((xcoord/self.square_size+self.grid_size[0]/2))
-        y = round((ycoord/self.square_size+self.grid_size[1]/2))
+        x = int(round((xcoord/self.square_size+self.grid_size[0]/2)))
+        y = int(round((ycoord/self.square_size+self.grid_size[1]/2)))
         if x >= 0 and x < self.grid_size[0] and \
            y >= 0 and y < self.grid_size[1]:
             return (x,y)
