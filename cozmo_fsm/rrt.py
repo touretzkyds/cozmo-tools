@@ -161,10 +161,12 @@ class RRT():
         self.arc_radius = arc_radius
         if self.auto_obstacles:
             if use_wf:
-                passageway_adjustment = -50  # narrow doorways for WaveFront
-            else:
+                obstacle_inflation = 20
+                passageway_adjustment = -40  # narrow doorways for WaveFront
+            else: # use RRT
+                obstacle_inflation = 5
                 passageway_adjustment = +77  # widen doorways for RRT
-            self.generate_obstacles(passageway_adjustment)
+            self.generate_obstacles(obstacle_inflation, passageway_adjustment)
         self.start = start
         self.goal = goal
         self.target_heading = goal.q
@@ -499,7 +501,7 @@ class RRT():
 
     #---------------- Obstacle Representation ----------------
 
-    def generate_obstacles(self, passageway_adjustment):
+    def generate_obstacles(self, obstacle_inflation, passageway_adjustment):
         self.robot.world.world_map.update_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
@@ -507,7 +509,8 @@ class RRT():
             if self.robot.carrying is obj: continue
             if obj.pose_confidence < 0: continue
             if isinstance(obj, WallObj):
-                obstacles = obstacles + self.generate_wall_obstacles(obj, passageway_adjustment)
+                obstacles = obstacles + \
+                            self.generate_wall_obstacles(obj, obstacle_inflation, passageway_adjustment)
             elif isinstance(obj, (LightCubeObj,CustomCubeObj,ChargerObj)):
                 obstacles.append(self.generate_cube_obstacle(obj))
             elif isinstance(obj, ChipObj):
@@ -516,22 +519,22 @@ class RRT():
                obstacles.append(self.generate_foreign_obstacle(obj))
         self.obstacles = obstacles
 
-    def generate_wall_obstacles(self, wall, passageway_adjustment):
+    def generate_wall_obstacles(self, wall, obstacle_inflation, passageway_adjustment):
         wall_spec = wall_marker_dict[wall.spec_id]
         half_length = wall.length / 2
         widths = []
         last_x = -half_length
-        edges = [ [0, -half_length, 0., 1.] ]
+        edges = [ [0, -half_length-obstacle_inflation, 0., 1.] ]
         for (center,width) in wall_spec.doorways:
             #width = 2 * width   # *** WIDEN DOORWAYS FOR PATH PLANNING SUCCESS
-            width += passageway_adjustment  # widen doorways for RRT, narrow for WaveFront
+            width += passageway_adjustment + obstacle_inflation  # widen doorways for RRT, narrow for WaveFront
             left_edge = center - width/2 - half_length
             edges.append([0., left_edge, 0., 1.])
             widths.append(left_edge - last_x)
             right_edge = center + width/2 - half_length
             edges.append([0., right_edge, 0., 1.])
             last_x = right_edge
-        edges.append([0., half_length, 0., 1.])
+        edges.append([0., half_length+obstacle_inflation, 0., 1.])
         widths.append(half_length-last_x)
         edges = np.array(edges).T
         edges = transform.aboutZ(wall.theta).dot(edges)
@@ -539,7 +542,7 @@ class RRT():
         obst = []
         for i in range(0,len(widths)):
             center = edges[:,2*i:2*i+2].mean(1).reshape(4,1)
-            dimensions=(4.0, widths[i])
+            dimensions=(4.0+obstacle_inflation, widths[i])
             r = Rectangle(center=center,
                           dimensions=dimensions,
                           orient=wall.theta )
