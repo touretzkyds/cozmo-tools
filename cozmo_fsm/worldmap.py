@@ -37,7 +37,6 @@ class LightCubeObj(WorldObject):
         if id is None:
             id = 'Cube-' + str(sdk_obj.cube_id)
         super().__init__(id,x,y,z)
-        self.orientation = transform.ORIENTATION_UPRIGHT
         self.sdk_obj = sdk_obj
         if sdk_obj:
             self.sdk_obj.wm_obj = self
@@ -45,6 +44,7 @@ class LightCubeObj(WorldObject):
             self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
         else:
             self.theta = theta
+            self.orientation = transform.ORIENTATION_UPRIGHT
         self.size = self.light_cube_size
 
     @property
@@ -69,10 +69,10 @@ class ChargerObj(WorldObject):
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
-        self.orientation = ''
+        self.orientation = transform.ORIENTATION_UPRIGHT
         self.theta = theta
         self.size = (104, 98, 10)
-        if self.sdk_obj.pose:
+        if self.sdk_obj and self.sdk_obj.pose:
             self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
     @property

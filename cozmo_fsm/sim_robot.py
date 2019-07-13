@@ -47,4 +47,3 @@ class SimRobot():
         robot.kine = CozmoKinematics(robot)  # depends on particle filter
         robot.world.rrt = RRT(robot) # depends on kine
         robot.world.world_map = WorldMap(robot)
-
