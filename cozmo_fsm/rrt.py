@@ -160,7 +160,11 @@ class RRT():
         self.max_turn = max_turn
         self.arc_radius = arc_radius
         if self.auto_obstacles:
-            self.generate_obstacles()
+            if use_wf:
+                passageway_adjustment = -50  # narrow doorways for WaveFront
+            else:
+                passageway_adjustment = +77  # widen doorways for RRT
+            self.generate_obstacles(passageway_adjustment)
         self.start = start
         self.goal = goal
         self.target_heading = goal.q
@@ -495,7 +499,7 @@ class RRT():
 
     #---------------- Obstacle Representation ----------------
 
-    def generate_obstacles(self):
+    def generate_obstacles(self, passageway_adjustment):
         self.robot.world.world_map.update_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
@@ -503,7 +507,7 @@ class RRT():
             if self.robot.carrying is obj: continue
             if obj.pose_confidence < 0: continue
             if isinstance(obj, WallObj):
-                obstacles = obstacles + self.generate_wall_obstacles(obj)
+                obstacles = obstacles + self.generate_wall_obstacles(obj, passageway_adjustment)
             elif isinstance(obj, (LightCubeObj,CustomCubeObj,ChargerObj)):
                 obstacles.append(self.generate_cube_obstacle(obj))
             elif isinstance(obj, ChipObj):
@@ -512,14 +516,15 @@ class RRT():
                obstacles.append(self.generate_foreign_obstacle(obj))
         self.obstacles = obstacles
 
-    def generate_wall_obstacles(self,wall):
+    def generate_wall_obstacles(self, wall, passageway_adjustment):
         wall_spec = wall_marker_dict[wall.spec_id]
         half_length = wall.length / 2
         widths = []
         last_x = -half_length
         edges = [ [0, -half_length, 0., 1.] ]
         for (center,width) in wall_spec.doorways:
-            width = 2 * width   # *** WIDEN DOORWAYS FOR PATH PLANNING SUCCESS
+            #width = 2 * width   # *** WIDEN DOORWAYS FOR PATH PLANNING SUCCESS
+            width += passageway_adjustment  # widen doorways for RRT, narrow for WaveFront
             left_edge = center - width/2 - half_length
             edges.append([0., left_edge, 0., 1.])
             widths.append(left_edge - last_x)
