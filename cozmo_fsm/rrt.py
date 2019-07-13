@@ -174,9 +174,9 @@ class RRT():
             self.wf.clear()
             wf_start = (start.x, start.y)
             wf_goal = (goal.x, goal.y)
-            self.wf.set_goal(*wf_goal)
             for obstacle in self.obstacles:
                 self.wf.add_obstacle(obstacle, 20)
+            self.wf.set_goal(*wf_goal)
             result = self.wf.propagate(*wf_start)
             if result:
                 path = self.wf.extract(result)

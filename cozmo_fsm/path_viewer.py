@@ -33,6 +33,7 @@ Path viewer commands:
   <        Zoom in
   >        Zoom out
   o        Show objects
+  b        Show obstacles
   space    Toggle redisplay (for debugging)
   h        Print this help text
 """
@@ -43,7 +44,8 @@ Path viewer commands:
   fn + left-arrow  Center the view (zero translation)
   option + <       Zoom in
   option + >       Zoom out
-  o                Show objects
+  option + o       Show objects
+  option + b       Show obstacles
   space            Toggle redisplay (for debugging)
   option + h       Print this help text
 """
@@ -287,6 +289,9 @@ class PathViewer():
         elif key == b'o':     # show objects
             self.robot.world.world_map.show_objects()
             return
+        elif key == b'b':     # show obstacles
+            self.show_obstacles()
+            return
         elif key == b'h':     # print help
             self.print_help()
             return
@@ -310,6 +315,12 @@ class PathViewer():
     def print_display_params(self):
         print('scale=%.2f translation=[%.1f, %.1f]' %
               (self.scale, *self.translation))
+
+    def show_obstacles(self):
+        print('RRT has %d obstacles.' % len(the_rrt.obstacles))
+        for obstacle in the_rrt.obstacles:
+            print('  ', obstacle)
+        print()
 
     def print_help(self):
         if platform.system() == 'Darwin':
