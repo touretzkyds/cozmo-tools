@@ -424,6 +424,10 @@ class WorldMap():
         self.objects = dict()
         self.shared_objects = dict()
 
+    def clear(self):
+        self.objects.clear()
+        self.robot.world.particle_filter.clear_landmarks()
+
     def add_fixed_landmark(self,landmark):
         landmark.is_fixed = True
         self.objects[landmark.id] = landmark
