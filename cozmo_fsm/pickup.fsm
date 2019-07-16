@@ -411,7 +411,7 @@ class GoToCube(StateNode):
 
         check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
         check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
-        check_almost_docked =S=> manual_dock1        # we're close: skip the Pilot and set up dock manually
+        check_almost_docked =S=> Forward(-10) =C=> manual_dock1   # we're close: skip the Pilot and set up dock manually
         check_almost_docked =F=> pilot_check_start   # not close: use the Pilot to path plan
 
         manual_dock1: self.ManualDock1()
