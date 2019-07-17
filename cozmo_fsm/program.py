@@ -72,6 +72,7 @@ class StateMachineProgram(StateNode):
         if not hasattr(self.robot, 'erouter'):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
+            self.robot.erouter.start()
         else:
             self.robot.erouter.clear()
 

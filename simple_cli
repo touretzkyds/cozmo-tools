@@ -487,9 +487,10 @@ def run(sdk_conn):
     if "TK_VIEWER" in sys.argv:
         time.sleep(1.5) # allow time for Tk to set up the viewer window
     try:
+        cozmo_fsm.evbase.robot_for_loading = robot
         robot.erouter = cozmo_fsm.evbase.EventRouter()
         robot.erouter.robot = robot
-        cozmo_fsm.evbase.robot_for_loading = robot
+        robot.erouter.start()
     except: pass
     cli_loop(robot)
 
