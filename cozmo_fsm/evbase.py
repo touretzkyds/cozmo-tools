@@ -43,12 +43,19 @@ class EventRouter:
         self.wildcard_registry = dict()
         # event generator objects
         self.event_generators = dict()
+        # running processes
+        self.processes = []
+
+    def start(self):
+        self.clear()
+        self.poll_processes()
 
     def clear(self):
         self.dispatch_table.clear()
         self.listener_registry.clear()
         self.wildcard_registry.clear()
         self.event_generators.clear()
+        self.processes = []
 
     def add_listener(self, listener, event_class, source):
         if not issubclass(event_class, Event):
@@ -145,6 +152,25 @@ class EventRouter:
                 print('TRACE%d:' % TRACE.listener_invocation, listener.__class__, 'receiving', event)
             self.robot.loop.call_soon(listener,event)
     
+    def add_process_node(self, node):
+        self.processes.append(node)
+
+    def delete_process_node(self, node):
+        if node in self.processes:
+            self.processes.remove(node)
+
+    POLLING_INTERVAL = 0.1
+
+    def poll_processes(self):
+        for node in self.processes:
+            if not node.queue.empty():
+                event = node.queue.get()
+                self.delete_process_node(node)
+                event.source = node
+                print(event)
+                self.post(event)
+        self.robot.loop.call_later(self.POLLING_INTERVAL, self.poll_processes)
+
 #________________ Event Listener ________________
 
 class EventListener:

@@ -1,5 +1,5 @@
 """
-    The base Event class is imported from erouter.py.
+    The base Event class is imported from evbase.py.
     All other events are defined here.
 """
 

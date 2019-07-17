@@ -47,6 +47,7 @@ class StateMachineProgram(StateNode):
 
                  aruco = True,
                  arucolibname = cv2.aruco.DICT_4X4_100,
+                 aruco_disabled_ids = (17, 37),
                  aruco_marker_size = ARUCO_MARKER_SIZE,
 
                  perched_cameras = False,
@@ -71,6 +72,7 @@ class StateMachineProgram(StateNode):
         if not hasattr(self.robot, 'erouter'):
             self.robot.erouter = EventRouter()
             self.robot.erouter.robot = self.robot
+            self.robot.erouter.start()
         else:
             self.robot.erouter.clear()
 
@@ -100,7 +102,8 @@ class StateMachineProgram(StateNode):
         self.aruco = aruco
         self.aruco_marker_size = aruco_marker_size
         if self.aruco:
-            self.robot.world.aruco = Aruco(self.robot, arucolibname, aruco_marker_size)
+            self.robot.world.aruco = \
+                Aruco(self.robot, arucolibname, aruco_marker_size, aruco_disabled_ids)
 
         self.perched_cameras = perched_cameras
         if self.perched_cameras:

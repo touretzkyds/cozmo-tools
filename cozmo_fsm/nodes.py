@@ -5,6 +5,7 @@ import types
 import random
 import numpy as np
 import math
+from multiprocessing import Process, Queue
 from math import pi
 import cv2
 
@@ -1186,3 +1187,38 @@ class RollBlock(StartBehavior):
 class StackBlocks(StartBehavior):
     def __init__(self,stop_on_exit=True):
         super().__init__(cozmo.robot.behavior.BehaviorTypes.StackBlocks,stop_on_exit)
+
+#________________ Multiprocessing ________________
+
+class LaunchProcess(StateNode):
+    def __init__(self):
+        super().__init__()
+        self.process = None
+        self.queue = None
+
+    def dummy_task(self):
+        print('*** Failed to override create_process for', self, '***')
+        print('Sleeping for 2 seconds...')
+        time.sleep(2)
+        # A process returns its result to the caller as an event.
+        result = 42
+        self.queue.put(DataEvent(None,result))  # source must be None for pickling
+
+    def create_process(self):
+        p = Process(target=self.dummy_task, args=[])
+        return p
+
+    def start(self, event=None):
+        super().start(event)
+        self.queue = Queue()
+        self.process = self.create_process()
+        self.robot.erouter.add_process_node(self)
+        self.process.start()
+        print('Launched', self.process)
+
+    def stop(self):
+        self.robot.erouter.delete_process_node(self)
+        self.process.terminate()
+        self.process = None
+        self.queue = None
+        super().stop()

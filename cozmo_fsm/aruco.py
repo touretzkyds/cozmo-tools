@@ -48,12 +48,13 @@ class ArucoMarker(object):
         return array([x, y, z])
 
 class Aruco(object):
-    def __init__(self, robot, arucolibname, marker_size=ARUCO_MARKER_SIZE):
+    def __init__(self, robot, arucolibname, marker_size=ARUCO_MARKER_SIZE, disabled_ids=[]):
         self.arucolibname = arucolibname
         self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         self.seen_marker_ids = []
         self.seen_marker_objects = dict()
+        self.disabled_ids = disabled_ids  # disable markers with high false detection rates
         self.ids = []
         self.corners = []
 
@@ -88,6 +89,7 @@ class Aruco(object):
         self.tvecs = estimate[1]
         for i in range(len(self.ids)):
             id = int(self.ids[i][0])
+            if id in self.disabled_ids: continue
             marker = ArucoMarker(self, id,
                                  self.corners[i], self.tvecs[i][0], self.rvecs[i][0])
             self.seen_marker_ids.append(marker.id)
