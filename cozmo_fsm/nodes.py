@@ -1191,26 +1191,27 @@ class StackBlocks(StartBehavior):
 #________________ Multiprocessing ________________
 
 class LaunchProcess(StateNode):
-    def __init__(self,stop_on_exit=True):
+    def __init__(self):
         super().__init__()
-        self.stop_on_exit = stop_on_exit
         self.process = None
         self.queue = None
 
-    def dummy_task(self,queue):
+    def dummy_task(self):
         print('*** Failed to override launch_process for', self, '***')
-        print('Sleeping for a while.')
-        time.sleep(5)
-        queue.put(CompletionEvent())
+        print('Sleeping for 2 seconds...')
+        time.sleep(2)
+        # A process returns its result to the caller as an event.
+        result = 42
+        self.queue.put(DataEvent(None,result))  # source must be None for pickling
 
-    def launch_process(self,queue):
-        p = Process(target=self.dummy_task, args=(queue,))
+    def launch_process(self):
+        p = Process(target=self.dummy_task, args=[])
         return p
 
     def start(self, event=None):
         super().start(event)
         self.queue = Queue()
-        self.process = self.launch_process(self.queue)
+        self.process = self.launch_process()
         self.robot.erouter.add_process(self)
         self.process.start()
         print('Launched', self.process)
