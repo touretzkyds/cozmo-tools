@@ -1202,15 +1202,17 @@ class LaunchProcess(StateNode):
         time.sleep(2)
         # A process returns its result to the caller as an event.
         result = 42
-        self.queue.put(DataEvent(None,result))  # source must be None for pickling
+        self.post_process_event(DataEvent(None,result))  # source must be None for pickling
 
     def create_process(self):
         p = Process(target=self.dummy_task, args=[])
         return p
 
+    def post_process_event(self,event):
+        self.robot.erouter.post_process_event(self, event)
+
     def start(self, event=None):
         super().start(event)
-        self.queue = Queue()
         self.process = self.create_process()
         self.robot.erouter.add_process_node(self)
         self.process.start()
@@ -1220,5 +1222,4 @@ class LaunchProcess(StateNode):
         self.robot.erouter.delete_process_node(self)
         self.process.terminate()
         self.process = None
-        self.queue = None
         super().stop()

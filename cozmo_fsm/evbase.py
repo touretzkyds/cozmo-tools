@@ -44,7 +44,8 @@ class EventRouter:
         # event generator objects
         self.event_generators = dict()
         # running processes
-        self.processes = []
+        self.processes = dict()  # id -> node
+        self.interprocess_queue = Queue()
 
     def start(self):
         self.clear()
@@ -55,7 +56,9 @@ class EventRouter:
         self.listener_registry.clear()
         self.wildcard_registry.clear()
         self.event_generators.clear()
-        self.processes = []
+        self.processes.clear()
+        while not self.interprocess_queue.empty():
+            self.interprocess_queue.empty.get()
 
     def add_listener(self, listener, event_class, source):
         if not issubclass(event_class, Event):
@@ -153,22 +156,26 @@ class EventRouter:
             self.robot.loop.call_soon(listener,event)
     
     def add_process_node(self, node):
-        self.processes.append(node)
+        self.processes[id(node)] = node
 
     def delete_process_node(self, node):
-        if node in self.processes:
-            self.processes.remove(node)
+        node_id = id(node)
+        if node_id in self.processes:
+            del self.processes(node_id)
+
+    def post_process_event(self, node, event):
+        pair = (id(node), event)
+        self.interprocess_queue.put(pair)
 
     POLLING_INTERVAL = 0.1
 
     def poll_processes(self):
-        for node in self.processes:
-            if not node.queue.empty():
-                event = node.queue.get()
-                self.delete_process_node(node)
-                event.source = node
-                print(event)
-                self.post(event)
+        while not self.interprocess_queue.empty():
+            (id,event) = self.interprocess_queue.get()
+            node = self.processes[id]
+            event.source = node
+            print('Node %s returned %s' % (node,event))
+            self.post(event)
         self.robot.loop.call_later(self.POLLING_INTERVAL, self.poll_processes)
 
 #________________ Event Listener ________________
