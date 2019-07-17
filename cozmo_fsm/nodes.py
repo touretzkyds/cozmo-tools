@@ -1197,27 +1197,27 @@ class LaunchProcess(StateNode):
         self.queue = None
 
     def dummy_task(self):
-        print('*** Failed to override launch_process for', self, '***')
+        print('*** Failed to override create_process for', self, '***')
         print('Sleeping for 2 seconds...')
         time.sleep(2)
         # A process returns its result to the caller as an event.
         result = 42
         self.queue.put(DataEvent(None,result))  # source must be None for pickling
 
-    def launch_process(self):
+    def create_process(self):
         p = Process(target=self.dummy_task, args=[])
         return p
 
     def start(self, event=None):
         super().start(event)
         self.queue = Queue()
-        self.process = self.launch_process()
-        self.robot.erouter.add_process(self)
+        self.process = self.create_process()
+        self.robot.erouter.add_process_node(self)
         self.process.start()
         print('Launched', self.process)
 
     def stop(self):
-        self.robot.erouter.delete_process(self)
+        self.robot.erouter.delete_process_node(self)
         self.process.terminate()
         self.process = None
         self.queue = None

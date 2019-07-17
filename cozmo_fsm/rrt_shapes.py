@@ -23,6 +23,10 @@ class Shape():
         else:
             raise Exception("%s has no collides() method defined for %s." % (self, shape))
 
+    def get_bounding_box(self):
+        """Should return ((xmin,ymin), (xmax,ymax))"""
+        raise NotImplementedError("get_bounding_box")
+
 #================ Basic Shapes ================
 
 class Circle(Shape):
@@ -51,6 +55,13 @@ class Circle(Shape):
         dist = sqrt(dx*dx + dy*dy)
         return dist < (self.radius + circle.radius)
         
+    def get_bounding_box(self):
+        xmin = self.center[0] - self.radius
+        xmax = self.center[0] + self.radius
+        ymin = self.center[1] - self.radius
+        ymax = self.center[1] + self.radius
+        return ((xmin,ymin), (xmax,ymax))
+
 class Polygon(Shape):
     def __init__(self, vertices=None):
       self.vertices = vertices
@@ -59,10 +70,21 @@ class Polygon(Shape):
                           for i in range(N) )
       center = vertices.mean(1).resize(4,1)
 
-    def collides_poly(self,poly): pass
+    def get_bounding_box(self):
+        mins = self.vertices.min(1)
+        maxs = self.vertices.max(1)
+        xmin = mins[0]
+        ymin = mins[1]
+        xmax = maxs[0]
+        ymax = maxs[1]
+        return ((xmin,ymin), (xmax,ymax))
+
+    def collides_poly(self,poly):
+        raise NotImplementedError()
 
     def collides_circle(self,circle):
-        raise ValueError()
+        raise NotImplementedError()
+
 
 class Rectangle(Polygon):
     def __init__(self, center=None, dimensions=None, orient=0):

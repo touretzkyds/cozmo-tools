@@ -152,10 +152,10 @@ class EventRouter:
                 print('TRACE%d:' % TRACE.listener_invocation, listener.__class__, 'receiving', event)
             self.robot.loop.call_soon(listener,event)
     
-    def add_process(self, node):
+    def add_process_node(self, node):
         self.processes.append(node)
 
-    def delete_process(self, node):
+    def delete_process_node(self, node):
         if node in self.processes:
             self.processes.remove(node)
 
@@ -165,7 +165,7 @@ class EventRouter:
         for node in self.processes:
             if not node.queue.empty():
                 event = node.queue.get()
-                self.delete_process(node)
+                self.delete_process_node(node)
                 event.source = node
                 print(event)
                 self.post(event)
