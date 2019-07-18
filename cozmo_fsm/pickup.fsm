@@ -616,8 +616,9 @@ class PickUpCube(StateNode):
             print('Verifying pickup.  hangle=%4.1f deg.  langle=%4.1f deg.  lheight=%4.1f mm' %
                   (self.robot.head_angle.degrees, self.robot.lift_angle.degrees,
                    self.robot.lift_height.distance_mm))
-            for col in range(100,220,20):
-                run_length = self.probe_column(im, col, 0, 100)
+            columns = (100, 110, 120, 200, 210, 220)  # avoid the screw in the center
+            for col in columns: # range(100,220,20):
+                run_length = self.probe_column(im, col, 8, 100)
                 if run_length < min_length or run_length > max_length:
                     bad_runs += 1
             print('  Number of bad_runs:', bad_runs)

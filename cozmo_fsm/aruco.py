@@ -90,6 +90,12 @@ class Aruco(object):
         for i in range(len(self.ids)):
             id = int(self.ids[i][0])
             if id in self.disabled_ids: continue
+            tvec = self.tvecs[i][0]
+            rvec = self.rvecs[i][0]
+            if rvec[2] > math.pi/2 or rvec[2] < -math.pi/2:
+                # can't see a marker facing away from us, so bogus
+                print('Marker rejected! id=', id, 'tvec=', tvec, 'rvec=', rvec)
+                continue
             marker = ArucoMarker(self, id,
                                  self.corners[i], self.tvecs[i][0], self.rvecs[i][0])
             self.seen_marker_ids.append(marker.id)
