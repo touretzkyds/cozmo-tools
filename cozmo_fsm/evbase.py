@@ -7,6 +7,7 @@
 """
 
 import functools
+from multiprocessing import Queue
 
 import cozmo
 
@@ -57,8 +58,8 @@ class EventRouter:
         self.wildcard_registry.clear()
         self.event_generators.clear()
         self.processes.clear()
-        while not self.interprocess_queue.empty():
-            self.interprocess_queue.empty.get()
+        self.interprocess_queue.close()
+        self.interprocess_queue = Queue()
 
     def add_listener(self, listener, event_class, source):
         if not issubclass(event_class, Event):
@@ -161,7 +162,7 @@ class EventRouter:
     def delete_process_node(self, node):
         node_id = id(node)
         if node_id in self.processes:
-            del self.processes(node_id)
+            del self.processes[node_id]
 
     def post_process_event(self, node, event):
         pair = (id(node), event)

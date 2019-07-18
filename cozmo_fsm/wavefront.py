@@ -15,8 +15,10 @@ class WaveFront():
         self.grid = np.ndarray(grid_size, dtype=np.int32)
         self.goal_marker = 2**31 - 1
 
-    def clear(self):
-        self.grid[:,:] = 0
+    def initialize_grid(self):
+        # Replace this with code to dynamically compute the grid size
+        # based on world.rrt.get_bounding_box()
+        self.grid = np.ndarray(self.grid_size, dtype=np.int32)
 
     def convert_coords(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
@@ -32,6 +34,13 @@ class WaveFront():
         (x,y) = self.convert_coords(xcoord,ycoord)
         if x:
             self.grid[x,y] = -1
+
+    def set_goal(self,xcoord,ycoord):
+        (x,y) = self.convert_coords(xcoord,ycoord)
+        if x:
+            self.grid[x,y] = self.goal_marker
+        else:
+            raise ValueError('Coordinates %s are outside the wavefront grid' % ((xcoord,ycoord)))
 
     def add_obstacle(self, obstacle, inflate_size):
         if isinstance(obstacle, Rectangle):
@@ -52,15 +61,9 @@ class WaveFront():
         else:
             raise Exception("%s has no add_obstacle() method defined for %s." % (self, obstacle))
 
-    def set_goal(self,xcoord,ycoord):
-        (x,y) = self.convert_coords(xcoord,ycoord)
-        if x:
-            self.grid[x,y] = self.goal_marker
-        else:
-            raise ValueError('Coordinates %s are outside the wavefront grid' % ((xcoord,ycoord)))
-
     def propagate(self,xstart,ystart):
-        "Propagate the wavefront from the given starting coordinates until a goal cell is reached."
+        """Propagate the wavefront in eight directions from the starting coordinates
+until a goal cell is reached or we fill up the grid."""
         (x,y) = self.convert_coords(xstart,ystart)
         grid = self.grid
         goal_marker = self.goal_marker

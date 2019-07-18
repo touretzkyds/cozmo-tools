@@ -56,19 +56,19 @@ class Circle(Shape):
         return dist < (self.radius + circle.radius)
         
     def get_bounding_box(self):
-        xmin = self.center[0] - self.radius
-        xmax = self.center[0] + self.radius
-        ymin = self.center[1] - self.radius
-        ymax = self.center[1] + self.radius
+        xmin = self.center[0,0] - self.radius
+        xmax = self.center[0,0] + self.radius
+        ymin = self.center[1,0] - self.radius
+        ymax = self.center[1,0] + self.radius
         return ((xmin,ymin), (xmax,ymax))
 
 class Polygon(Shape):
     def __init__(self, vertices=None):
-      self.vertices = vertices
-      N = vertices.shape[1]
-      self.edges = tuple( (vertices[:,i:i+1], vertices[:,(i+1)%N:((i+1)%N)+1])
-                          for i in range(N) )
-      center = vertices.mean(1).resize(4,1)
+        self.vertices = vertices
+        N = vertices.shape[1]
+        self.edges = tuple( (vertices[:,i:i+1], vertices[:,(i+1)%N:((i+1)%N)+1])
+                            for i in range(N) )
+        center = vertices.mean(1).resize(4,1)
 
     def get_bounding_box(self):
         mins = self.vertices.min(1)
@@ -91,6 +91,8 @@ class Rectangle(Polygon):
         self.center = center
         self.dimensions = dimensions
         self.orient = orient
+        if not isinstance(dimensions[0],(float,int)):
+            raise ValueError(dimensions)
         dx2 = dimensions[0]/2
         dy2 = dimensions[1]/2
         vertices = np.array([[-dx2,  dx2, dx2, -dx2 ],
@@ -99,14 +101,14 @@ class Rectangle(Polygon):
                              [  1,    1,   1,    1  ]])
         self.unrot = transform.aboutZ(-orient)
         center_ex = self.unrot.dot(center)
-        extents = transform.translate(center_ex[0],center_ex[1]).dot(vertices)
+        extents = transform.translate(center_ex[0,0],center_ex[1,0]).dot(vertices)
         # Extents measured along the rectangle's axes, not world axes
         self.min_Ex = min(extents[0,:])
         self.max_Ex = max(extents[0,:])
         self.min_Ey = min(extents[1,:])
         self.max_Ey = max(extents[1,:])
         world_vertices = transform.aboutZ(orient).dot(vertices)
-        world_vertices = transform.translate(center[0],center[1]).dot(world_vertices)
+        world_vertices = transform.translate(center[0,0],center[1,0]).dot(world_vertices)
         super().__init__(vertices=world_vertices)
 
     def __repr__(self):

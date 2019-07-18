@@ -501,7 +501,7 @@ class RRT():
 
     #---------------- Obstacle Representation ----------------
 
-    def generate_obstacles(self, obstacle_inflation, passageway_adjustment):
+    def generate_obstacles(self, obstacle_inflation=0, passageway_adjustment=0):
         self.robot.world.world_map.update_map()
         obstacles = []
         for obj in self.robot.world.world_map.objects.values():
@@ -526,7 +526,6 @@ class RRT():
         last_x = -half_length
         edges = [ [0, -half_length-obstacle_inflation, 0., 1.] ]
         for (center,width) in wall_spec.doorways:
-            #width = 2 * width   # *** WIDEN DOORWAYS FOR PATH PLANNING SUCCESS
             width += passageway_adjustment + obstacle_inflation  # widen doorways for RRT, narrow for WaveFront
             left_edge = center - width/2 - half_length
             edges.append([0., left_edge, 0., 1.])
@@ -578,3 +577,17 @@ class RRT():
                 robot_obst = joint.collision_model.instantiate(tmat)
                 result.append(robot_obst)
         return result
+
+    def get_bounding_box(self):
+        xmin = self.robot.world.particle_filter.pose[0]
+        ymin = self.robot.world.particle_filter.pose[1]
+        xmax = xmin
+        ymax = ymin
+        for obstacle in self.obstacles:
+            ((x0,y0),(x1,y1)) = obstacle.get_bounding_box()
+            xmin = min(xmin, x0)
+            ymin = min(ymin, y0)
+            xmax = max(xmax, x1)
+            ymax = max(ymax, y1)
+        bbox = ((xmin,ymin), (xmax,ymax))
+        return bbox

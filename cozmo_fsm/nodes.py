@@ -1202,13 +1202,14 @@ class LaunchProcess(StateNode):
         time.sleep(2)
         # A process returns its result to the caller as an event.
         result = 42
-        self.post_process_event(DataEvent(None,result))  # source must be None for pickling
+        self.post_event(DataEvent(None,result))  # source must be None for pickling
+        self.post_event(CompletionEvent()) # we can post more than one event
 
     def create_process(self):
         p = Process(target=self.dummy_task, args=[])
         return p
 
-    def post_process_event(self,event):
+    def post_event(self,event):
         self.robot.erouter.post_process_event(self, event)
 
     def start(self, event=None):
