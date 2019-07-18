@@ -74,6 +74,7 @@ class RRT():
         self.start = None
         self.goal = None
         self.wf = WaveFront()
+        self.bbox = None
 
     REACHED = 'reached'
     COLLISION = 'collision'
@@ -170,15 +171,46 @@ class RRT():
         self.start = start
         self.goal = goal
         self.target_heading = goal.q
+        self.bbox = self.get_bounding_box()
 
         # Use WaveFront
         if use_wf:
-            self.wf.clear()
+            self.wf.initialize_grid(bbox=self.bbox)
             wf_start = (start.x, start.y)
             wf_goal = (goal.x, goal.y)
             for obstacle in self.obstacles:
                 self.wf.add_obstacle(obstacle, 20)
             self.wf.set_goal(*wf_goal)
+
+            # Check collision
+            collider = self.collides(RRTNode(x=start.x, y=start.y, q=start.q))
+            if collider:
+                self.path = []
+                raise StartCollides(start,collider,collider.obstacle)
+            else:
+                temp_goal = goal.copy()
+                offset_goal = goal.copy()
+                collision_cnt = 0
+                no_collision_cnt = 0
+                for theta in range(0,360,45):
+                    q = theta/180*pi
+                    step = max(self.step_size, abs(center_of_rotation_offset))
+                    temp_goal.x = goal.x + step*cos(q)
+                    temp_goal.y = goal.y + step*sin(q)
+                    temp_goal.q = wrap_angle(q+pi)
+                    collider = self.collides(temp_goal)
+                    if collider:
+                        collision_cnt += 1
+                        continue
+                    offset_goal.x = temp_goal.x + center_of_rotation_offset * cos(q)
+                    offset_goal.y = temp_goal.y + center_of_rotation_offset * sin(q)
+                    offset_goal.q = temp_goal.q
+                    collider = self.collides(offset_goal)
+                    if collider:
+                        collision_cnt += 1
+                if collision_cnt == 8:
+                    raise GoalCollides(goal,collider,collider.obstacle)
+
             result = self.wf.propagate(*wf_start)
             if result:
                 path = self.wf.extract(result)
@@ -186,7 +218,7 @@ class RRT():
                 self.smooth_path()
             else:
                 self.path = []
-            return self.path
+            return [], [], self.path
 
         # Set up start node
         collider = self.collides(start)
