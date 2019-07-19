@@ -154,7 +154,7 @@ class RRT():
                     return obstacle
         return False
 
-    def all_colliders(self, node, is_start_node=True, is_goal_node=False):
+    def all_colliders(self, node, is_start_node=False, is_goal_node=False):
         temp_node = node.copy()
         offset_node = node.copy()
         collision_cnt = 0
