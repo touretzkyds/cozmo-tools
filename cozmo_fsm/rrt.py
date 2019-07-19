@@ -154,6 +154,34 @@ class RRT():
                     return obstacle
         return False
 
+    def all_colliders(self, node, is_start_node=True, is_goal_node=False):
+        temp_node = node.copy()
+        offset_node = node.copy()
+        collision_cnt = 0
+        no_collision_cnt = 0
+        for theta in range(0,360,45):
+            q = theta/180*pi
+            step = max(self.step_size, abs(center_of_rotation_offset))
+            temp_node.x = node.x + step*cos(q)
+            temp_node.y = node.y + step*sin(q)
+            temp_node.q = wrap_angle(q+pi)
+            collider = self.collides(temp_node)
+            if collider:
+                collision_cnt += 1
+                continue
+            offset_node.x = temp_node.x + center_of_rotation_offset * cos(q)
+            offset_node.y = temp_node.y + center_of_rotation_offset * sin(q)
+            offset_node.q = temp_node.q
+            collider = self.collides(offset_node)
+            if collider:
+                collision_cnt += 1
+        if collision_cnt == 8:
+            if is_start_node:
+                raise StartCollides(node,collider,collider.obstacle)
+            elif is_goal_node:
+                raise GoalCollides(node,collider,collider.obstacle)
+
+
     def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
         return self.plan_path(start, goal, max_turn, arc_radius)
 
@@ -183,33 +211,8 @@ class RRT():
             self.wf.set_goal(*wf_goal)
 
             # Check collision
-            collider = self.collides(RRTNode(x=start.x, y=start.y, q=start.q))
-            if collider:
-                self.path = []
-                raise StartCollides(start,collider,collider.obstacle)
-            else:
-                temp_goal = goal.copy()
-                offset_goal = goal.copy()
-                collision_cnt = 0
-                no_collision_cnt = 0
-                for theta in range(0,360,45):
-                    q = theta/180*pi
-                    step = max(self.step_size, abs(center_of_rotation_offset))
-                    temp_goal.x = goal.x + step*cos(q)
-                    temp_goal.y = goal.y + step*sin(q)
-                    temp_goal.q = wrap_angle(q+pi)
-                    collider = self.collides(temp_goal)
-                    if collider:
-                        collision_cnt += 1
-                        continue
-                    offset_goal.x = temp_goal.x + center_of_rotation_offset * cos(q)
-                    offset_goal.y = temp_goal.y + center_of_rotation_offset * sin(q)
-                    offset_goal.q = temp_goal.q
-                    collider = self.collides(offset_goal)
-                    if collider:
-                        collision_cnt += 1
-                if collision_cnt == 8:
-                    raise GoalCollides(goal,collider,collider.obstacle)
+            self.all_colliders(start, is_start_node=True)
+            self.all_colliders(goal, is_goal_node=True)
 
             result = self.wf.propagate(*wf_start)
             if result:
