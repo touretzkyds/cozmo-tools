@@ -10,7 +10,8 @@ from .transform import wrap_angle
 from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
 from .wavefront import WaveFront
-from .worldmap import WallObj, wall_marker_dict, LightCubeObj, CustomCubeObj, ChargerObj, ChipObj, RobotForeignObj
+from .worldmap import WallObj, wall_marker_dict, RoomObj, LightCubeObj
+from .worldmap import CustomCubeObj, ChargerObj, ChipObj, RobotForeignObj
 
 # *** TODO: Collision checking needs to use opposite headings
 # for treeB nodes because robot is asymmetric.
@@ -154,6 +155,14 @@ class RRT():
                     return obstacle
         return False
 
+    def all_colliders(self, node):
+        result = []
+        for part in self.robot_parts_to_node(node):
+            for obstacle in self.obstacles:
+                if part.collides(obstacle):
+                    result.append(part)
+        return result
+
     def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
         return self.plan_path(start, goal, max_turn, arc_radius)
 
@@ -215,6 +224,8 @@ class RRT():
             if result:
                 path = self.wf.extract(result)
                 self.path = self.transform_path(path)
+                # re-generate obstacles with normal doors so path smoothing will work
+                self.generate_obstacles(5, 0)
                 self.smooth_path()
             else:
                 self.path = []
@@ -615,8 +626,10 @@ class RRT():
         ymin = self.robot.world.particle_filter.pose[1]
         xmax = xmin
         ymax = ymin
-        for obstacle in self.obstacles:
-            ((x0,y0),(x1,y1)) = obstacle.get_bounding_box()
+        rooms = [obj for obj in self.robot.world.world_map.objects.values()
+                 if isinstance(obj,RoomObj)]
+        for obj in self.obstacles + rooms:
+            ((x0,y0),(x1,y1)) = obj.get_bounding_box()
             xmin = min(xmin, x0)
             ymin = min(ymin, y0)
             xmax = max(xmax, x1)

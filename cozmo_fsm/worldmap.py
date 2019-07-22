@@ -314,6 +314,11 @@ class RoomObj(WorldObject):
     def __repr__(self):
         return '<RoomObj %s: (%.1f,%.1f) floor=%s>' % (self.id, self.x, self.y, self.floor)
 
+    def get_bounding_box(self):
+        mins = self.points.min(1)
+        maxs = self.points.max(1)
+        return ((mins[0],mins[1]), (maxs[0],maxs[1]))
+
 
 class ChipObj(WorldObject):
     def __init__(self, id, x, y, z=0, radius=25/2, thickness=4):
@@ -324,6 +329,7 @@ class ChipObj(WorldObject):
     def __repr__(self):
         return '<ChipObj (%.1f,%.1f) radius %.1f>' % \
                (self.x, self.y, self.radius)
+
 
 class FaceObj(WorldObject):
     def __init__(self, sdk_obj, id, x, y, z, name):
@@ -502,12 +508,15 @@ class WorldMap():
         if cube.is_visible:
             wmobject.update_from_sdk = True  # In case we've just dropped it; now we see it
             wmobject.pose_confidence = +1
-        elif (cube.pose is None) or not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
-            wmobject.update_from_sdk = False
+        elif (cube.pose is None):
+            return wmobject
+        elif not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
+            wmobject.pose_confidence = -1
+            return wmobject
         else:       # Robot re-localized so cube came back
             pass  # skip for now due to SDK bug
             # wmobject.update_from_sdk = True
-            # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
+            wmobject.pose_confidence = max(0, wmobject.pose_confidence)
         if wmobject.update_from_sdk:  # True unless if we've dropped it and haven't seen it yet
             self.update_coords_from_sdk(wmobject, cube)
             wmobject.orientation, _, _, wmobject.theta = get_orientation_state(cube.pose.rotation.q0_q1_q2_q3)
@@ -534,7 +543,8 @@ class WorldMap():
         elif charger.is_visible:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
-        elif (charger.pose is None) or not charger.pose.is_comparable(self.robot.pose):
+        elif wmobject.update_from_sdk and \
+             ((charger.pose is None) or not charger.pose.is_comparable(self.robot.pose)):
             wmobject.update_from_sdk = False
             wmobject.pose_confidence = -1
         else:       # Robot re-localized so charger came back

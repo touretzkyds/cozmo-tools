@@ -1,6 +1,7 @@
 from cozmo.util import Pose
 from cv2 import Rodrigues
 from numpy import matrix, tan, arctan2
+from math import sin, cos, atan2, pi, sqrt
 
 from .nodes import *
 from .transitions import *
@@ -9,10 +10,12 @@ from .pilot0 import *
 from .worldmap import WallObj, DoorwayObj
 from time import sleep
 
-from math import sin, cos, atan2, pi, sqrt
-
 class DoorPass(StateNode):
     """Pass through a doorway. Assumes the doorway is nearby and unobstructed."""
+
+    OUTER_GATE_DISTANCE = 150 # mm
+    INNER_GATE_DISTANCE =  70 # mm
+
     def __init__(self, door=None):
         self.door = door
         super().__init__()
@@ -25,7 +28,7 @@ class DoorPass(StateNode):
             door ='Doorway-%d' % door
         if isinstance(door, str):
             doorway = self.robot.world.world_map.objects.get(door)
-        elif instance(door, DoorwayObj):
+        elif isinstance(door, DoorwayObj):
             doorway = door
         if isinstance(doorway, DoorwayObj):
             self.object = doorway
@@ -34,12 +37,13 @@ class DoorPass(StateNode):
             raise ValueError(door,doorway)
         super().start(event)
 
-    def calculate_gate(self,offset):
+
+    def calculate_gate(robot,door,offset):
         """Returns closest gate point (gx, gy)"""
-        (rx,ry,_) = self.robot.world.particle_filter.pose
-        dx = self.object.x
-        dy = self.object.y
-        dtheta = self.object.theta
+        (rx,ry,_) = robot.world.particle_filter.pose
+        dx = door.x
+        dy = door.y
+        dtheta = door.theta
         pt1x = dx + offset * cos(dtheta)
         pt1y = dy + offset * sin(dtheta)
         pt2x = dx + offset * cos(dtheta+pi)
@@ -47,9 +51,10 @@ class DoorPass(StateNode):
         dist1sq = (pt1x-rx)**2 + (pt1y-ry)**2
         dist2sq = (pt2x-rx)**2 + (pt2y-ry)**2
         if dist1sq < dist2sq:
-            return (pt1x, pt1y)
+            return (pt1x, pt1y, wrap_angle(dtheta+pi))
         else:
-            return (pt2x, pt2y)
+            return (pt2x, pt2y, dtheta)
+
 
     class AdjustLiftHeight(SetLiftHeight):
         # TODO: If lift is high, push it higher (we're carrying something).
@@ -57,6 +62,7 @@ class DoorPass(StateNode):
         def start(self, event=None):
             self.height = 0
             super().start(event)
+
 
     class TurnToGate(Turn):
         """Turn to the approach gate, or post success if we're already there."""
@@ -66,7 +72,7 @@ class DoorPass(StateNode):
 
         def start(self,event=None):
             (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
-            (gate_x, gate_y) = self.parent.calculate_gate(self.offset)
+            (gate_x, gate_y, _) = DoorPass.calculate_gate(self.robot,self.parent.object,self.offset)
             bearing = atan2(gate_y-ry, gate_x-rx)
             turn = wrap_angle(bearing - rtheta)
             print('^^ TurnToGate: gate=(%.1f, %.1f)  rtheta=%.1f  bearing=%.1f  turn=%.1f' %
@@ -88,7 +94,7 @@ class DoorPass(StateNode):
 
         def start(self,event=None):
             (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
-            (gate_x, gate_y) = self.parent.calculate_gate(self.offset)
+            (gate_x, gate_y, _) = DoorPass.calculate_gate(self.robot,self.parent.object,self.offset)
             dist = sqrt((gate_x-rx)**2 + (gate_y-ry)**2)
             self.distance = distance_mm(dist)
             self.speed = speed_mmps(50)
@@ -135,20 +141,24 @@ class DoorPass(StateNode):
         check_start2 =S=> turn_to_gate1
         check_start2 =F=> ParentFails()
 
-        turn_to_gate1: self.TurnToGate(150) =C=> StateNode() =T(0.2)=> forward_to_gate1
-        forward_to_gate1: self.ForwardToGate(150) =C=> StateNode() =T(0.2)=> {look_up, turn_to_gate2}
+        turn_to_gate1: self.TurnToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
+            StateNode() =T(0.2)=> forward_to_gate1
+
+        forward_to_gate1: self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
+            StateNode() =T(0.2)=> {look_up, turn_to_gate2}
 
         # If we're carrying a cube, should we lower the lift so we can see?
         look_up: SetHeadAngle(35)
 
-        turn_to_gate2: self.TurnToGate(70) =C=> StateNode() =T(0.2)=> turn_to_marker1
+        turn_to_gate2: self.TurnToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
+            StateNode() =T(0.2)=> turn_to_marker1
 
         turn_to_marker1: self.TurnToMarker()
         turn_to_marker1 =C=> marker_forward1
         turn_to_marker1 =F=> marker_forward1
 
-        marker_forward1: self.ForwardToGate(70) =C=> SetHeadAngle(40) =C=>
-            StateNode() =T(0.2)=> turn_to_marker2
+        marker_forward1: self.ForwardToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
+            SetHeadAngle(40) =C=> StateNode() =T(0.2)=> turn_to_marker2
 
         turn_to_marker2: self.TurnToMarker()
         turn_to_marker2 =C=> marker_forward2
