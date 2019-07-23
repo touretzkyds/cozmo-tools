@@ -66,8 +66,11 @@ class WaveFront():
         Propagate the wavefront in eight directions from the starting coordinates
         until a goal cell is reached or we fill up the grid.
         """
-        (x,y) = self.convert_coords(xstart,ystart)
         grid = self.grid
+        (x,y) = self.convert_coords(xstart,ystart)
+        if grid[x,y] != 0:
+            raise ValueError("Start collides")
+            
         goal_marker = self.goal_marker
         fringe = [(1,(x,y))]
         heapq.heapify(fringe)

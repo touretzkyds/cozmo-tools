@@ -282,7 +282,7 @@ def show_stuff(args):
         robot.world.worldmap_viewer = WorldMapViewer(robot)
         robot.world.worldmap_viewer.start()
     elif spec == "pose":
-        show_pose()
+        robot.world.world_map.show_pose()
     elif spec == "landmarks":
         robot.world.particle_filter.show_landmarks()
     elif spec == "objects":
@@ -380,14 +380,6 @@ def show_kine_joint(name):
     print(fmt % 'DH r:', formatq('prismatic',joint.r))
     print(fmt % 'Link in base frame:')
     tprint(robot.kine.link_to_base(name))
-    print()
-
-def show_pose():
-    print('robot.pose is:   %6.1f %6.1f @ %6.1f deg.' %
-          (robot.pose.position.x, robot.pose.position.y, robot.pose_angle.degrees))
-    print('particle filter: %6.1f %6.1f @ %6.1f deg.' %
-          (*robot.world.particle_filter.pose[0:2],
-           robot.world.particle_filter.pose[2]*180/pi))
     print()
 
 def show_landmarks():

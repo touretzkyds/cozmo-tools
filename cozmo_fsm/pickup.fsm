@@ -365,7 +365,7 @@ class GoToCube(StateNode):
             self.parent.wmobject.pose_confidence = -1
 
 
-    class TryAllSides(StateNode):
+    class ChooseAnotherSide(StateNode):
         def __init__(self):
             super().__init__()
 
@@ -376,12 +376,12 @@ class GoToCube(StateNode):
                 print('Have tried all sides.')
                 self.parent.try_number = 0
                 self.parent.side_index = 0
-                self.post_success()
+                self.post_failure()
             else:
                 self.parent.try_number += 1
                 self.parent.side_index = (self.parent.side_index + 1) % 4
-                self.post_failure()
                 print('Haven\'t tired out all sides of cube. Going to try the side', self.parent.side_index)
+                self.post_success()
 
 
     class CheckCubePoseValid(StateNode):
@@ -421,7 +421,8 @@ class GoToCube(StateNode):
         waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
            check_almost_docked
 
-        check_cube_pose_valid: self.CheckCubePoseValid() =C=> check_cube_pose_valid
+        check_cube_pose_valid: self.CheckCubePoseValid()
+        check_cube_pose_valid =C=> check_cube_pose_valid
         check_cube_pose_valid =F=> ParentFails()
 
         check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
@@ -482,11 +483,11 @@ class GoToCube(StateNode):
 
         success: Print('GoToSide has succeeded.') =N=> ParentCompletes()
 
-        failure: Print('GoToSide has failed.') =N=> try_all_sides
+        failure: Print('GoToSide has failed.') =N=> choose_another_side
 
-        try_all_sides: self.TryAllSides()
-        try_all_sides =S=> ParentFails()
-        try_all_sides =F=> droplift
+        choose_another_side: self.ChooseAnotherSide()
+        choose_another_side =F=> ParentFails()
+        choose_another_side =S=> droplift
     }
 
 class SetCarrying(StateNode):

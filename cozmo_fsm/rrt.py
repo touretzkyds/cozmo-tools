@@ -171,7 +171,7 @@ class RRT():
         self.arc_radius = arc_radius
         if self.auto_obstacles:
             if use_wf:
-                obstacle_inflation = 20
+                obstacle_inflation = 10  # must be << pilot's escape_distance
                 passageway_adjustment = -40  # narrow doorways for WaveFront
             else: # use RRT
                 obstacle_inflation = 5
@@ -182,20 +182,40 @@ class RRT():
         self.target_heading = goal.q
         self.bbox = self.get_bounding_box()
 
+        # Check for StartCollides
+        collider = self.collides(start)
+        if collider:
+            raise StartCollides(start,collider,collider.obstacle)
+
         # Use WaveFront
         if use_wf:
+
+            temp_goal = goal.copy()
+            if isnan(temp_goal.q):
+                headings = range(0, 360, 10)
+            else:
+                headings = [temp_goal.q]
+            for phi in headings:
+                temp_goal.q = phi/180*pi
+                collider = self.collides(temp_goal)
+                if not collider:
+                    break
+            if collider:
+                raise GoalCollides(goal,collider,collider.obstacle)
+            
             self.wf.initialize_grid(bbox=self.bbox)
             wf_start = (start.x, start.y)
             wf_goal = (goal.x, goal.y)
+            inflation = 20
             for obstacle in self.obstacles:
-                self.wf.add_obstacle(obstacle, 20)
+                self.wf.add_obstacle(obstacle, inflation)
             self.wf.set_goal(*wf_goal)
 
-            # Check collision
-            self.all_colliders(start, is_start_node=True)
-            self.all_colliders(goal, is_goal_node=True)
+            try:
+                result = self.wf.propagate(*wf_start)
+            except ValueError:
+                raise StartCollides(start,None,None)
 
-            result = self.wf.propagate(*wf_start)
             if result:
                 path = self.wf.extract(result)
                 self.path = self.transform_path(path)
@@ -203,27 +223,23 @@ class RRT():
                 self.generate_obstacles(5, 0)
                 self.smooth_path()
             else:
-                self.path = []
+                raise MaxIter()
             return [], [], self.path
 
-        # Set up start node
-        collider = self.collides(start)
-        if collider:
-            raise StartCollides(start,collider,collider.obstacle)
-        else:
-            treeA = [start.copy()]
-            self.treeA = treeA
+        # Set up treeA with start node
+        treeA = [start.copy()]
+        self.treeA = treeA
 
-        # Set up goal node(s)
+        # Set up treeB with goal node(s)
         if not isnan(self.target_heading):
             offset_x = goal.x + center_of_rotation_offset * cos(goal.q)
             offset_y = goal.y + center_of_rotation_offset * sin(goal.q)
             offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
-            treeB = [offset_goal]
-            self.treeB = treeB
             collider = self.collides(offset_goal)
             if collider:
                 raise GoalCollides(goal,collider,collider.obstacle)
+            treeB = [offset_goal]
+            self.treeB = treeB
         else:  # target_heading is nan
             treeB = [goal.copy()]
             self.treeB = treeB

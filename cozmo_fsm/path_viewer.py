@@ -34,6 +34,7 @@ Path viewer commands:
   >        Zoom out
   o        Show objects
   b        Show obstacles
+  p        Show pose
   space    Toggle redisplay (for debugging)
   h        Print this help text
 """
@@ -46,6 +47,7 @@ Path viewer commands:
   option + >       Zoom out
   option + o       Show objects
   option + b       Show obstacles
+  option + p       Show pose
   space            Toggle redisplay (for debugging)
   option + h       Print this help text
 """
@@ -291,6 +293,9 @@ class PathViewer():
             return
         elif key == b'b':     # show obstacles
             self.show_obstacles()
+            return
+        elif key == b'p':     # show pose
+            self.robot.world.world_map.show_pose()
             return
         elif key == b'h':     # print help
             self.print_help()
