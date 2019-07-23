@@ -206,7 +206,7 @@ class RRT():
             self.wf.initialize_grid(bbox=self.bbox)
             wf_start = (start.x, start.y)
             wf_goal = (goal.x, goal.y)
-            inflation = 20
+            inflation = 10
             for obstacle in self.obstacles:
                 self.wf.add_obstacle(obstacle, inflation)
             self.wf.set_goal(*wf_goal)
@@ -223,7 +223,7 @@ class RRT():
                 self.generate_obstacles(5, 0)
                 self.smooth_path()
             else:
-                raise MaxIter()
+                raise MaxIterations()
             return [], [], self.path
 
         # Set up treeA with start node

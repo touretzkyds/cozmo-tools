@@ -17,7 +17,8 @@ class WaveFront():
 
     def initialize_grid(self,bbox=None,inflate_size=5):
         if bbox:
-            self.grid_size = (int(bbox[1][0]-bbox[0][0]+2*inflate_size), int(bbox[1][1]-bbox[0][1]+2*inflate_size))
+            self.grid_size = (int(bbox[1][0]-bbox[0][0]+2*inflate_size),
+                              int(bbox[1][1]-bbox[0][1]+2*inflate_size))
         self.grid = np.zeros(self.grid_size, dtype=np.int32)
 
     def convert_coords(self,xcoord,ycoord):
