@@ -219,22 +219,37 @@ class GoToCube(StateNode):
             (dist, relative_angle) = self.parent.measure_dockedness(side,True)
             max_distance_from_dock_point = 150 # millimeters
             max_angle_from_dock_heading = 10 # degrees
+            max_angle_for_sideways = 135 # degrees
 
             if isinstance(cube, LightCube):
                 orientation = cube.wm_obj.orientation
             elif isinstance(cube, LightCubeObj):
                 orientation = cube.sdk_obj.orientation
 
+            # Re-calculate relative_angle for sideways cube
             if orientation == ORIENTATION_SIDEWAYS:
-                print(orientation)
-                self.post_failure()
-            elif dist < max_distance_from_dock_point:
+                (rx, ry, rtheta) = self.parent.get_robot_cor(True)
+                ctheta = side[2]
+                dtheta = (rtheta - ctheta) if (rtheta>ctheta) else (ctheta-rtheta)
+                relative_angle = abs(dtheta/pi*180)
+                # print('robot: %.1f deg; cube: %.1f deg; delta: %.1f deg.' %(rtheta/pi*180, ctheta/pi*180, relative_angle))
+
+            if dist < max_distance_from_dock_point:
                 if relative_angle < max_angle_from_dock_heading and cube.is_visible:
                     print('CheckAlmostDocked is satisfied.  dist=%.1f mm  angle=%.1f deg.' %
                           (dist, relative_angle))
                     self.post_completion()
                 else:
-                    if not cube.is_visible:
+                    if orientation == ORIENTATION_SIDEWAYS:
+                        if relative_angle < max_angle_for_sideways and cube.is_visible:
+                            print('CheckAlmostDocked: bad angle.  (dist=%.1f mm)  angle=%.1f deg.' %
+                                  (dist, relative_angle))
+                            self.post_success()
+                        else:
+                            print('CheckAlmostDocked: use the Pilot to path plan. orientation=%s. dist=%.1f mm.  angle=%.1f deg.' %
+                                  (orientation, dist, relative_angle))
+                            self.post_failure()
+                    elif not cube.is_visible:
                         print('CheckAlmostDocked: cube not visible')
                     else:
                         print('CheckAlmostDocked: bad angle.  (dist=%.1f mm)  angle=%.1f deg.' %
