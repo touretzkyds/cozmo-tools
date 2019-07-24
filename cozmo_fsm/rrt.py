@@ -617,9 +617,12 @@ class RRT():
         ymin = self.robot.world.particle_filter.pose[1]
         xmax = xmin
         ymax = ymin
-        rooms = [obj for obj in self.robot.world.world_map.objects.values()
-                 if isinstance(obj,RoomObj)]
-        for obj in self.obstacles + rooms:
+        objs =  self.robot.world.world_map.objects.values()
+        # Rooms aren't obstacles, so include them separately.
+        rooms = [obj for obj in objs if isinstance(obj,RoomObj)]
+        # Cubes may not be obstacles if they are goal locations, so include them again.
+        cubes = [obj for obj in objs if isinstance(obj,LightCubeObj) and obj.pose_confidence >= 0]
+        for obj in self.obstacles + rooms + cubes:
             ((x0,y0),(x1,y1)) = obj.get_bounding_box()
             xmin = min(xmin, x0)
             ymin = min(ymin, y0)

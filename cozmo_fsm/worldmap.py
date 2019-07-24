@@ -33,6 +33,7 @@ class WorldObject():
 
 class LightCubeObj(WorldObject):
     light_cube_size = (44., 44., 44.)
+
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
         if id is None:
             id = 'Cube-' + str(sdk_obj.cube_id)
@@ -50,6 +51,22 @@ class LightCubeObj(WorldObject):
     @property
     def is_visible(self):
         return self.sdk_obj.is_visible
+
+    def get_bounding_box(self):
+        s = self.light_cube_size[0]
+        pts = np.array([[-s/2, -s/2,  s/2, s/2],
+                        [-s/2,  s/2, -s/2, s/2],
+                        [ 0,    0,    0,   0  ],
+                        [ 1,    1,    1,   1  ]])
+        pts = transform.aboutZ(self.theta).dot(pts)
+        pts = transform.translate(self.x, self.y).dot(pts)
+        mins = pts.min(1)
+        maxs = pts.max(1)
+        xmin = mins[0]
+        ymin = mins[1]
+        xmax = maxs[0]
+        ymax = maxs[1]
+        return ((xmin,ymin), (xmax,ymax))
 
     def __repr__(self):
         if self.pose_confidence >= 0:

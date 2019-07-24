@@ -37,8 +37,9 @@ class Circle(Shape):
         self.orient = 0.
 
     def __repr__(self):
-        return '<Circle (%.1f,%.1f) r=%.1f>' % \
-               (self.center[0,0], self.center[1,0], self.radius)
+        id = self.obstacle.id if self.obstacle else '[no obstacle]'
+        return '<Circle (%.1f,%.1f) r=%.1f %s>' % \
+               (self.center[0,0], self.center[1,0], self.radius, id)
 
     def instantiate(self, tmat):
         return Circle(center=tmat.dot(self.center), radius=self.radius)        
@@ -112,9 +113,10 @@ class Rectangle(Polygon):
         super().__init__(vertices=world_vertices)
 
     def __repr__(self):
-        return '<Rectangle (%.1f,%.1f) %.1fx%.1f %.1f deg>' % \
+        id = self.obstacle.id if self.obstacle else '[no obstacle]'
+        return '<Rectangle (%.1f,%.1f) %.1fx%.1f %.1f deg %s>' % \
                (self.center[0,0],self.center[1,0],*self.dimensions,
-                self.orient*(180/pi))
+                self.orient*(180/pi), id)
 
     def instantiate(self, tmat):
         dimensions = (self.max_Ex-self.min_Ex, self.max_Ey-self.min_Ey)
