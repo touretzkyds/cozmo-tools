@@ -11,7 +11,7 @@ from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
 from .wavefront import WaveFront
 from .worldmap import WallObj, wall_marker_dict, RoomObj, LightCubeObj
-from .worldmap import CustomCubeObj, ChargerObj, ChipObj, RobotForeignObj
+from .worldmap import CustomCubeObj, ChargerObj, CustomMarkerObj, ChipObj, RobotForeignObj
 
 # *** TODO: Collision checking needs to use opposite headings
 # for treeB nodes because robot is asymmetric.
@@ -547,6 +547,8 @@ class RRT():
                             self.generate_wall_obstacles(obj, obstacle_inflation, passageway_adjustment)
             elif isinstance(obj, (LightCubeObj,CustomCubeObj,ChargerObj)):
                 obstacles.append(self.generate_cube_obstacle(obj))
+            elif isinstance(obj, CustomMarkerObj):
+                obstacles.append(self.generate_marker_obstacle(obj))
             elif isinstance(obj, ChipObj):
                 obstacles.append(self.generate_chip_obstacle(obj))
             elif isinstance(obj, RobotForeignObj):
@@ -590,6 +592,15 @@ class RRT():
         r.obstacle = obj
         return r
 
+    def generate_marker_obstacle(self,obj):
+        sx,sy,sz = obj.size
+        r = Rectangle(center=transform.point(obj.x+sx/2, obj.y),
+                      dimensions=(sx,sy),
+                      orient=obj.theta)
+        r.obstacle = obj
+        return r
+
+
     def generate_chip_obstacle(self,obj):
         r = Circle(center=transform.point(obj.x,obj.y),
                    radius=obj.radius)
@@ -620,9 +631,9 @@ class RRT():
         objs =  self.robot.world.world_map.objects.values()
         # Rooms aren't obstacles, so include them separately.
         rooms = [obj for obj in objs if isinstance(obj,RoomObj)]
-        # Cubes may not be obstacles if they are goal locations, so include them again.
-        cubes = [obj for obj in objs if isinstance(obj,LightCubeObj) and obj.pose_confidence >= 0]
-        for obj in self.obstacles + rooms + cubes:
+        # Cubes and markers may not be obstacles if they are goal locations, so include them again.
+        goals = [obj for obj in objs if isinstance(obj,(LightCubeObj,CustomMarkerObj)) and obj.pose_confidence >= 0]
+        for obj in self.obstacles + rooms + goals:
             ((x0,y0),(x1,y1)) = obj.get_bounding_box()
             xmin = min(xmin, x0)
             ymin = min(ymin, y0)

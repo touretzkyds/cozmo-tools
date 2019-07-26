@@ -113,6 +113,7 @@ class CustomMarkerObj(WorldObject):
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
+        self.size = (4,44,44)
         if self.sdk_obj:
             self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
         else:
@@ -122,6 +123,22 @@ class CustomMarkerObj(WorldObject):
     @property
     def is_visible(self):
         return self.sdk_obj.is_visible
+
+    def get_bounding_box(self):
+        sx,sy,sz = self.size
+        pts = np.array([[ 0,    0,    sx,    sx],
+                        [-sy/2, sy/2, sy/2, -sy/2],
+                        [ 0,    0,    0,     0  ],
+                        [ 1,    1,    1,     1  ]])
+        pts = transform.aboutZ(self.theta).dot(pts)
+        pts = transform.translate(self.x, self.y).dot(pts)
+        mins = pts.min(1)
+        maxs = pts.max(1)
+        xmin = mins[0]
+        ymin = mins[1]
+        xmax = maxs[0]
+        ymax = maxs[1]
+        return ((xmin,ymin), (xmax,ymax))
 
     def __repr__(self):
         if self.sdk_obj:
