@@ -50,7 +50,7 @@ class LightCubeObj(WorldObject):
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        return self.sdk_obj and self.sdk_obj.is_visible
 
     def get_bounding_box(self):
         s = self.light_cube_size[0]
@@ -94,7 +94,7 @@ class ChargerObj(WorldObject):
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        return self.sdk_obj and self.sdk_obj.is_visible
 
     def __repr__(self):
         if self.pose_confidence >= 0:
@@ -122,7 +122,7 @@ class CustomMarkerObj(WorldObject):
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        return self.sdk_obj and self.sdk_obj.is_visible
 
     def get_bounding_box(self):
         sx,sy,sz = self.size
@@ -170,7 +170,7 @@ class CustomCubeObj(WorldObject):
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        return self.sdk_obj and self.sdk_obj.is_visible
 
     def __repr__(self):
         vis = ' visible' if self.sdk_obj and self.is_visible else ''
@@ -378,7 +378,7 @@ class FaceObj(WorldObject):
 
     @property
     def is_visible(self):
-        return self.sdk_obj.is_visible
+        return self.sdk_obj and self.sdk_obj.is_visible
 
     def __repr__(self):
         return "<FaceObj name:'%s' expression:%s (%.1f, %.1f, %.1f) vis:%s>" % \
