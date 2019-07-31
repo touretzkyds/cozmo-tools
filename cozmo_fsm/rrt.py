@@ -76,6 +76,7 @@ class RRT():
         self.goal = None
         self.wf = WaveFront()
         self.bbox = None
+        self.path = []
 
     REACHED = 'reached'
     COLLISION = 'collision'
