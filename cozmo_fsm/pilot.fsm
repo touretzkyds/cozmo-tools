@@ -191,6 +191,8 @@ class PilotToPose(StateNode):
                 self.parent.robot.world.path_viewer.clear()
                 self.parent.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
+            self.robot.world.rrt.draw_path = path
+
             # Construct the nav plan
             if self.parent.verbose:
                 [print(' ',x) for x in path]
