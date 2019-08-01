@@ -140,7 +140,7 @@ class PilotToPose(StateNode):
                 # See if we can escape the start collision using canned headings.
                 # This could be made more sophisticated, e.g., using arcs.
                 #print('planner',e,'start',start_node)
-                escape_distance = 25 # mm
+                escape_distance = 50 # mm
                 escape_headings = (0, +30/180.0*pi, -30/180.0*pi, pi, pi/2, -pi/2)
                 for phi in escape_headings:
                     if phi != pi:
@@ -159,7 +159,7 @@ class PilotToPose(StateNode):
                     self.parent.post_event(PilotEvent(StartCollides, e.args))
                     self.parent.post_failure()
                     return
-                #print('escape=', start_escape_move)
+                print('escape=', start_escape_move)
                 try:
                     (treeA, treeB, path) = self.planner(start_node, goal_node)
                 except GoalCollides as e:
