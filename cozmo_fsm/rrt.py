@@ -77,6 +77,7 @@ class RRT():
         self.wf = WaveFront()
         self.bbox = None
         self.path = []
+        self.draw_path = []
 
     REACHED = 'reached'
     COLLISION = 'collision'
@@ -203,7 +204,7 @@ class RRT():
                     break
             if collider:
                 raise GoalCollides(goal,collider,collider.obstacle)
-            
+
             self.wf.initialize_grid(bbox=self.bbox)
             wf_start = (start.x, start.y)
             wf_goal = (goal.x, goal.y)
