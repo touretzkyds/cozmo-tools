@@ -544,7 +544,7 @@ class WorldMap():
             wmobject.pose_confidence = +1
         elif (cube.pose is None):
             return wmobject
-        elif not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
+        elif wmobject.update_from_sdk and not cube.pose.is_comparable(self.robot.pose): # Robot picked up or cube moved
             if (self.robot.fetching and self.robot.fetching.sdk_obj is cube) or \
                (self.robot.carrying and self.robot.carrying.sdk_obj is cube):
                 pass
