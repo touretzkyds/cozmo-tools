@@ -164,10 +164,6 @@ class EventRouter:
         if node_id in self.processes:
             del self.processes[node_id]
 
-    def post_process_event(self, node, event):
-        pair = (id(node), event)
-        self.interprocess_queue.put(pair)
-
     POLLING_INTERVAL = 0.1
 
     def poll_processes(self):

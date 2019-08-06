@@ -12,6 +12,7 @@ import cv2
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle, Pose
 
+from . import evbase
 from .base import *
 from .events import *
 from .cozmo_kin import wheelbase
@@ -1191,26 +1192,33 @@ class StackBlocks(StartBehavior):
 #________________ Multiprocessing ________________
 
 class LaunchProcess(StateNode):
+
     def __init__(self):
         super().__init__()
         self.process = None
-        self.queue = None
 
-    def dummy_task(self):
-        print('*** Failed to override create_process for', self, '***')
+    @staticmethod
+    def process_workhorse(reply_token):
+        print('*** Failed to override process_workhorse for LaunchProcess node ***')
         print('Sleeping for 2 seconds...')
         time.sleep(2)
         # A process returns its result to the caller as an event.
         result = 42
-        self.post_event(DataEvent(None,result))  # source must be None for pickling
-        self.post_event(CompletionEvent()) # we can post more than one event
+
+        LaunchProcess.post_event(reply_token,DataEvent(None,result))  # source must be None for pickling
+        LaunchProcess.post_event(reply_token,CompletionEvent()) # we can post more than one event
+
+    @staticmethod
+    def post_event(reply_token,event):
+        id,queue = reply_token
+        pair = (id, event)
+        queue.put(pair)
 
     def create_process(self):
-        p = Process(target=self.dummy_task, args=[])
+        reply_token = (id(self), self.robot.erouter.interprocess_queue)
+        p = Process(target=self.__class__.process_workhorse,
+                    args=[reply_token])
         return p
-
-    def post_event(self,event):
-        self.robot.erouter.post_process_event(self, event)
 
     def start(self, event=None):
         super().start(event)
@@ -1224,3 +1232,8 @@ class LaunchProcess(StateNode):
         self.process.terminate()
         self.process = None
         super().stop()
+
+class Launch2(LaunchProcess):
+    @staticmethod
+    def process_workhorse(reply_token):
+        Launch2.post_event(reply_token,SuccessEvent(None,None))
