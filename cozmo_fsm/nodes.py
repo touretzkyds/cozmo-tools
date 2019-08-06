@@ -1199,6 +1199,11 @@ class LaunchProcess(StateNode):
 
     @staticmethod
     def process_workhorse(reply_token):
+        """
+        Override this static method with the code to do your computation.
+        The method must be static because we can't pickle methods of StateNode
+        instances.
+        """
         print('*** Failed to override process_workhorse for LaunchProcess node ***')
         print('Sleeping for 2 seconds...')
         time.sleep(2)
@@ -1211,8 +1216,8 @@ class LaunchProcess(StateNode):
     @staticmethod
     def post_event(reply_token,event):
         id,queue = reply_token
-        pair = (id, event)
-        queue.put(pair)
+        event_pair = (id, event)
+        queue.put(event_pair)
 
     def create_process(self):
         reply_token = (id(self), self.robot.erouter.interprocess_queue)
@@ -1233,7 +1238,3 @@ class LaunchProcess(StateNode):
         self.process = None
         super().stop()
 
-class Launch2(LaunchProcess):
-    @staticmethod
-    def process_workhorse(reply_token):
-        Launch2.post_event(reply_token,SuccessEvent(None,None))
