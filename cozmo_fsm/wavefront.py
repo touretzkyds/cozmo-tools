@@ -9,10 +9,14 @@ from .transform import wrap_angle
 from .rrt_shapes import *
 
 class WaveFront():
-    def __init__(self, square_size=10, grid_size=(100,100)):
+    def __init__(self, square_size=10, bbox=None, grid_size=(100,100), inflat_size=5):
         self.square_size = square_size
-        self.grid_size = grid_size
-        self.grid = np.ndarray(grid_size, dtype=np.int32)
+        if bbox:
+            self.grid_size = (int(bbox[1][0]-bbox[0][0]+2*inflate_size),
+                              int(bbox[1][1]-bbox[0][1]+2*inflate_size))
+        else:
+            self.grid_size = grid_size
+        self.grid = np.zeros(grid_size, dtype=np.int32)
         self.goal_marker = 2**31 - 1
 
     def initialize_grid(self,bbox=None,inflate_size=5):
@@ -31,19 +35,12 @@ class WaveFront():
         else:
             return (None,None)
 
-    def set_obstacle(self,xcoord,ycoord):
+    def set_obstacle_cell(self,xcoord,ycoord):
         (x,y) = self.convert_coords(xcoord,ycoord)
         if x:
             self.grid[x,y] = -1
 
-    def set_goal(self,xcoord,ycoord):
-        (x,y) = self.convert_coords(xcoord,ycoord)
-        if x:
-            self.grid[x,y] = self.goal_marker
-        else:
-            raise ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord)))
-
-    def add_obstacle(self, obstacle, inflate_size):
+    def add_obstacle(self, obstacle, inflate_size=0):
         if isinstance(obstacle, Rectangle):
             centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
             width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
@@ -52,15 +49,26 @@ class WaveFront():
                 for y in range(int(round(centerY-height/2)), int(ceil(centerY+height/2))):
                     new_x = ((x - centerX) * cos(theta) - (y - centerY) * sin(theta)) + centerX
                     new_y = ((x - centerX) * sin(theta) + (y - centerY) * cos(theta)) + centerY
-                    self.set_obstacle(new_x, new_y)
+                    self.set_obstacle_cell(new_x, new_y)
         elif isinstance(obstacle, Polygon):
-            pass
+            raise NotImplemented(obstacle)
         elif isinstance(obstacle, Circle):
-            pass
+            raise NotImplemented(obstacle)
         elif isinstance(obstacle, Compound):
-            pass
+            raise NotImplemented(obstacle)
         else:
             raise Exception("%s has no add_obstacle() method defined for %s." % (self, obstacle))
+
+    def set_goal_cell(self,xcoord,ycoord):
+        (x,y) = self.convert_coords(xcoord,ycoord)
+        if x:
+            self.grid[x,y] = self.goal_marker
+        else:
+            raise ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord)))
+
+    def set_goal_shape(self,obj):
+        """Temporary hack. Should me tracing perimeter of object."""
+        self.set_goal_cell(obj.center[0,0], obj.center[1,0])
 
     def propagate(self,xstart,ystart):
         """
@@ -184,11 +192,11 @@ def wf_test():
     #
     wf = WaveFront()
     wf.grid[:,:] = 0
-    wf.set_goal(*goal)
-    wf.set_obstacle(280,280)
-    wf.set_obstacle(280,290)
-    wf.set_obstacle(290,280)
-    wf.set_obstacle(290,290)
+    wf.set_goal_cell(*goal)
+    wf.set_obstacle_cell(280,280)
+    wf.set_obstacle_cell(280,290)
+    wf.set_obstacle_cell(290,280)
+    wf.set_obstacle_cell(290,290)
     result1 = wf.propagate(*start)
     result2 = wf.extract(result1)
     print('path length =', len(result2))

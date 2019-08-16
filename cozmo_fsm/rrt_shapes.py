@@ -3,10 +3,11 @@ from math import sqrt, pi, atan2
 import numpy as np
 
 class Shape():
-    def __init__(self):
-        self.center = transform.point()
+    def __init__(self, center=transform.point()):
+        if center is None: raise ValueError()
+        self.center = center
         self.rotmat = transform.identity()
-        self.obstacle = None
+        self.obstacle_id = None
     
     def __repr__(self):
         return "<%s >" % (self.__class__.__name__)
@@ -31,13 +32,12 @@ class Shape():
 
 class Circle(Shape):
     def __init__(self, center=transform.point(), radius=25/2):
-        super().__init__()
-        self.center = center
+        super().__init__(center)
         self.radius = radius
         self.orient = 0.
 
     def __repr__(self):
-        id = self.obstacle.id if self.obstacle else '[no obstacle]'
+        id = self.obstacle_id if self.obstacle_id else '[no obstacle]'
         return '<Circle (%.1f,%.1f) r=%.1f %s>' % \
                (self.center[0,0], self.center[1,0], self.radius, id)
 
@@ -65,11 +65,13 @@ class Circle(Shape):
 
 class Polygon(Shape):
     def __init__(self, vertices=None):
+        center = vertices.mean(1)
+        center.resize(4,1)
+        super().__init__(center)
         self.vertices = vertices
         N = vertices.shape[1]
         self.edges = tuple( (vertices[:,i:i+1], vertices[:,(i+1)%N:((i+1)%N)+1])
                             for i in range(N) )
-        center = vertices.mean(1).resize(4,1)
 
     def get_bounding_box(self):
         mins = self.vertices.min(1)
@@ -89,31 +91,30 @@ class Polygon(Shape):
 
 class Rectangle(Polygon):
     def __init__(self, center=None, dimensions=None, orient=0):
-        self.center = center
         self.dimensions = dimensions
         self.orient = orient
         if not isinstance(dimensions[0],(float,int)):
             raise ValueError(dimensions)
         dx2 = dimensions[0]/2
         dy2 = dimensions[1]/2
-        vertices = np.array([[-dx2,  dx2, dx2, -dx2 ],
-                             [-dy2, -dy2, dy2,  dy2 ],
-                             [  0,    0,   0,    0  ],
-                             [  1,    1,   1,    1  ]])
+        relative_vertices = np.array([[-dx2,  dx2, dx2, -dx2 ],
+                                      [-dy2, -dy2, dy2,  dy2 ],
+                                      [  0,    0,   0,    0  ],
+                                      [  1,    1,   1,    1  ]])
         self.unrot = transform.aboutZ(-orient)
         center_ex = self.unrot.dot(center)
-        extents = transform.translate(center_ex[0,0],center_ex[1,0]).dot(vertices)
+        extents = transform.translate(center_ex[0,0],center_ex[1,0]).dot(relative_vertices)
         # Extents measured along the rectangle's axes, not world axes
         self.min_Ex = min(extents[0,:])
         self.max_Ex = max(extents[0,:])
         self.min_Ey = min(extents[1,:])
         self.max_Ey = max(extents[1,:])
-        world_vertices = transform.aboutZ(orient).dot(vertices)
-        world_vertices = transform.translate(center[0,0],center[1,0]).dot(world_vertices)
-        super().__init__(vertices=world_vertices)
+        vertices = transform.translate(center[0,0],center[1,0]).dot(
+            transform.aboutZ(orient).dot(relative_vertices))
+        super().__init__(vertices=vertices)
 
     def __repr__(self):
-        id = self.obstacle.id if self.obstacle else '[no obstacle]'
+        id = self.obstacle_id if self.obstacle_id else '[no obstacle]'
         return '<Rectangle (%.1f,%.1f) %.1fx%.1f %.1f deg %s>' % \
                (self.center[0,0],self.center[1,0],*self.dimensions,
                 self.orient*(180/pi), id)

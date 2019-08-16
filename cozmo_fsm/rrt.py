@@ -182,12 +182,12 @@ class RRT():
         self.start = start
         self.goal = goal
         self.target_heading = goal.q
-        self.bbox = self.get_bounding_box()
+        self.compute_bounding_box()
 
         # Check for StartCollides
         collider = self.collides(start)
         if collider:
-            raise StartCollides(start,collider,collider.obstacle)
+            raise StartCollides(start,collider,collider.obstacle_id)
 
         # Use WaveFront
         if use_wf:
@@ -203,7 +203,7 @@ class RRT():
                 if not collider:
                     break
             if collider:
-                raise GoalCollides(goal,collider,collider.obstacle)
+                raise GoalCollides(goal,collider,collider.obstacle_id)
 
             self.wf.initialize_grid(bbox=self.bbox)
             wf_start = (start.x, start.y)
@@ -211,7 +211,7 @@ class RRT():
             inflation = 10
             for obstacle in self.obstacles:
                 self.wf.add_obstacle(obstacle, inflation)
-            self.wf.set_goal(*wf_goal)
+            self.wf.set_goal_cell(*wf_goal)
 
             try:
                 result = self.wf.propagate(*wf_start)
@@ -239,7 +239,7 @@ class RRT():
             offset_goal = RRTNode(x=offset_x, y=offset_y, q=goal.q)
             collider = self.collides(offset_goal)
             if collider:
-                raise GoalCollides(goal,collider,collider.obstacle)
+                raise GoalCollides(goal,collider,collider.obstacle_id)
             treeB = [offset_goal]
             self.treeB = treeB
         else:  # target_heading is nan
@@ -262,7 +262,7 @@ class RRT():
                 if not collider:
                     treeB.append(RRTNode(parent=treeB[0], x=temp_goal.x, y=temp_goal.y, q=temp_goal.q))
             if len(treeB) == 1:
-                raise GoalCollides(goal,collider,collider.obstacle)
+                raise GoalCollides(goal,collider,collider.obstacle_id)
 
         # Set bounds for search area
         self.compute_world_bounds(start,goal)
@@ -522,16 +522,17 @@ class RRT():
         turn_node = RRTNode(next_node, tang_x, tang_y, tang_q, radius=radius)
         return (next_node, turn_node)
 
-    def transform_path(self, path):
+    def coords_to_path(self, coords_pairs):
         """
-        Transform a path with coordinates to RRTNode
+        Transform a path of coordinates pairs to RRTNodes
         """
-        for i in range(len(path)):
-            if i==0:
-                path[i] = RRTNode(x=path[i][0], y=path[i][1], q=math.nan)
-            else:
-                path[i] = RRTNode(parent=path[i-1], x=path[i][0], y=path[i][1], q=math.nan)
-                path[i-1].q = atan2(path[i].y - path[i-1].y, path[i].x - path[i-1].x)
+        path = []
+        for (x,y) in coords_pairs:
+            node = RRTNode(x=x, y=y, q=math.nan)
+            if path:
+                node.parent = path[-1]
+                path[-1].q = atan2(y - path[-1].y, x - path[-1].x)
+            path.append(node)
         return path
 
 
@@ -583,7 +584,7 @@ class RRT():
             r = Rectangle(center=center,
                           dimensions=dimensions,
                           orient=wall.theta )
-            r.obstacle = wall
+            r.obstacle_id = wall.id
             obst.append(r)
         return obst
 
@@ -591,7 +592,7 @@ class RRT():
         r = Rectangle(center=transform.point(obj.x, obj.y),
                       dimensions=obj.size[0:2],
                       orient=obj.theta)
-        r.obstacle = obj
+        r.obstacle_id = obj.id
         return r
 
     def generate_marker_obstacle(self,obj):
@@ -599,21 +600,25 @@ class RRT():
         r = Rectangle(center=transform.point(obj.x+sx/2, obj.y),
                       dimensions=(sx,sy),
                       orient=obj.theta)
-        r.obstacle = obj
+        r.obstacle_id = obj.id
         return r
 
+    def generate_room_obstacle(self,obj):
+        """Rooms aren't really obstacles, but this is used by PathPlanner to encode goal locations."""
+        r = Polygon(vertices=obj.points)
+        return r
 
     def generate_chip_obstacle(self,obj):
         r = Circle(center=transform.point(obj.x,obj.y),
                    radius=obj.radius)
-        r.obstacle = obj
+        r.obstacle_id = obj.id
         return r
 
     def generate_foreign_obstacle(self,obj):
         r = Rectangle(center=transform.point(obj.x, obj.y),
                       dimensions=(obj.size[0:2]),
                       orient=obj.theta)
-        r.obstacle = obj
+        r.obstacle_id = obj.id
         return r
 
     def make_robot_parts(self,robot):
@@ -625,7 +630,7 @@ class RRT():
                 result.append(robot_obst)
         return result
 
-    def get_bounding_box(self):
+    def compute_bounding_box(self):
         xmin = self.robot.world.particle_filter.pose[0]
         ymin = self.robot.world.particle_filter.pose[1]
         xmax = xmin
@@ -641,5 +646,5 @@ class RRT():
             ymin = min(ymin, y0)
             xmax = max(xmax, x1)
             ymax = max(ymax, y1)
-        bbox = ((xmin,ymin), (xmax,ymax))
-        return bbox
+        self.bbox = ((xmin,ymin), (xmax,ymax))
+        return self.bbox

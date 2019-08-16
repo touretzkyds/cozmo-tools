@@ -581,11 +581,10 @@ class WorldMap():
         elif charger.is_visible:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
-        elif wmobject.update_from_sdk and \
-             ((charger.pose is None) or not charger.pose.is_comparable(self.robot.pose)):
+        elif ((charger.pose is None) or not charger.pose.is_comparable(self.robot.pose)):
             wmobject.update_from_sdk = False
             wmobject.pose_confidence = -1
-        else:       # Robot re-localized so charger came back
+        else:       # Robot re-localized so charger pose came back
             pass  # skip for now due to SDK bug
             # wmobject.update_from_sdk = True
             # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
