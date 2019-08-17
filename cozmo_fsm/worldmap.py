@@ -581,11 +581,10 @@ class WorldMap():
         elif charger.is_visible:
             wmobject.update_from_sdk = True
             wmobject.pose_confidence = +1
-        elif wmobject.update_from_sdk and \
-             ((charger.pose is None) or not charger.pose.is_comparable(self.robot.pose)):
+        elif ((charger.pose is None) or not charger.pose.is_comparable(self.robot.pose)):
             wmobject.update_from_sdk = False
             wmobject.pose_confidence = -1
-        else:       # Robot re-localized so charger came back
+        else:       # Robot re-localized so charger pose came back
             pass  # skip for now due to SDK bug
             # wmobject.update_from_sdk = True
             # wmobject.pose_confidence = max(0, wmobject.pose_confidence)
@@ -842,10 +841,13 @@ class WorldMap():
 
     def show_pose(self):
         print('robot.pose is:   %6.1f %6.1f @ %6.1f deg.' %
-              (self.robot.pose.position.x, self.robot.pose.position.y, self.robot.pose_angle.degrees))
-        print('particle filter: %6.1f %6.1f @ %6.1f deg.' %
+              (self.robot.pose.position.x,
+               self.robot.pose.position.y,
+               self.robot.pose_angle.degrees))
+        print('particle filter: %6.1f %6.1f @ %6.1f deg.   [%s]' %
               (*self.robot.world.particle_filter.pose[0:2],
-               self.robot.world.particle_filter.pose[2]*180/pi))
+               self.robot.world.particle_filter.pose[2]*180/pi,
+               self.robot.world.particle_filter.state))
         print()
 
 #================ Event Handlers ================

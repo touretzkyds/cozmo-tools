@@ -933,7 +933,7 @@ class SLAMSensorModel(SensorModel):
         particles = self.robot.world.particle_filter.particles
         if id.startswith('Aruco-'):
             marker_number = int(id[6:])
-            print('spurious data=',data,'seen_marker_objects=',seen_marker_objects)
+            print('spurious data=',data)
             marker = seen_marker_objects[marker_number]
             sensor_dist = marker.camera_distance
             sensor_bearing = atan2(marker.camera_coords[0],
