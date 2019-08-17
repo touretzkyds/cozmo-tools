@@ -841,10 +841,13 @@ class WorldMap():
 
     def show_pose(self):
         print('robot.pose is:   %6.1f %6.1f @ %6.1f deg.' %
-              (self.robot.pose.position.x, self.robot.pose.position.y, self.robot.pose_angle.degrees))
-        print('particle filter: %6.1f %6.1f @ %6.1f deg.' %
+              (self.robot.pose.position.x,
+               self.robot.pose.position.y,
+               self.robot.pose_angle.degrees))
+        print('particle filter: %6.1f %6.1f @ %6.1f deg.   [%s]' %
               (*self.robot.world.particle_filter.pose[0:2],
-               self.robot.world.particle_filter.pose[2]*180/pi))
+               self.robot.world.particle_filter.pose[2]*180/pi,
+               self.robot.world.particle_filter.state))
         print()
 
 #================ Event Handlers ================
