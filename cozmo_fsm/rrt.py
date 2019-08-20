@@ -56,17 +56,19 @@ class MaxIterations(RRTException): pass
 class RRT():
     DEFAULT_MAX_ITER = 2000
 
-    def __init__(self, robot, max_iter=DEFAULT_MAX_ITER, step_size=10, arc_radius=40,
+    def __init__(self, robot=None, robot_parts=None,
+                 max_iter=DEFAULT_MAX_ITER, step_size=10, arc_radius=40,
                  xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
                  bounds=(range(-500,500), range(-500,500))):
         self.robot = robot
         self.max_iter = max_iter
         self.step_size = step_size
+        self.max_turn = pi
         self.arc_radius = arc_radius
         self.xy_tolsq = xy_tolsq
         self.q_tol = q_tol
-        self.robot_parts = self.make_robot_parts(robot)
+        self.robot_parts = robot_parts if robot_parts is not None else self.make_robot_parts(robot) 
         self.bounds = bounds
         self.obstacles = obstacles
         self.auto_obstacles = auto_obstacles
@@ -558,7 +560,8 @@ class RRT():
                obstacles.append(self.generate_foreign_obstacle(obj))
         self.obstacles = obstacles
 
-    def generate_wall_obstacles(self, wall, obstacle_inflation, passageway_adjustment):
+    @staticmethod
+    def generate_wall_obstacles(wall, obstacle_inflation, passageway_adjustment):
         wall_spec = wall_marker_dict[wall.spec_id]
         half_length = wall.length / 2
         widths = []
@@ -588,14 +591,16 @@ class RRT():
             obst.append(r)
         return obst
 
-    def generate_cube_obstacle(self,obj):
+    @staticmethod
+    def generate_cube_obstacle(obj):
         r = Rectangle(center=transform.point(obj.x, obj.y),
                       dimensions=obj.size[0:2],
                       orient=obj.theta)
         r.obstacle_id = obj.id
         return r
 
-    def generate_marker_obstacle(self,obj):
+    @staticmethod
+    def generate_marker_obstacle(obj):
         sx,sy,sz = obj.size
         r = Rectangle(center=transform.point(obj.x+sx/2, obj.y),
                       dimensions=(sx,sy),
@@ -603,25 +608,29 @@ class RRT():
         r.obstacle_id = obj.id
         return r
 
-    def generate_room_obstacle(self,obj):
+    @staticmethod
+    def generate_room_obstacle(obj):
         """Rooms aren't really obstacles, but this is used by PathPlanner to encode goal locations."""
         r = Polygon(vertices=obj.points)
         return r
 
-    def generate_chip_obstacle(self,obj):
+    @staticmethod
+    def generate_chip_obstacle(obj):
         r = Circle(center=transform.point(obj.x,obj.y),
                    radius=obj.radius)
         r.obstacle_id = obj.id
         return r
 
-    def generate_foreign_obstacle(self,obj):
+    @staticmethod
+    def generate_foreign_obstacle(obj):
         r = Rectangle(center=transform.point(obj.x, obj.y),
                       dimensions=(obj.size[0:2]),
                       orient=obj.theta)
         r.obstacle_id = obj.id
         return r
 
-    def make_robot_parts(self,robot):
+    @staticmethod
+    def make_robot_parts(robot):
         result = []
         for joint in robot.kine.joints.values():
             if joint.collision_model:

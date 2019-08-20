@@ -9,14 +9,14 @@ from .transform import wrap_angle
 from .rrt_shapes import *
 
 class WaveFront():
-    def __init__(self, square_size=10, bbox=None, grid_size=(100,100), inflat_size=5):
+    def __init__(self, square_size=10, bbox=None, grid_size=(100,100), inflate_size=5):
         self.square_size = square_size
         if bbox:
             self.grid_size = (int(bbox[1][0]-bbox[0][0]+2*inflate_size),
                               int(bbox[1][1]-bbox[0][1]+2*inflate_size))
         else:
             self.grid_size = grid_size
-        self.grid = np.zeros(grid_size, dtype=np.int32)
+        self.grid = np.zeros(self.grid_size, dtype=np.int32)
         self.goal_marker = 2**31 - 1
 
     def initialize_grid(self,bbox=None,inflate_size=5):
@@ -69,6 +69,8 @@ class WaveFront():
     def set_goal_shape(self,obj):
         """Temporary hack. Should me tracing perimeter of object."""
         self.set_goal_cell(obj.center[0,0], obj.center[1,0])
+        self.set_goal_cell(obj.center[0,0]+25, obj.center[1,0]+25)
+        self.set_goal_cell(obj.center[0,0]-25, obj.center[1,0]-25)
 
     def propagate(self,xstart,ystart):
         """

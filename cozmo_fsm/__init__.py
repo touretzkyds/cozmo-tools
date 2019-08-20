@@ -10,6 +10,7 @@ from .program import *
 from .trace import tracefsm
 from .particle import *
 from .particle_viewer import ParticleViewer
+from .path_planner import PathPlanner
 from .cozmo_kin import *
 from .rrt import *
 from .path_viewer import PathViewer
