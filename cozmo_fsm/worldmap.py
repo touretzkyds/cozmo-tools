@@ -6,9 +6,9 @@ from cozmo.objects import LightCube, CustomObject
 from cozmo.util import Pose
 
 from . import evbase
-from . import transform
+from . import geometry
 from . import custom_objs
-from .transform import wrap_angle, quat2rot, quaternion_to_euler_angle, get_orientation_state
+from .geometry import wrap_angle, quat2rot, quaternion_to_euler_angle, get_orientation_state
 
 import math
 import numpy as np
@@ -45,7 +45,7 @@ class LightCubeObj(WorldObject):
             self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
         else:
             self.theta = theta
-            self.orientation = transform.ORIENTATION_UPRIGHT
+            self.orientation = geometry.ORIENTATION_UPRIGHT
         self.size = self.light_cube_size
 
     @property
@@ -58,8 +58,8 @@ class LightCubeObj(WorldObject):
                         [-s/2,  s/2, -s/2, s/2],
                         [ 0,    0,    0,   0  ],
                         [ 1,    1,    1,   1  ]])
-        pts = transform.aboutZ(self.theta).dot(pts)
-        pts = transform.translate(self.x, self.y).dot(pts)
+        pts = geometry.aboutZ(self.theta).dot(pts)
+        pts = geometry.translate(self.x, self.y).dot(pts)
         mins = pts.min(1)
         maxs = pts.max(1)
         xmin = mins[0]
@@ -86,7 +86,7 @@ class ChargerObj(WorldObject):
         if sdk_obj:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
-        self.orientation = transform.ORIENTATION_UPRIGHT
+        self.orientation = geometry.ORIENTATION_UPRIGHT
         self.theta = theta
         self.size = (104, 98, 10)
         if self.sdk_obj and self.sdk_obj.pose:
@@ -118,7 +118,7 @@ class CustomMarkerObj(WorldObject):
             self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
         else:
             self.theta = theta
-            self.orientation = transform.ORIENTATION_UPRIGHT
+            self.orientation = geometry.ORIENTATION_UPRIGHT
 
     @property
     def is_visible(self):
@@ -130,8 +130,8 @@ class CustomMarkerObj(WorldObject):
                         [-sy/2, sy/2, sy/2, -sy/2],
                         [ 0,    0,    0,     0  ],
                         [ 1,    1,    1,     1  ]])
-        pts = transform.aboutZ(self.theta).dot(pts)
-        pts = transform.translate(self.x, self.y).dot(pts)
+        pts = geometry.aboutZ(self.theta).dot(pts)
+        pts = geometry.translate(self.x, self.y).dot(pts)
         mins = pts.min(1)
         maxs = pts.max(1)
         xmin = mins[0]
@@ -267,9 +267,9 @@ class WallObj(WorldObject):
                 marker_number = int(key[1+key.rfind('-'):])
                 marker = ArucoMarkerObj(world_map.robot.world.aruco, marker_number=marker_number)
                 world_map.objects[marker.id] = marker
-            wall_xyz = transform.point(self.length/2 - value[1][0], 0, value[1][1])
+            wall_xyz = geometry.point(self.length/2 - value[1][0], 0, value[1][1])
             s = 0 if value[0] == +1 else pi
-            rel_xyz = transform.aboutZ(self.theta+s).dot(wall_xyz)
+            rel_xyz = geometry.aboutZ(self.theta+s).dot(wall_xyz)
             marker.x = self.x + rel_xyz[1][0]
             marker.y = self.y + rel_xyz[0][0]
             marker.z = rel_xyz[2][0]
@@ -573,7 +573,7 @@ class WorldMap():
             wmobject.update_from_sdk = False
             theta = wrap_angle(self.robot.world.particle_filter.pose[2] + pi)
             charger_offset = np.array([[-30], [0], [0], [1]])
-            offset = transform.aboutZ(theta).dot(charger_offset)
+            offset = geometry.aboutZ(theta).dot(charger_offset)
             wmobject.x = self.robot.world.particle_filter.pose[0] + offset[0,0]
             wmobject.y = self.robot.world.particle_filter.pose[1] + offset[1,0]
             wmobject.theta = theta
@@ -615,9 +615,9 @@ class WorldMap():
                 wmobject.y = landmark_spec[0][1][0]
                 wmobject.theta = landmark_spec[1]
                 elevation = atan2(value.camera_coords[1], value.camera_coords[2])
-                cam_pos = transform.point(0,
-                                          value.camera_distance * sin(elevation),
-                                          value.camera_distance * cos(elevation))
+                cam_pos = geometry.point(0,
+                                         value.camera_distance * sin(elevation),
+                                         value.camera_distance * cos(elevation))
                 base_pos = self.robot.kine.joint_to_base('camera').dot(cam_pos)
                 wmobject.z = base_pos[2,0]
                 wmobject.elevation = elevation
@@ -631,9 +631,9 @@ class WorldMap():
             else:
                 # Non-landmark: convert aruco sensor values to pf coordinates and update
                 elevation = atan2(value.camera_coords[1], value.camera_coords[2])
-                cam_pos = transform.point(0,
-                                          value.camera_distance * sin(elevation),
-                                          value.camera_distance * cos(elevation))
+                cam_pos = geometry.point(0,
+                                         value.camera_distance * sin(elevation),
+                                         value.camera_distance * cos(elevation))
                 base_pos = self.robot.kine.joint_to_base('camera').dot(cam_pos)
                 wmobject.x = base_pos[0,0]
                 wmobject.y = base_pos[1,0]
@@ -680,8 +680,8 @@ class WorldMap():
                         dir = value[0]    # +1 for front side or -1 for back side
                         s = 0 if dir == +1 else pi
                         aruco_marker.theta = wrap_angle(wall.theta + s)
-                        wall_xyz = transform.point(-dir*(wall.length/2 - value[1][0]), 0, value[1][1])
-                        rel_xyz = transform.aboutZ(aruco_marker.theta + pi/2).dot(wall_xyz)
+                        wall_xyz = geometry.point(-dir*(wall.length/2 - value[1][0]), 0, value[1][1])
+                        rel_xyz = geometry.aboutZ(aruco_marker.theta + pi/2).dot(wall_xyz)
                         aruco_marker.x = wall.x + rel_xyz[0][0]
                         aruco_marker.y = wall.y + rel_xyz[1][0]
                         aruco_marker.z = rel_xyz[2][0]
@@ -758,7 +758,7 @@ class WorldMap():
         tmat = self.robot.kine.base_to_link(world_frame).dot(self.robot.kine.joint_to_base(lift_attach_frame))
         # *** HACK *** : depth calculation only works for cubes; need to handle custom obj, chips
         half_depth = wmobject.size[0] / 2
-        new_pose = tmat.dot(transform.point(half_depth,0))
+        new_pose = tmat.dot(geometry.point(half_depth,0))
         theta = self.robot.world.particle_filter.pose[2]
         wmobject.x = new_pose[0,0]
         wmobject.y = new_pose[1,0]
@@ -849,6 +849,18 @@ class WorldMap():
                self.robot.world.particle_filter.pose[2]*180/pi,
                self.robot.world.particle_filter.state))
         print()
+
+    def generate_doorway_list(self):
+        "Used by path-planner.py"
+        doorways = []
+        for (key,obj) in self.objects.items():
+            if isinstance(obj,DoorwayObj):
+                w = obj.door_width
+                doorway_threshold_theta = obj.theta + pi/2
+                dx = w * sin(doorway_threshold_theta)
+                dy = w * cos(doorway_threshold_theta)
+                doorways.append((obj, ((obj.x-dx, obj.y-dy), (obj.x+dx, obj.y+dy))))
+        return doorways
 
 #================ Event Handlers ================
 

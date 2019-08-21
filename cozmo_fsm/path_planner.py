@@ -3,28 +3,31 @@ Path planner using RRT and Wavefront algorithms.
 """
 
 from math import pi, sin, cos
+from multiprocessing import Process
 
-from .base import StateNode
-from .events import DataEvent
+from .nodes import LaunchProcess
+from .events import DataEvent, PilotEvent
 from .pilot0 import NavPlan
 from .worldmap import WorldObject, LightCubeObj, ChargerObj, CustomMarkerObj, RoomObj, DoorwayObj
-from .rrt import RRT, RRTNode
+from .rrt import RRT, RRTNode, StartCollides, GoalCollides, GoalUnreachable
 from .wavefront import WaveFront
-from .transform import wrap_angle
+from .geometry import wrap_angle
 
 from . import rrt
 
-class PathPlanner(StateNode):
-
-    def __init__(self):
-        super().__init__()
+class PathPlanner(LaunchProcess):
 
     def start(self, event=None):
-        super().start(event)
-        goal_object = event.data if isinstance(event,DataEvent) else None
+        if not isinstance(event,DataEvent):
+            raise ValueError('PathPlanner node must be invoked with a DataEvent for the goal.')
+        goal_object = event.data
         if not isinstance(goal_object, WorldObject):
             raise ValueError('Path planner goal %s is not a WorldObject' % goal_object)
+        self.goal_object = goal_object
+        super().start(event)
 
+    def create_process(self,reply_token):
+        goal_object = self.goal_object
         # Fat obstacles and narrow doorways for WaveFront
         obstacle_inflation = 10  # must be << pilot's escape_distance
         passageway_adjustment = -40  # narrow doorways for WaveFront
@@ -51,35 +54,22 @@ class PathPlanner(StateNode):
 
         robot_parts = self.robot.world.rrt.make_robot_parts(self.robot)
         bbox = self.robot.world.rrt.compute_bounding_box()
-
-        doorway_list = self.generate_doorway_list()
-
+        doorway_list = self.robot.world.world_map.generate_doorway_list()
         need_tree = self.robot.world.path_viewer is not None
 
-        result = \
-            PathPlanner.plan_path(start_node, goal_shape, robot_parts, bbox,
-                                  fat_obstacles, skinny_obstacles, doorway_list, need_tree)
-        return result
-
-    def generate_doorway_list(self):
-        doorways = []
-        for (key,obj) in self.robot.world.world_map.objects.items():
-            if isinstance(obj,DoorwayObj):
-                w = obj.door_width
-                door_theta = obj.theta + pi/2
-                dx = w * sin(door_theta)
-                dy = w * cos(door_theta)
-                doorways.append((obj, ((obj.x-dx, obj.y-dy), (obj.x+dx, obj.y+dy))))
-        return doorways
+        p = Process(target=self.__class__.process_workhorse,
+                    args = [reply_token,
+                            start_node, goal_shape, robot_parts, bbox,
+                            fat_obstacles, skinny_obstacles, doorway_list, need_tree])
+        return p
 
     @staticmethod
-    def plan_path(start_node, goal_shape, robot_parts, bbox,
-                  fat_obstacles, skinny_obstacles, doorway_list, need_tree):
-        rrt = RRT(robot_parts=robot_parts)
-        rrt.bbox = bbox
-
-        start_escape_move = None
+    def process_workhorse(reply_token, start_node, goal_shape, robot_parts, bbox,
+                          fat_obstacles, skinny_obstacles, doorway_list, need_tree):
+        rrt = RRT(robot_parts=robot_parts, bbox=bbox)
         rrt.obstacles = skinny_obstacles
+        start_escape_move = None
+
         collider = rrt.collides(start_node)
         if collider:
             escape_distance = 50 # mm
@@ -97,10 +87,8 @@ class PathPlanner(StateNode):
                     start_node = new_start
                     break
             if start_escape_move is None:
-                print('PilotPlanner: Start collides!',e)
-                raise NotImplementedError('path planner report failure')
-                self.parent.post_event(PilotEvent(StartCollides, e.args))
-                self.parent.post_failure()
+                print('PathPlanner: Start collides!', collider)
+                PathPlanner.post_event(reply_token, PilotEvent(StartCollides,collider))
                 return
 
         # Run the wavefront path finder
@@ -113,7 +101,8 @@ class PathPlanner(StateNode):
         wf_start = (start_node.x, start_node.y)
         goal_found = wf.propagate(*wf_start)
         if goal_found is None:
-            raise NotImplementedError('wavefront could not reach goal')
+            PathPlanner.post_event(reply_token, PilotEvent(GoalUnreachable))
+            return
 
         # Extract and smooth the path
         coords_pairs = wf.extract(goal_found)
@@ -134,8 +123,9 @@ class PathPlanner(StateNode):
                 navplan.steps[0].param.insert(0, (start.x, start.y))
             else:
                 # Shouldn't get here, but just in case
+                print("Shouldn't end up here!", navplan.steps[0])
                 escape_step = NavStep(NavStep.DRIVE, ((start.x,start.y), (new_start.x,new_start.y)))
                 navplan.steps.insert(0, escape_step)
 
         # Return the navigation plan
-        return navplan
+        PathPlanner.post_event(reply_token, DataEvent(navplan))

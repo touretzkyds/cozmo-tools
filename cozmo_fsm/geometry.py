@@ -1,5 +1,7 @@
 """
-Transformation matrices for kinematics calculations.
+Geometry calculations, including transformation matrices for
+kinematics.
+
 """
 
 import numpy as np

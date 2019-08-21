@@ -4,8 +4,8 @@ import random
 import time
 import math
 
-import cozmo_fsm.transform
-from .transform import wrap_angle
+import cozmo_fsm.geometry
+from .geometry import wrap_angle
 
 from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
@@ -52,11 +52,12 @@ class RRTException(Exception):
 class StartCollides(RRTException): pass
 class GoalCollides(RRTException): pass
 class MaxIterations(RRTException): pass
+class GoalUnreachable(RRTException): pass
 
 class RRT():
     DEFAULT_MAX_ITER = 2000
 
-    def __init__(self, robot=None, robot_parts=None,
+    def __init__(self, robot=None, robot_parts=None, bbox=None,
                  max_iter=DEFAULT_MAX_ITER, step_size=10, arc_radius=40,
                  xy_tolsq=90, q_tol=5*pi/180,
                  obstacles=[], auto_obstacles=True,
@@ -77,7 +78,7 @@ class RRT():
         self.start = None
         self.goal = None
         self.wf = WaveFront()
-        self.bbox = None
+        self.bbox = bbox
         self.path = []
         self.draw_path = []
 
@@ -144,10 +145,10 @@ class RRT():
     def robot_parts_to_node(self,node):
         parts = []
         for part in self.robot_parts:
-            tmat = transform.aboutZ(part.orient)
-            tmat = transform.translate(part.center[0,0], part.center[1,0]).dot(tmat)
-            tmat = transform.aboutZ(node.q).dot(tmat)
-            tmat = transform.translate(node.x, node.y).dot(tmat)
+            tmat = geometry.aboutZ(part.orient)
+            tmat = geometry.translate(part.center[0,0], part.center[1,0]).dot(tmat)
+            tmat = geometry.aboutZ(node.q).dot(tmat)
+            tmat = geometry.translate(node.x, node.y).dot(tmat)
             this_part = part.instantiate(tmat)
             parts.append(this_part)
         return parts
@@ -578,8 +579,8 @@ class RRT():
         edges.append([0., half_length+obstacle_inflation, 0., 1.])
         widths.append(half_length-last_x)
         edges = np.array(edges).T
-        edges = transform.aboutZ(wall.theta).dot(edges)
-        edges = transform.translate(wall.x,wall.y).dot(edges)
+        edges = geometry.aboutZ(wall.theta).dot(edges)
+        edges = geometry.translate(wall.x,wall.y).dot(edges)
         obst = []
         for i in range(0,len(widths)):
             center = edges[:,2*i:2*i+2].mean(1).reshape(4,1)
@@ -593,7 +594,7 @@ class RRT():
 
     @staticmethod
     def generate_cube_obstacle(obj):
-        r = Rectangle(center=transform.point(obj.x, obj.y),
+        r = Rectangle(center=geometry.point(obj.x, obj.y),
                       dimensions=obj.size[0:2],
                       orient=obj.theta)
         r.obstacle_id = obj.id
@@ -602,7 +603,7 @@ class RRT():
     @staticmethod
     def generate_marker_obstacle(obj):
         sx,sy,sz = obj.size
-        r = Rectangle(center=transform.point(obj.x+sx/2, obj.y),
+        r = Rectangle(center=geometry.point(obj.x+sx/2, obj.y),
                       dimensions=(sx,sy),
                       orient=obj.theta)
         r.obstacle_id = obj.id
@@ -616,14 +617,14 @@ class RRT():
 
     @staticmethod
     def generate_chip_obstacle(obj):
-        r = Circle(center=transform.point(obj.x,obj.y),
+        r = Circle(center=geometry.point(obj.x,obj.y),
                    radius=obj.radius)
         r.obstacle_id = obj.id
         return r
 
     @staticmethod
     def generate_foreign_obstacle(obj):
-        r = Rectangle(center=transform.point(obj.x, obj.y),
+        r = Rectangle(center=geometry.point(obj.x, obj.y),
                       dimensions=(obj.size[0:2]),
                       orient=obj.theta)
         r.obstacle_id = obj.id

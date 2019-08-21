@@ -1,11 +1,12 @@
-from .base import *
-from .rrt import *
-from .events import PilotEvent
-
 """
 To avoid circular dependencies between pilot.fsm and doorpass.fsm, we
 put some pilot classes here so both pilot and doorpass can import them.
 """
+
+from .base import *
+from .rrt import *
+from .events import PilotEvent
+from .geometry import segment_intersect_test
 
 class PilotCheckStart(StateNode):
     "Fails if rrt planner indicates start_collides"
@@ -57,8 +58,10 @@ class NavPlan():
         self.steps = steps
 
     @staticmethod
-    def intersects_doorway(p1, p2, doorways):
+    def intersects_doorway(node1, node2, doorways):
         for door in doorways:
+            p1 = (node1.x, node1.y)
+            p2 = (node2.x, node2.y)
             p3 = door[1][0]
             p4 = door[1][1]
             result = segment_intersect_test(p1, p2, p3, p4)

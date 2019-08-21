@@ -20,8 +20,8 @@ WINDOW = None
 from . import opengl
 from .rrt import RRTNode
 from .rrt_shapes import *
-from . import transform
-from .transform import wrap_angle
+from . import geometry
+from .geometry import wrap_angle
 
 the_rrt = None
 the_items = []  # each item is a tuple (tree,color)
@@ -193,8 +193,8 @@ class PathViewer():
                 radius = node.radius
                 dir = +1 if radius >= 0 else -1
                 r = abs(radius)
-                center = transform.translate(init_x,init_y).dot(
-                    transform.aboutZ(init_q+dir*pi/2).dot(transform.point(r)))
+                center = geometry.translate(init_x,init_y).dot(
+                    geometry.aboutZ(init_q+dir*pi/2).dot(geometry.point(r)))
                 theta = wrap_angle(init_q - dir*pi/2)
                 targ_theta = wrap_angle(targ_q - dir*pi/2)
                 ang_step = 0.05 # radians

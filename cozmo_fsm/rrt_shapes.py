@@ -1,12 +1,12 @@
-from cozmo_fsm import transform
+from cozmo_fsm import geometry
 from math import sqrt, pi, atan2
 import numpy as np
 
 class Shape():
-    def __init__(self, center=transform.point()):
+    def __init__(self, center=geometry.point()):
         if center is None: raise ValueError()
         self.center = center
-        self.rotmat = transform.identity()
+        self.rotmat = geometry.identity()
         self.obstacle_id = None
     
     def __repr__(self):
@@ -31,7 +31,7 @@ class Shape():
 #================ Basic Shapes ================
 
 class Circle(Shape):
-    def __init__(self, center=transform.point(), radius=25/2):
+    def __init__(self, center=geometry.point(), radius=25/2):
         super().__init__(center)
         self.radius = radius
         self.orient = 0.
@@ -101,16 +101,16 @@ class Rectangle(Polygon):
                                       [-dy2, -dy2, dy2,  dy2 ],
                                       [  0,    0,   0,    0  ],
                                       [  1,    1,   1,    1  ]])
-        self.unrot = transform.aboutZ(-orient)
+        self.unrot = geometry.aboutZ(-orient)
         center_ex = self.unrot.dot(center)
-        extents = transform.translate(center_ex[0,0],center_ex[1,0]).dot(relative_vertices)
+        extents = geometry.translate(center_ex[0,0],center_ex[1,0]).dot(relative_vertices)
         # Extents measured along the rectangle's axes, not world axes
         self.min_Ex = min(extents[0,:])
         self.max_Ex = max(extents[0,:])
         self.min_Ey = min(extents[1,:])
         self.max_Ey = max(extents[1,:])
-        vertices = transform.translate(center[0,0],center[1,0]).dot(
-            transform.aboutZ(orient).dot(relative_vertices))
+        vertices = geometry.translate(center[0,0],center[1,0]).dot(
+            geometry.aboutZ(orient).dot(relative_vertices))
         super().__init__(vertices=vertices)
 
     def __repr__(self):

@@ -16,7 +16,7 @@ except:
     pass
 
 from . import opengl
-from . import transform
+from . import geometry
 from . import worldmap
 
 import cozmo
@@ -242,9 +242,9 @@ class WorldMapViewer():
         glPushMatrix()
         glTranslatef(*pos)
         if lcube.is_visible:
-            t = transform.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)
+            t = geometry.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)
         else:
-            t = transform.aboutZ(cube_obj.theta)
+            t = geometry.aboutZ(cube_obj.theta)
         t = t.transpose()   # Transpose the matrix for sending to OpenGL
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
@@ -274,9 +274,9 @@ class WorldMapViewer():
         glTranslatef(pos[0], pos[1], max(pos[2],5))
         # Transpose the pose rotation matrix for sending to OpenCV
         if isinstance(custom_obj, cozmo.objects.CustomObject):
-            t = transform.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).transpose()
+            t = geometry.quat2rot(*custom_obj.pose.rotation.q0_q1_q2_q3).transpose()
         else:
-            t = transform.identity()
+            t = geometry.identity()
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
         comparable = True # obj.pose.origin_id == 0 or obj.pose.is_comparable(self.robot.pose)
@@ -380,8 +380,8 @@ class WorldMapViewer():
         edges.append([0., half_length, door_height/2, 1.])
         widths.append(half_length-last_x)
         edges = np.array(edges).T
-        edges = transform.aboutZ(wall_obj.theta).dot(edges)
-        edges = transform.translate(wall_obj.x,wall_obj.y).dot(edges)
+        edges = geometry.aboutZ(wall_obj.theta).dot(edges)
+        edges = geometry.translate(wall_obj.x,wall_obj.y).dot(edges)
         c = glGenLists(1)
         glNewList(c, GL_COMPILE)
         if wall_obj.is_foreign:
@@ -587,11 +587,11 @@ class WorldMapViewer():
         glTranslatef(*pos)
         # Transpose the matrix for sending to OpenCV
 
-        t = transform.quat2rot(cos(phi/2),0,0,sin(phi/2)).transpose()
+        t = geometry.quat2rot(cos(phi/2),0,0,sin(phi/2)).transpose()
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
 
-        t = transform.quat2rot( cos(-angle/2 + pi/4) ,0 ,sin(-angle/2 + pi/4) ,0 ).transpose()
+        t = geometry.quat2rot( cos(-angle/2 + pi/4) ,0 ,sin(-angle/2 + pi/4) ,0 ).transpose()
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
 
@@ -635,7 +635,7 @@ class WorldMapViewer():
         glPushMatrix()
         self.robot.kine.get_pose()
         lift_tran = self.robot.kine.joint_to_base('lift_attach')
-        lift_pt = transform.point(0, 0, 0)
+        lift_pt = geometry.point(0, 0, 0)
         lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
         glTranslatef(*lift_point)
         self.make_cube(lift_size_mm, color=color)
@@ -643,11 +643,11 @@ class WorldMapViewer():
 
         # Draw the lift arms
         glPushMatrix()
-        lift_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        lift_pt = geometry.point(0, 0, lift_arm_spacing_mm / 2)
         lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
 
         shoulder_tran = self.robot.kine.joint_to_base('shoulder')
-        shoulder_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        shoulder_pt = geometry.point(0, 0, lift_arm_spacing_mm / 2)
         shoulder_point = self.tran_to_tuple(shoulder_tran.dot(shoulder_pt));
 
         arm_point = ((shoulder_point[0] + lift_point[0]) / 2,
@@ -699,7 +699,7 @@ class WorldMapViewer():
         glPushMatrix()
         self.robot.kine.get_pose()
         lift_tran = self.robot.kine.joint_to_base('lift_attach')
-        lift_pt = transform.point(0, 0, 0)
+        lift_pt = geometry.point(0, 0, 0)
         lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
         glTranslatef(*lift_point)
         self.make_cube(lift_size_mm, highlight=self.robot.is_on_charger)
@@ -707,11 +707,11 @@ class WorldMapViewer():
 
         # Draw the lift arms
         glPushMatrix()
-        lift_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        lift_pt = geometry.point(0, 0, lift_arm_spacing_mm / 2)
         lift_point = self.tran_to_tuple(lift_tran.dot(lift_pt))
 
         shoulder_tran = self.robot.kine.joint_to_base('shoulder')
-        shoulder_pt = transform.point(0, 0, lift_arm_spacing_mm / 2)
+        shoulder_pt = geometry.point(0, 0, lift_arm_spacing_mm / 2)
         shoulder_point = self.tran_to_tuple(shoulder_tran.dot(shoulder_pt));
 
         arm_point = ((shoulder_point[0] + lift_point[0]) / 2,

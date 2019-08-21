@@ -105,25 +105,33 @@ class StateNode(EventListener):
     def post_completion(self):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting completion')
-        self.robot.erouter.post(CompletionEvent(self))
+        event = CompletionEvent()
+        event.source = self
+        self.robot.erouter.post(event)
 
     def post_success(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop,
                   self, 'posting success, details=%s' % details)
-        self.robot.erouter.post(SuccessEvent(self,details))
+        event = SuccessEvent(details)
+        event.source = self
+        self.robot.erouter.post(event)
 
     def post_failure(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop,
                   self, 'posting failure, details=%s' % details)
-        self.robot.erouter.post(FailureEvent(self,details))
+        event = FailureEvent(details)
+        event.source = self
+        self.robot.erouter.post(event)
 
     def post_data(self,value):
         if TRACE.trace_level > TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop,
                   self, 'posting data', value)
-        self.robot.erouter.post(DataEvent(self,value))
+        event = DataEvent(value)
+        event.source = self
+        self.robot.erouter.post(event)
 
     def now(self):
         """Use now() to execute this node from the command line instead of as part of a state machine."""

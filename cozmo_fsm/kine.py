@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from . import transform
+from . import geometry
 from . import rrt_shapes
 
 class Joint():
@@ -9,7 +9,7 @@ class Joint():
                  description='A kinematic joint',
                  qmin=-math.inf, qmax=math.inf,
                  d=0, theta=0, r=0, alpha=0,
-                 collision_model=None, ctransform=transform.identity()):
+                 collision_model=None, ctransform=geometry.identity()):
         self.name = name
         self.parent = parent
         self.type = type
@@ -35,7 +35,7 @@ class Joint():
         self.q = 0
         self.qmin = qmin
         self.qmax = qmax
-        self.parent_link_to_this_joint = transform.dh_matrix(-d,-theta,-r,-alpha)
+        self.parent_link_to_this_joint = geometry.dh_matrix(-d,-theta,-r,-alpha)
         self.this_joint_to_parent_link = np.linalg.inv(self.parent_link_to_this_joint)
 
         self.solver = None
@@ -57,16 +57,16 @@ class Joint():
         return np.linalg.inv(self.this_joint_to_this_link())
 
     def revolute(self):
-        return transform.aboutZ(-self.q)
+        return geometry.aboutZ(-self.q)
 
     def prismatic(self):
-        return transform.translate(0.,0.,-self.q)
+        return geometry.translate(0.,0.,-self.q)
 
     def fixed(self):
-        return transform.identity()
+        return geometry.identity()
 
     def world_joint(self):
-        return transform.translate(self.q[0],self.q[1]).dot(transform.aboutZ(self.q[2]))
+        return geometry.translate(self.q[0],self.q[1]).dot(geometry.aboutZ(self.q[2]))
 
 class Kinematics():
     def __init__(self,joint_list,robot):
@@ -83,7 +83,7 @@ class Kinematics():
     def joint_to_base(self,joint):
         if isinstance(joint,str):
             joint = self.joints[joint]
-        Tinv = transform.identity()
+        Tinv = geometry.identity()
         j = joint
         while j is not self.base and j.parent is not None:
             Tinv = j.parent.this_link_to_this_joint().dot(

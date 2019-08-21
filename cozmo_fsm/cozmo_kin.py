@@ -3,8 +3,8 @@ from math import pi
 import cozmo
 
 from .kine import *
-from cozmo_fsm import transform
-from .transform import tprint
+from cozmo_fsm import geometry
+from .geometry import tprint
 from .rrt_shapes import *
 
 # ================ Constants ================
@@ -23,7 +23,7 @@ class CozmoKinematics(Kinematics):
         cor_frame = Joint('cor', parent=base_frame,
                           description='Center of rotation',
                           r=-19.,
-                          collision_model=Rectangle(transform.point(),
+                          collision_model=Rectangle(geometry.point(),
                                                     dimensions=(95,60)))
 
         # Use link instead of joint for world_frame
@@ -52,7 +52,7 @@ class CozmoKinematics(Kinematics):
                   getter=self.get_lift_attach, r=66.,
                   qmax = - cozmo.robot.MIN_LIFT_ANGLE.radians,
                   qmin = - cozmo.robot.MAX_LIFT_ANGLE.radians,
-                  #collision_model=Circle(transform.point(), radius=10))
+                  #collision_model=Circle(geometry.point(), radius=10))
             )
 
         # Positive head angle is up, so z must point to the right.

@@ -14,15 +14,15 @@ class CompletionEvent(Event):
 
 class SuccessEvent(Event):
     """Signals success of a state node's action."""
-    def __init__(self,source,details):
-        super().__init__(source)
+    def __init__(self,details=None):
+        super().__init__()
         self.details = details
 
 
 class FailureEvent(Event):
     """Signals failure of a state node's action."""
-    def __init__(self,source,details):
-        super().__init__(source)
+    def __init__(self,details=None):
+        super().__init__()
         self.details = details
 
     def __repr__(self):
@@ -35,9 +35,8 @@ class FailureEvent(Event):
 
 class DataEvent(Event):
     """Signals a data item broadcasted by the node."""
-    def __init__(self,source,data):
+    def __init__(self,data):
         super().__init__()
-        self.source = source
         self.data = data
 
 

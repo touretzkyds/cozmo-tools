@@ -5,7 +5,7 @@ from math import sin, cos, atan2, pi, sqrt
 
 from .nodes import *
 from .transitions import *
-from .transform import wrap_angle
+from .geometry import wrap_angle
 from .pilot0 import *
 from .worldmap import WallObj, DoorwayObj
 from time import sleep

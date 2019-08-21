@@ -16,7 +16,7 @@ from . import evbase
 from .base import *
 from .events import *
 from .cozmo_kin import wheelbase
-from .transform import wrap_angle
+from .geometry import wrap_angle
 from .worldmap import WorldObject, FaceObj, CustomMarkerObj
 
 #________________ Ordinary Nodes ________________
@@ -133,7 +133,9 @@ class DriveContinuous(StateNode):
             raise ValueError('Node %s has a null path' % repr(self))
         self.path_index = 0
         self.cur = self.path[self.path_index]
+        self.prev = None
         self.last_dist = -1
+        self.target_q = None
         self.reached_dist = False
         self.mode = None
         self.pause_counter = 0
@@ -157,7 +159,7 @@ class DriveContinuous(StateNode):
         x = self.robot.world.particle_filter.pose[0]
         y = self.robot.world.particle_filter.pose[1]
         q = self.robot.world.particle_filter.pose[2]
-        dist = math.sqrt((self.cur[0]-x)**2 + (self.cur[1]-y)**2)
+        dist = math.sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
         if self.pause_counter > 0:
             self.pause_counter -= 1
             #print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
@@ -166,8 +168,8 @@ class DriveContinuous(StateNode):
         if not self.reached_dist:
             self.reached_dist = \
                 (dist - self.last_dist) > 0.1 and \
-                ( (self.mode == 'x' and np.sign(x-self.cur[0]) == np.sign(self.cur[0]-self.prev[0])) or
-                  (self.mode == 'y' and np.sign(y-self.cur[1]) == np.sign(self.cur[1]-self.prev[1])) )
+                ( (self.mode == 'x' and np.sign(x-self.cur.x) == np.sign(self.cur.x-self.prev.x)) or
+                  (self.mode == 'y' and np.sign(y-self.cur.y) == np.sign(self.cur.y-self.prev.y)) )
         # Once reached_dist is true, we can enter mode 'q' where we'll turn  until
         # the heading error is < 5 degrees, then we've reached the waypoint.
         reached_waypoint = (self.path_index == 0) or \
@@ -195,12 +197,12 @@ class DriveContinuous(StateNode):
             self.cur = self.path[self.path_index]
             self.last_dist = math.inf
             self.reached_dist = False
-            self.target_q = math.atan2(self.cur[1]-self.prev[1], self.cur[0]-self.prev[0])
-            print(': [%.1f, %.1f] tgtQ is %.1f deg.' % (*self.cur, self.target_q*180/pi))
+            self.target_q = math.atan2(self.cur.y-self.prev.y, self.cur.x-self.prev.x)
+            print(': [%.1f, %.1f] tgtQ is %.1f deg.' % (self.cur.x, self.cur.y, self.target_q*180/pi))
 
             # Is the target behind us?
             delta_q = wrap_angle(self.target_q - q)
-            delta_dist = math.sqrt((self.cur[0]-x)**2 + (self.cur[1]-y)**2)
+            delta_dist = math.sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
             if False and abs(delta_q) > 135*pi/180:
                 #self.target_q = wrap_angle(self.target_q + pi)
                 self.drive_direction = -1
@@ -212,12 +214,12 @@ class DriveContinuous(StateNode):
             # Heading determines whether we're solving y=f(x) or x=f(y)
             if abs(self.target_q) < pi/4 or abs(abs(self.target_q)-pi) < pi/4:
                 self.mode = 'x'
-                self.m = (self.cur[1]-self.prev[1]) / (self.cur[0]-self.prev[0])
-                self.b = self.cur[1] - self.m * (self.cur[0]-self.prev[0])
+                self.m = (self.cur.y-self.prev.y) / (self.cur.x-self.prev.x)
+                self.b = self.cur.y - self.m * (self.cur.x-self.prev.x)
             else:
                 self.mode = 'y'
-                self.m = (self.cur[0]-self.prev[0]) / (self.cur[1]-self.prev[1])
-                self.b = self.cur[0] - self.m * (self.cur[1]-self.prev[1])
+                self.m = (self.cur.x-self.prev.x) / (self.cur.y-self.prev.y)
+                self.b = self.cur.x - self.m * (self.cur.y-self.prev.y)
 
             # Do we need to turn in place before setting off toward new waypoint?
             if abs(wrap_angle(q-self.target_q)) > 45*pi/180:
@@ -252,15 +254,15 @@ class DriveContinuous(StateNode):
         q_error = wrap_angle(q - self.target_q)
         #print('DriveCont--> q_error is',q*180/pi,'degrees')
         if self.mode == 'x':      # y = f(x)
-            target_y = self.m * (x-self.prev[0]) + self.b
+            target_y = self.m * (x-self.prev.x) + self.b
             d_error = (y - target_y) * np.sign(pi/2 - abs(self.target_q))
             correcting_q = - 0.8*q_error - 0.25*math.atan2(d_error,25)
         elif self.mode == 'y':    # x = f(y)
-            target_x = self.m * (y-self.prev[1]) + self.b
+            target_x = self.m * (y-self.prev.y) + self.b
             d_error = (x - target_x) * np.sign(pi/2 - abs(self.target_q-pi/2))
             correcting_q = - 0.8*q_error - 0.25*math.atan2(-d_error,25)
         elif self.mode == 'q':
-            d_error = math.sqrt((x-self.cur[0])**2 + (y-self.cur[1])**2)
+            d_error = math.sqrt((x-self.cur.x)**2 + (y-self.cur.y)**2)
             correcting_q = - 0.8*q_error
         else:
             print("Bad mode value '%s'" % repr(self.mode))
@@ -1210,7 +1212,7 @@ class LaunchProcess(StateNode):
         # A process returns its result to the caller as an event.
         result = 42
 
-        LaunchProcess.post_event(reply_token,DataEvent(None,result))  # source must be None for pickling
+        LaunchProcess.post_event(reply_token,DataEvent(result))  # source must be None for pickling
         LaunchProcess.post_event(reply_token,CompletionEvent()) # we can post more than one event
 
     @staticmethod
@@ -1219,15 +1221,15 @@ class LaunchProcess(StateNode):
         event_pair = (id, event)
         queue.put(event_pair)
 
-    def create_process(self):
-        reply_token = (id(self), self.robot.erouter.interprocess_queue)
+    def create_process(self, reply_token):
         p = Process(target=self.__class__.process_workhorse,
                     args=[reply_token])
         return p
 
     def start(self, event=None):
         super().start(event)
-        self.process = self.create_process()
+        reply_token = (id(self), self.robot.erouter.interprocess_queue)
+        self.process = self.create_process(reply_token)
         self.robot.erouter.add_process_node(self)
         self.process.start()
         print('Launched', self.process)

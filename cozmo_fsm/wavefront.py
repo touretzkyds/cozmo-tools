@@ -4,33 +4,33 @@ Wavefront path planning algorithm.
 
 import numpy as np
 import heapq
-from math import ceil, cos, sin
-from .transform import wrap_angle
+from math import floor, ceil, cos, sin
+from .geometry import wrap_angle
 from .rrt_shapes import *
 
 class WaveFront():
-    def __init__(self, square_size=10, bbox=None, grid_size=(100,100), inflate_size=5):
-        self.square_size = square_size
-        if bbox:
-            self.grid_size = (int(bbox[1][0]-bbox[0][0]+2*inflate_size),
-                              int(bbox[1][1]-bbox[0][1]+2*inflate_size))
-        else:
-            self.grid_size = grid_size
-        self.grid = np.zeros(self.grid_size, dtype=np.int32)
+    def __init__(self, square_size=10, bbox=None, grid_shape=(100,100), inflate_size=5):
+        self.square_size = square_size  # in mm
+        self.bbox = bbox  # in mm
+        self.inflate_size = inflate_size  # in mm
+        self.grid_shape = grid_shape  # array shape
         self.goal_marker = 2**31 - 1
+        self.initialize_grid(bbox=bbox)
 
-    def initialize_grid(self,bbox=None,inflate_size=5):
+    def initialize_grid(self,bbox=None):
         if bbox:
-            self.grid_size = (int(bbox[1][0]-bbox[0][0]+2*inflate_size),
-                              int(bbox[1][1]-bbox[0][1]+2*inflate_size))
-        self.grid = np.zeros(self.grid_size, dtype=np.int32)
+            self.bbox = bbox
+            self.grid_shape = (ceil((bbox[1][0] - bbox[0][0] + 2*self.inflate_size)/self.square_size),
+                              ceil((bbox[1][1] - bbox[0][1] + 2*self.inflate_size)/self.square_size))
+        self.grid = np.zeros(self.grid_shape, dtype=np.int32)
+        print('bbox=',self.bbox,'  grid_shape=',self.grid_shape)
 
     def convert_coords(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
-        x = int(round((xcoord/self.square_size+self.grid_size[0]/2)))
-        y = int(round((ycoord/self.square_size+self.grid_size[1]/2)))
-        if x >= 0 and x < self.grid_size[0] and \
-           y >= 0 and y < self.grid_size[1]:
+        x = int(round((xcoord-self.bbox[0][0])/self.square_size))
+        y = int(round((ycoord-self.bbox[0][1])/self.square_size))
+        if x >= 0 and x < self.grid_shape[0] and \
+           y >= 0 and y < self.grid_shape[1]:
             return (x,y)
         else:
             return (None,None)
@@ -45,8 +45,12 @@ class WaveFront():
             centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
             width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
             theta = wrap_angle(obstacle.orient)
-            for x in range(int(round(centerX-width/2)), int(ceil(centerX+width/2))):
-                for y in range(int(round(centerY-height/2)), int(ceil(centerY+height/2))):
+            for x in range(floor(centerX-width/2),
+                           ceil(centerX+width/2),
+                           int(self.square_size/2)):
+                for y in range(floor(centerY-height/2),
+                               ceil(centerY+height/2),
+                               int(self.square_size/2)):
                     new_x = ((x - centerX) * cos(theta) - (y - centerY) * sin(theta)) + centerX
                     new_y = ((x - centerX) * sin(theta) + (y - centerY) * cos(theta)) + centerY
                     self.set_obstacle_cell(new_x, new_y)
@@ -85,8 +89,8 @@ class WaveFront():
         goal_marker = self.goal_marker
         fringe = [(1,(x,y))]
         heapq.heapify(fringe)
-        xmax = self.grid_size[0] - 1
-        ymax = self.grid_size[1] - 1
+        xmax = self.grid_shape[0] - 1
+        ymax = self.grid_shape[1] - 1
         while fringe:
             dist,(x,y) = heapq.heappop(fringe)
             if grid[x,y] == 0:
@@ -142,8 +146,8 @@ class WaveFront():
         (x,y) = search_result
         maxdist = self.goal_marker + 1
         grid = self.grid
-        xmax = self.grid_size[0] - 1
-        ymax = self.grid_size[1] - 1
+        xmax = self.grid_shape[0] - 1
+        ymax = self.grid_shape[1] - 1
         path = []
         while maxdist > 1:
             path.append((x,y))
@@ -183,9 +187,9 @@ class WaveFront():
         path.append((x,y))
         path.reverse()
         square_size = self.square_size
-        xmid = self.grid_size[0]/2
-        ymid = self.grid_size[1]/2
-        path_coords = [((x-xmid)*square_size, (y-ymid)*square_size) for (x,y) in path]
+        xmin = self.bbox[0][0]
+        ymin = self.bbox[0][1]
+        path_coords = [(x*square_size+xmin, y*square_size+ymin) for (x,y) in path]
         return path_coords
 
 def wf_test():
