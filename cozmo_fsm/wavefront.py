@@ -12,7 +12,7 @@ class WaveFront():
     def __init__(self, square_size=10, grid_size=(100,100)):
         self.square_size = square_size
         self.grid_size = grid_size
-        self.grid = np.ndarray(grid_size, dtype=np.int32)
+        self.grid = np.zeros(grid_size, dtype=np.int32)
         self.goal_marker = 2**31 - 1
 
     def initialize_grid(self,bbox=None,inflate_size=5):
@@ -71,7 +71,7 @@ class WaveFront():
         (x,y) = self.convert_coords(xstart,ystart)
         if grid[x,y] != 0:
             raise ValueError("Start collides")
-            
+
         goal_marker = self.goal_marker
         fringe = [(1,(x,y))]
         heapq.heapify(fringe)

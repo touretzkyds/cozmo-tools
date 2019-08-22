@@ -16,6 +16,7 @@ import numpy as np
 import platform
 
 WINDOW = None
+WINDOW_WF = None
 
 from . import opengl
 from .rrt import RRTNode
@@ -83,11 +84,28 @@ class PathViewer():
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    def window_creator_wf(self):
+        global WINDOW_WF
+        WINDOW_WF = opengl.create_window(bytes('wavefront grid','utf-8'), (self.width,self.height))
+        glutDisplayFunc(self.display_wf)
+        # glutReshapeFunc(self.reshape)
+        glutKeyboardFunc(self.keyPressed)
+        glutSpecialFunc(self.specialKeyPressed)
+        glViewport(0,0,self.width,self.height)
+        glClearColor(*self.bgcolor, 0)
+        # Enable transparency
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     def start(self): # Displays in background
         if not WINDOW:
             opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
+                time.sleep(0.1)
+        if not WINDOW_WF:
+            opengl.CREATION_QUEUE.append(self.window_creator_wf)
+            while not WINDOW_WF:
                 time.sleep(0.1)
         if platform.system() == 'Darwin':
             print("Type 'option' + 'h' in the path viewer window for help.")
@@ -235,6 +253,33 @@ class PathViewer():
                                 angle=obst.orient*(180/pi),
                                 width=width, height=height, color=color, fill=True)
 
+    def draw_wf(self):
+        grid = the_rrt.wf.grid
+        square_size = the_rrt.wf.square_size
+        grid_flat = list(set(grid.flatten()))
+        grid_flat.sort()
+        try:
+            max_val = grid_flat[-2]
+        except IndexError:
+            max_val = max(grid_flat)
+        if max_val <=0:
+            max_val = the_rrt.wf.goal_marker
+        for x in range(0, the_rrt.wf.grid_size[0]-square_size, square_size):
+            for y in range(0, the_rrt.wf.grid_size[1]-square_size, square_size):
+                try:
+                    if the_rrt.wf.goal_marker in grid[x:(x+square_size), y:(y+square_size)]:
+                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(0, 1, 0)) # green for goal
+                    elif -1 in grid[x:(x+square_size), y:(y+square_size)]:
+                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(1, 0, 0)) # red for obstacle
+                    elif grid[x+square_size//2, y+square_size//2] < 0:
+                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(0, 0, 0)) # black
+                    else:
+                        value = grid[x+square_size//2, y+square_size//2]/max_val    # shades of gray for distance values
+                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(value, value, value))
+                except IndexError:
+                    # print('index is out of bounds', x, y)
+                    pass
+
     def add_tree(self, tree, color):
         global the_items
         the_items.append((tree,color))
@@ -268,6 +313,23 @@ class PathViewer():
         pose = self.robot.world.particle_filter.pose
         self.draw_robot(RRTNode(x=pose[0], y=pose[1], q=pose[2]))
 
+        glutSwapBuffers()
+
+    def display_wf(self):
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        w = max(the_rrt.wf.grid_size)/2
+        glOrtho(-w, w, -w, w, 1, -1)
+
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+        glRotatef(90,0,0,1)
+        glScalef(1+self.scale, 1+self.scale, 1+self.scale)
+        glTranslatef(-self.translation[0]-w, -self.translation[1]-w, 0.)
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        self.draw_wf()
         glutSwapBuffers()
 
     def reshape(self,width,height):
