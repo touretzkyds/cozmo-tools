@@ -29,7 +29,7 @@ class Event:
             src_string = self.source.name
         except:
             src_string = repr(self.source)
-        return '<%s for %s>' % (self.__class__.__name__, src_string)
+        return '<%s from %s>' % (self.__class__.__name__, src_string)
 
 #________________ Event Router ________________
 

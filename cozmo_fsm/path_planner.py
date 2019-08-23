@@ -4,6 +4,7 @@ Path planner using RRT and Wavefront algorithms.
 
 from math import pi, sin, cos
 from multiprocessing import Process
+import cv2
 
 from .nodes import LaunchProcess
 from .events import DataEvent, PilotEvent
@@ -29,13 +30,13 @@ class PathPlanner(LaunchProcess):
     def create_process(self,reply_token):
         goal_object = self.goal_object
         # Fat obstacles and narrow doorways for WaveFront
-        obstacle_inflation = 10  # must be << pilot's escape_distance
+        obstacle_inflation = 20  # must be << pilot's escape_distance
         passageway_adjustment = -40  # narrow doorways for WaveFront
         self.robot.world.rrt.generate_obstacles(obstacle_inflation, passageway_adjustment)
         fat_obstacles = self.robot.world.rrt.obstacles
 
         # Skinny obstacles and wide doorways for RRT
-        obstacle_inflation = 5
+        obstacle_inflation = 10
         passageway_adjustment = +77  # widen doorways for RRT
         self.robot.world.rrt.generate_obstacles(obstacle_inflation, passageway_adjustment)
         skinny_obstacles = self.robot.world.rrt.obstacles
@@ -66,6 +67,7 @@ class PathPlanner(LaunchProcess):
     @staticmethod
     def process_workhorse(reply_token, start_node, goal_shape, robot_parts, bbox,
                           fat_obstacles, skinny_obstacles, doorway_list, need_tree):
+        cv2.startWindowThread()
         rrt = RRT(robot_parts=robot_parts, bbox=bbox)
         rrt.obstacles = skinny_obstacles
         start_escape_move = None
@@ -100,7 +102,9 @@ class PathPlanner(LaunchProcess):
         wf.set_goal_shape(goal_shape)
         wf_start = (start_node.x, start_node.y)
         goal_found = wf.propagate(*wf_start)
+        wf.display_grid()
         if goal_found is None:
+            print('PathPlanner: goal unreachable!')
             PathPlanner.post_event(reply_token, PilotEvent(GoalUnreachable))
             return
 
@@ -117,15 +121,18 @@ class PathPlanner(LaunchProcess):
         if start_escape_move:
             phi, start, new_start = start_escape_move
             if phi == pi:
-                escape_step = NavStep(NavStep.BACKUP, (new_start.x, new_start.y))
+                escape_step = NavStep(NavStep.BACKUP, RRTNode(x=new_start.x, y=new_start.y))
                 navplan.steps.insert(0, escape_step)
             elif navplan.steps[0].type == NavStep.DRIVE:
-                navplan.steps[0].param.insert(0, (start.x, start.y))
+                navplan.steps[0].param.insert(0, RRTNode(x=start.x, y=start.y))
             else:
                 # Shouldn't get here, but just in case
                 print("Shouldn't end up here!", navplan.steps[0])
-                escape_step = NavStep(NavStep.DRIVE, ((start.x,start.y), (new_start.x,new_start.y)))
+                escape_step = NavStep(NavStep.DRIVE,
+                                      (RRTNode(x=start.x, y=start.y),
+                                       RRTNode(x=new_start.x, y=new_start.y)))
                 navplan.steps.insert(0, escape_step)
 
         # Return the navigation plan
-        PathPlanner.post_event(reply_token, DataEvent(navplan))
+        result = (navplan, rrt.path)
+        PathPlanner.post_event(reply_token, DataEvent(result))

@@ -19,7 +19,6 @@ except:
     pass
 
 from . import opengl
-from . import transform
 from . import program
 
 #For capturing images

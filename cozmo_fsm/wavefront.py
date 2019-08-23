@@ -3,13 +3,15 @@ Wavefront path planning algorithm.
 """
 
 import numpy as np
+import cv2
 import heapq
 from math import floor, ceil, cos, sin
+
 from .geometry import wrap_angle
 from .rrt_shapes import *
 
 class WaveFront():
-    def __init__(self, square_size=10, bbox=None, grid_shape=(100,100), inflate_size=5):
+    def __init__(self, square_size=10, bbox=None, grid_shape=(100,100), inflate_size=50):
         self.square_size = square_size  # in mm
         self.bbox = bbox  # in mm
         self.inflate_size = inflate_size  # in mm
@@ -27,8 +29,8 @@ class WaveFront():
 
     def convert_coords(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
-        x = int(round((xcoord-self.bbox[0][0])/self.square_size))
-        y = int(round((ycoord-self.bbox[0][1])/self.square_size))
+        x = int(round((xcoord-self.bbox[0][0]+self.inflate_size)/self.square_size))
+        y = int(round((ycoord-self.bbox[0][1]+self.inflate_size)/self.square_size))
         if x >= 0 and x < self.grid_shape[0] and \
            y >= 0 and y < self.grid_shape[1]:
             return (x,y)
@@ -40,7 +42,7 @@ class WaveFront():
         if x:
             self.grid[x,y] = -1
 
-    def add_obstacle(self, obstacle, inflate_size=0):
+    def add_obstacle(self, obstacle, inflate_size=25):
         if isinstance(obstacle, Rectangle):
             centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
             width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
@@ -73,8 +75,8 @@ class WaveFront():
     def set_goal_shape(self,obj):
         """Temporary hack. Should me tracing perimeter of object."""
         self.set_goal_cell(obj.center[0,0], obj.center[1,0])
-        self.set_goal_cell(obj.center[0,0]+25, obj.center[1,0]+25)
-        self.set_goal_cell(obj.center[0,0]-25, obj.center[1,0]-25)
+        self.set_goal_cell(obj.center[0,0]+50, obj.center[1,0]+50)
+        self.set_goal_cell(obj.center[0,0]-50, obj.center[1,0]-50)
 
     def propagate(self,xstart,ystart):
         """
@@ -88,6 +90,7 @@ class WaveFront():
             
         goal_marker = self.goal_marker
         fringe = [(1,(x,y))]
+        self.maxdist = 1
         heapq.heapify(fringe)
         xmax = self.grid_shape[0] - 1
         ymax = self.grid_shape[1] - 1
@@ -99,6 +102,7 @@ class WaveFront():
                 continue
             dist10 = dist + 10
             dist14 = dist + 14
+            self.maxdist = dist14
             if x > 0:
                 cell = grid[x-1,y]
                 if cell == goal_marker: return (x-1,y)
@@ -189,8 +193,37 @@ class WaveFront():
         square_size = self.square_size
         xmin = self.bbox[0][0]
         ymin = self.bbox[0][1]
-        path_coords = [(x*square_size+xmin, y*square_size+ymin) for (x,y) in path]
+        path_coords = [(x*square_size + xmin - self.inflate_size,
+                        y*square_size + ymin - self.inflate_size)
+                       for (x,y) in path]
         return path_coords
+
+    def display_grid(self):
+        scale_factor = 4
+        s = self.grid_shape
+        maxval = float(self.maxdist)
+        image = np.zeros((s[0]*scale_factor, s[1]*scale_factor, 3), dtype='uint8')
+        for i in range(self.grid_shape[0]):
+            for j in range(self.grid_shape[1]):
+                cell = self.grid[i,j]
+                if cell == -1:
+                    pixel = (0,0,200)
+                elif cell == 0:
+                    pixel = (255,0,0)
+                elif cell == 1:
+                    pixel = (0,255,255)
+                elif cell == self.goal_marker:
+                    pixel = (0,200,0)
+                else:
+                    v = 20 + int(cell/maxval*200)
+                    pixel = (v,v,v)
+                for i1 in range(scale_factor):
+                    for j1 in range(scale_factor):
+                        image[i*scale_factor+i1, j*scale_factor+j1, :] = pixel
+        print('Displaying grid')
+        cv2.imshow('grid', image)
+        cv2.waitKey(0)
+        print('Displayed grid')
 
 def wf_test():
     start = (261,263)

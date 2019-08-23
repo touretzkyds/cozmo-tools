@@ -222,13 +222,13 @@ class RRT():
                 raise StartCollides(start,None,None)
 
             if result:
-                path = self.wf.extract(result)
-                self.path = self.transform_path(path)
+                cpath = self.wf.extract(result)
+                self.path = self.coords_to_path(cpath)
                 # re-generate obstacles with normal doors so path smoothing will work
                 self.generate_obstacles(5, 0)
                 self.smooth_path()
             else:
-                raise MaxIterations()
+                raise GoalUnreachable()
             return [], [], self.path
 
         # Set up treeA with start node
@@ -527,7 +527,7 @@ class RRT():
 
     def coords_to_path(self, coords_pairs):
         """
-        Transform a path of coordinates pairs to RRTNodes
+        Transform a path of coordinates pairs to RRTNodes.
         """
         path = []
         for (x,y) in coords_pairs:

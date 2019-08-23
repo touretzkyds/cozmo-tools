@@ -48,6 +48,15 @@ class PilotBase(StateNode):
           super().start()
           self.post_event(DataEvent(self.parent.object))
 
+    class ReceivePlan(StateNode):
+        def start(self, event=None):
+            super().start(event)
+            if not isinstance(event, DataEvent):
+                raise ValueError(event)
+            (navplan, path) = event.data
+            self.robot.world.rrt.draw_path = path
+            self.post_event(DataEvent(navplan))
+
     class PilotExecutePlan(StateNode):
         def start(self, event=None):
             if not isinstance(event, DataEvent) and isinstance(event.data, NavPlan):
@@ -143,7 +152,9 @@ class PilotToObject(PilotBase):
     $setup{
         launch: self.SendObject() =D=> planner
 
-        planner: PathPlanner() =D=> exec
+        planner: PathPlanner() =D=> recv
+
+        recv: self.ReceivePlan() =D=> exec
 
         exec: self.PilotExecutePlan()
         exec =C=> check
