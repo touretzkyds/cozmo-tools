@@ -3,12 +3,14 @@ Create a dummy robot and world so we can use cozmo-tools
 classes without having to connect to a real robot.
 """
 
+import asyncio
+
 import cozmo
 import cv2
 
 from cozmo.util import Distance, Angle, Pose
 from .cozmo_kin import CozmoKinematics
-
+from .evbase import EventRouter
 from .aruco import Aruco
 from .particle import SLAMParticleFilter
 from .rrt import RRT, RRTNode
@@ -27,6 +29,11 @@ class SimServer():
 class SimRobot():
     def __init__(self):
         robot = self
+
+        robot.loop = asyncio.get_event_loop()
+        robot.erouter = EventRouter()
+        robot.erouter.robot = robot
+        robot.erouter.start()
 
         robot.head_angle = Angle(radians=0)
         robot.shoulder_angle = Angle(radians=0)

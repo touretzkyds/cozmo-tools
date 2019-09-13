@@ -9,7 +9,6 @@ from .geometry import wrap_angle
 
 from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
-from .wavefront import WaveFront
 from .worldmap import WallObj, wall_marker_dict, RoomObj, LightCubeObj
 from .worldmap import CustomCubeObj, ChargerObj, CustomMarkerObj, ChipObj, RobotForeignObj
 
@@ -77,7 +76,6 @@ class RRT():
         self.treeB = []
         self.start = None
         self.goal = None
-        self.wf = WaveFront()
         self.bbox = bbox
         self.path = []
         self.draw_path = []

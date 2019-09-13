@@ -10,7 +10,7 @@ from .events import PilotEvent
 from .transitions import CompletionTrans, FailureTrans, SuccessTrans, DataTrans
 from .cozmo_kin import wheelbase, center_of_rotation_offset
 from .worldmap import DoorwayObj
-from .path_planner import PathPlanner
+from .path_planner import PathPlannerProcess
 from .geometry import segment_intersect_test
 from .doorpass import DoorPass
 from .pilot0 import *
@@ -152,7 +152,7 @@ class PilotToObject(PilotBase):
     $setup{
         launch: self.SendObject() =D=> planner
 
-        planner: PathPlanner() =D=> recv
+        planner: PathPlannerProcess() =D=> recv
 
         recv: self.ReceivePlan() =D=> exec
 
