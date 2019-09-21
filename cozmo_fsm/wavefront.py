@@ -26,7 +26,7 @@ class WaveFront():
             self.grid_shape = (ceil((bbox[1][0] - bbox[0][0] + 2*self.inflate_size)/self.square_size),
                               ceil((bbox[1][1] - bbox[0][1] + 2*self.inflate_size)/self.square_size))
         self.grid = np.zeros(self.grid_shape, dtype=np.int32)
-        print('bbox=',self.bbox,'  grid_shape=',self.grid_shape)
+        self.maxdist = 1
 
     def convert_coords(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
@@ -84,17 +84,23 @@ class WaveFront():
         self.set_goal_cell(obj.center[0,0]+offset, obj.center[1,0]+offset)
         self.set_goal_cell(obj.center[0,0]-offset, obj.center[1,0]-offset)
 
+    def check_start_collides(self,xstart,ystart):
+        (x,y) = self.convert_coords(xstart,ystart)
+        if self.grid[x,y] == 0 or self.grid[x,y] == self.goal_marker:
+            return False
+        else:
+            return True
+
     def propagate(self,xstart,ystart):
         """
         Propagate the wavefront in eight directions from the starting coordinates
         until a goal cell is reached or we fill up the grid.
         """
-        grid = self.grid
-        (x,y) = self.convert_coords(xstart,ystart)
-        self.maxdist = 1
-        if grid[x,y] != 0:
+        if self.check_start_collides(xstart,ystart):
             raise StartCollides()
             
+        grid = self.grid
+        (x,y) = self.convert_coords(xstart,ystart)
         goal_marker = self.goal_marker
         fringe = [(1,(x,y))]
         heapq.heapify(fringe)
@@ -204,7 +210,7 @@ class WaveFront():
                        for (x,y) in path]
         return path_coords
 
-    def display_grid(self):
+    def make_grid_display(self):
         scale_factor = 4
         s = self.grid_shape
         x_max = s[0]*scale_factor - 1
@@ -228,10 +234,7 @@ class WaveFront():
                 for i1 in range(scale_factor):
                     for j1 in range(scale_factor):
                         image[x_max-(i*scale_factor+i1), y_max-(j*scale_factor+j1), :] = pixel
-        print('Displaying grid')
-        cv2.imshow('grid', image)
-        cv2.waitKey(0)
-        print('Displayed grid')
+        return image
 
 def wf_test():
     start = (261,263)
