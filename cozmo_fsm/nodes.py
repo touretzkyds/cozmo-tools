@@ -1089,6 +1089,26 @@ class PlaceOnObject(ActionNode):
             raise ValueError('No object to place')
         return self.robot.place_on_object(self.object, **self.action_kwargs)
 
+
+class RollCube(ActionNode):
+    "Uses SDK's roll_cube method."
+    def __init__(self, object=None, abort_on_stop=True, **action_kwargs):
+        self.object = object
+        self.action_kwargs = action_kwargs
+        super().__init__(abort_on_stop=abort_on_stop)
+
+    def start(self,event=None):
+        if self.running: return
+        if isinstance(event, DataEvent) and \
+                isinstance(event.data,cozmo.objects.LightCube):
+            self.object = event.data
+        super().start(event)
+
+    def action_launcher(self):
+        if self.object is None:
+            raise ValueError('No object to roll')
+        return self.robot.roll_cube(self.object, **self.action_kwargs)
+
 # Note: additional nodes for object manipulation are in pickup.fsm.
 
 #________________ Animations ________________

@@ -784,6 +784,110 @@ class DropObject(StateNode):
         wrap_up: SetNotFetching() =N=> ParentCompletes()
     }
 
+class RollingCube(StateNode):
+    def __init__(self, object=None, orientation=None):
+        super().__init__()
+        self.object = object
+        self.target_orientation = orientation
+        self.try_number = 0
+
+
+    def start(self, event=None):
+        if isinstance(self.object, LightCube):
+            self.wmobject = self.object.wm_obj
+        elif isinstance(self.object, LightCubeObj):
+            self.wmobject = self.object
+            self.object = self.object.sdk_obj
+        else:
+            return
+        self.children['goto_cube'].object = self.object
+        self.children['roll1'].object = self.object
+        self.children['roll2'].object = self.object
+        self.children['roll3'].object = self.object
+        if self.wmobject.pose_confidence < 0:
+            print('RollingCube: cube has invalid pose!', self.wmobject, self.object.pose)
+            self.post_event(PilotEvent(InvalidPose))
+            self.post_failure()
+        super().start(event)
+
+    class CheckOrientation(StateNode):
+        def start(self,event=None):
+            super().start(event)
+            self.parent.orientation, _, _, _ = get_orientation_state(self.parent.object.pose.rotation.q0_q1_q2_q3)
+            print('current orientation:', self.parent.orientation)
+            if self.parent.target_orientation == self.parent.orientation:
+                self.post_completion()
+            else:
+                self.post_failure()
+
+    class CheckCounts(StateNode):
+        def start(self,event=None):
+            super().start(event)
+            if not self.parent.target_orientation:
+                self.post_data(1)
+            elif self.parent.orientation == ORIENTATION_UPRIGHT or self.parent.orientation == ORIENTATION_INVERTED:
+                if self.parent.target_orientation == ORIENTATION_SIDEWAYS:
+                    self.post_data(1)
+                elif self.parent.orientation == self.parent.target_orientation:
+                    self.post_data(3)
+                else:
+                    self.post_data(2)
+            else:   # ORIENTATION_SIDEWAYS
+                if self.parent.target_orientation == ORIENTATION_UPRIGHT:
+                    self.post_data(1)
+                elif self.parent.target_orientation == ORIENTATION_SIDEWAYS:
+                    self.post_data(2)
+                else:
+                    self.post_data(3)
+
+    class TryAgain(StateNode):
+        def start(self, event=None):
+            super().start(event)
+
+            if self.parent.try_number > 2:
+                self.post_failure()
+            else:
+                self.parent.try_number += 1
+                print('try again', self.parent.try_number)
+                self.post_success()
+
+
+    $setup {
+        check_orientation: self.CheckOrientation()
+        check_orientation =C=> ParentCompletes()
+        check_orientation =F=> goto_cube
+
+        goto_cube: GoToCube()
+        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> Print('goto_cube has pilot.') =N=> get_ready
+        goto_cube =F=> Print('goto_cube has failed.') =N=> try_again
+        goto_cube =C=> Print('goto_cube has succeeded.') =N=> get_ready
+
+        get_ready: SetHeadAngle(-5) =C=> Forward(-60) =C=> StateNode() =T(1)=> decide_roll_counts
+
+        decide_roll_counts: self.CheckCounts()
+        decide_roll_counts =D(1)=> Print('Roll once') =C=> roll1
+        decide_roll_counts =D(2)=> Print('Roll twice') =C=> roll2
+        decide_roll_counts =D(3)=> Print('Roll thrice') =C=> roll3
+
+        roll1: RollCube()
+        roll1 =C=> check_orientation
+        roll1 =F=> try_again
+
+        roll2: RollCube()
+        roll2 =C=> roll1
+        roll2 =F=> try_again
+
+        roll3: RollCube()
+        roll3 =C=> roll2
+        roll3 =F=> try_again
+
+        try_again:  self.TryAgain()
+        try_again =S=> check_orientation
+        try_again =F=> fail
+
+        fail: SetNotFetching() =C=> ParentFails()
+    }
+
 
 """
 class PickUpCubeForeign(StateNode):
