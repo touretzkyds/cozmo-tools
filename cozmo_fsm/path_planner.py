@@ -97,8 +97,8 @@ class PathPlanner():
                            (pi,           40),
                            (+60/180*pi,   80),
                            (-60/180*pi,   80),
-                           (+pi/2,        80),
-                           (-pi/2,        80)
+                           (+pi/2,        70),
+                           (-pi/2,        70)
         )
 
         rrt_instance.obstacles = skinny_obstacles
