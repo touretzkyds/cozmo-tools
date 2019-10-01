@@ -85,8 +85,11 @@ class PilotBase(StateNode):
         class ExecuteBackup(Forward):
             def start(self, event=None):
                 step = self.parent.navplan.steps[self.parent.index]
-                dx = step.param[0] - self.robot.world.particle_filter.pose[0]
-                dy = step.param[1] - self.robot.world.particle_filter.pose[1]
+                if len(step.param) > 1:
+                    print('***** WARNING: extra backup steps not being processed *****')
+                xy_pair = step.param[0]
+                dx = xy_pair[0] - self.robot.world.particle_filter.pose[0]
+                dy = xy_pair[1] - self.robot.world.particle_filter.pose[1]
                 self.distance = distance_mm(- sqrt(dx*dx + dy*dy))
                 super().start(event)
 

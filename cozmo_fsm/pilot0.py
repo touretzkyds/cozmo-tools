@@ -91,6 +91,8 @@ class NavPlan():
         step1 = NavStep(NavStep.DRIVE, new_path)
         steps.append(step1)
         if door:
+            # *** adding *** gate = DoorPass.calculate_gate(self.robot, door, DoorPass.OUTER_GATE_DISTANCE)
+            # Should this from_path method be in NavPlan?  Maybe move it to PathPlanner?
             step2 = NavStep(NavStep.DOORPASS, door)
             steps.append(step2)
         plan = NavPlan(steps)
