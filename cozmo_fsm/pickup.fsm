@@ -22,6 +22,8 @@ class GoToCube(StateNode):
         super().__init__()
         self.side_index = 0
         self.try_number = 0
+        self.roll_cube = False
+        self.roll_target = None
 
     def start(self, event=None):
         # self.object will normally be set up by the parent of this node
@@ -77,18 +79,25 @@ class GoToCube(StateNode):
         # sides = (side1, side2, side3, side4)
         sides = (side2, side3, side1, side4)
 
-        # if the orientation is sideways, only one valid side to pickup cube
         if orientation == ORIENTATION_SIDEWAYS:
-            self.try_number = 3
-            side = side2
-            d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
-            print('  side 0: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
-                  (d, side[0], side[1], side[2]*180/math.pi))
-            return side
-
+            if self.roll_cube:
+                # if the orientation is sideways, only two valid roll cube sides
+                if self.roll_target != ORIENTATION_SIDEWAYS:
+                    self.side_index = 0 if self.try_number == 0 else self.side_index
+                    self.try_number = 2 if self.try_number == 0 else self.try_number
+                    sides = (side1, side2)
+                    sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
+            else:
+                # if the orientation is sideways, only one valid side to pickup cube
+                self.try_number = 3
+                side = side2
+                d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
+                print('  side 0: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
+                      (d, side[0], side[1], side[2]*180/math.pi))
+                return side
         sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
 
-        for i in range(4):
+        for i in range(len(sides)):
             side = sides[i]
             d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
             print('  side %d: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
@@ -789,7 +798,7 @@ class RollingCube(StateNode):
         super().__init__()
         self.object = object
         self.target_orientation = orientation
-        self.try_number = 0
+        self.try_roll_number = 0
 
 
     def start(self, event=None):
@@ -801,6 +810,8 @@ class RollingCube(StateNode):
         else:
             return
         self.children['goto_cube'].object = self.object
+        self.children['goto_cube'].roll_cube = True
+        self.children['goto_cube'].roll_target = self.target_orientation
         self.children['roll1'].object = self.object
         self.children['roll2'].object = self.object
         self.children['roll3'].object = self.object
@@ -814,14 +825,18 @@ class RollingCube(StateNode):
         def start(self,event=None):
             super().start(event)
             self.parent.orientation, _, _, _ = get_orientation_state(self.parent.object.pose.rotation.q0_q1_q2_q3)
-            print('current orientation:', self.parent.orientation)
             if self.parent.target_orientation == self.parent.orientation:
                 self.post_completion()
             else:
+                print('current orientation:', self.parent.orientation)
                 self.post_failure()
 
     class CheckCounts(StateNode):
         def start(self,event=None):
+            SIDEWAYS_FRONT = 'front'
+            SIDEWAYS_BACK = 'back'
+            SIDEWAYS_SIDE = 'side'
+
             super().start(event)
             if not self.parent.target_orientation:
                 self.post_data(1)
@@ -833,22 +848,79 @@ class RollingCube(StateNode):
                 else:
                     self.post_data(2)
             else:   # ORIENTATION_SIDEWAYS
-                if self.parent.target_orientation == ORIENTATION_UPRIGHT:
-                    self.post_data(1)
-                elif self.parent.target_orientation == ORIENTATION_SIDEWAYS:
-                    self.post_data(2)
+                x, y, z = self.parent.object.pose.rotation.euler_angles
+                robot_angle = self.robot.pose.rotation.angle_z.radians
+
+                # print('x: %.2f, y: %.2f, z: %.2f' %(x, y, z))
+                # print('robot_angle: %.2f' % robot_angle)
+
+                z = min([math.pi/2, 0, -math.pi/2], key=lambda val:abs(val-z))
+
+                cube_rotate_angle = 0
+                new_robot_angle = 0
+                if z == -math.pi/2:
+                    pattern = 1
+                    cube_rotate_angle = wrap_angle(x - math.pi/2)
+                    new_robot_angle = wrap_angle(robot_angle + cube_rotate_angle)
+                elif z == math.pi/2:
+                    pattern = 3
+                    cube_rotate_angle = wrap_angle(- (x + math.pi/2))
+                    new_robot_angle = wrap_angle(robot_angle + cube_rotate_angle)
                 else:
-                    self.post_data(3)
+                    if min([0, -math.pi, math.pi], key=lambda val:abs(val-x)) == 0:
+                        pattern = 2
+                        cube_rotate_angle = wrap_angle(y + math.pi)
+                    else:
+                        pattern = 4
+                        cube_rotate_angle = y
+                    new_robot_angle = wrap_angle(robot_angle + cube_rotate_angle)
+
+                # print('pattern:', pattern)
+                # print('cube_rotate_angle: %.2f' % cube_rotate_angle)
+
+                possible_angles = [-math.pi, -math.pi/2, 0, math.pi/2, math.pi]
+                facing_side = None
+                new_robot_angle = min(possible_angles, key=lambda val:abs(val-new_robot_angle))
+                if new_robot_angle == 0:
+                    facing_side = SIDEWAYS_FRONT
+                elif abs(new_robot_angle) == math.pi:
+                    facing_side = SIDEWAYS_BACK
+                else:
+                    facing_side = SIDEWAYS_SIDE
+
+                # print('new_robot_angle: %.2f' % new_robot_angle)
+                print('Robot is facing', facing_side)
+
+                if facing_side == SIDEWAYS_SIDE:    # left/right
+                    if self.parent.target_orientation == ORIENTATION_SIDEWAYS:
+                        self.post_data(1)
+                    else:
+                        self.post_data(0)
+                elif facing_side == SIDEWAYS_FRONT:  # front
+                    if self.parent.target_orientation == ORIENTATION_INVERTED:
+                        self.post_data(1)
+                    elif self.parent.target_orientation == ORIENTATION_SIDEWAYS:
+                        self.post_data(2)
+                    else:
+                        self.post_data(3)
+                elif facing_side == SIDEWAYS_BACK:  # back
+                    if self.parent.target_orientation == ORIENTATION_UPRIGHT:
+                        self.post_data(1)
+                    elif self.parent.target_orientation == ORIENTATION_SIDEWAYS:
+                        self.post_data(2)
+                    else:
+                        self.post_data(3)
+
 
     class TryAgain(StateNode):
         def start(self, event=None):
             super().start(event)
 
-            if self.parent.try_number > 2:
+            if self.parent.try_roll_number > 2:
                 self.post_failure()
             else:
-                self.parent.try_number += 1
-                print('try again', self.parent.try_number)
+                self.parent.try_roll_number += 1
+                print('try again', self.parent.try_roll_number)
                 self.post_success()
 
 
@@ -865,6 +937,7 @@ class RollingCube(StateNode):
         get_ready: SetHeadAngle(-5) =C=> Forward(-60) =C=> StateNode() =T(1)=> decide_roll_counts
 
         decide_roll_counts: self.CheckCounts()
+        decide_roll_counts =D(0)=> Print('No way to achieve from this side') =C=>check_orientation
         decide_roll_counts =D(1)=> Print('Roll once') =C=> roll1
         decide_roll_counts =D(2)=> Print('Roll twice') =C=> roll2
         decide_roll_counts =D(3)=> Print('Roll thrice') =C=> roll3
