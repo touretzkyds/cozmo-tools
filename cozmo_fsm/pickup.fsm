@@ -83,7 +83,7 @@ class GoToCube(StateNode):
             if self.roll_cube:
                 # if the orientation is sideways, only two valid roll cube sides
                 if self.roll_target != ORIENTATION_SIDEWAYS:
-                    self.side_index = 0 if self.try_number == 0 else self.side_index
+                    self.side_index = 0 if (self.try_number == 0 or self.side_index > 2) else self.side_index
                     self.try_number = 2 if self.try_number == 0 else self.try_number
                     sides = (side1, side2)
                     sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
@@ -793,6 +793,27 @@ class DropObject(StateNode):
         wrap_up: SetNotFetching() =N=> ParentCompletes()
     }
 
+
+class RollCube(StateNode):
+    def __init__(self):
+        super().__init__()
+
+    def start(self, event=None):
+        super().start(event)
+
+    $setup {
+        start: SetLiftHeight(1) =C=> Forward(35) =C=> put_arm
+
+        put_arm: SetLiftHeight(0.65) =C=> {drop, back}
+
+        drop: SetLiftHeight(0.25)
+        back: Forward(-60)
+
+        {drop, back} =C=> SetLiftHeight(0) =C=> ParentCompletes()
+        {drop, back} =F=> SetLiftHeight(0) =C=> ParentFails()
+    }
+
+
 class RollingCube(StateNode):
     def __init__(self, object=None, orientation=None):
         super().__init__()
@@ -809,27 +830,53 @@ class RollingCube(StateNode):
             self.object = self.object.sdk_obj
         else:
             return
+        self.children['looker'].object = self.object
         self.children['goto_cube'].object = self.object
         self.children['goto_cube'].roll_cube = True
         self.children['goto_cube'].roll_target = self.target_orientation
         self.children['roll1'].object = self.object
         self.children['roll2'].object = self.object
         self.children['roll3'].object = self.object
+        super().start(event)
         if self.wmobject.pose_confidence < 0:
             print('RollingCube: cube has invalid pose!', self.wmobject, self.object.pose)
             self.post_event(PilotEvent(InvalidPose))
             self.post_failure()
-        super().start(event)
+
 
     class CheckOrientation(StateNode):
         def start(self,event=None):
-            super().start(event)
             self.parent.orientation, _, _, _ = get_orientation_state(self.parent.object.pose.rotation.q0_q1_q2_q3)
+            super().start(event)
             if self.parent.target_orientation == self.parent.orientation:
                 self.post_completion()
             else:
                 print('current orientation:', self.parent.orientation)
                 self.post_failure()
+
+    class CheckCubePoseValidOnce(StateNode):
+        def __init__(self):
+            super().__init__()
+
+        def start(self, event=None):
+            super().start(event)
+
+            if isinstance(self.parent.object, LightCube):
+                cube_id = self.parent.object.wm_obj.id
+            elif isinstance(self.parent.object, LightCubeObj):
+                cube_id = self.parent.object.id
+            else:
+                raise ValueError(self.parent.object)
+
+            if 'Cube' not in str(cube_id):
+                cube_id = 'Cube-' + str(cube_id)
+            wmobject = self.robot.world.world_map.objects[cube_id]
+
+            if wmobject.pose_confidence < 0:
+                print('CheckCubePoseValidOnce: %s has invalid pose!' % cube_id)
+                self.post_failure()
+            else:
+                self.post_completion()
 
     class CheckCounts(StateNode):
         def start(self,event=None):
@@ -839,6 +886,7 @@ class RollingCube(StateNode):
 
             super().start(event)
             if not self.parent.target_orientation:
+                print('no target_orientation')
                 self.post_data(1)
             elif self.parent.orientation == ORIENTATION_UPRIGHT or self.parent.orientation == ORIENTATION_INVERTED:
                 if self.parent.target_orientation == ORIENTATION_SIDEWAYS:
@@ -925,25 +973,31 @@ class RollingCube(StateNode):
 
 
     $setup {
+        start: SetFetching() =C=> {looker, check_cube_pose}
+
+        looker: LookAtObject()
+
+        check_cube_pose: self.CheckCubePoseValidOnce()
+        check_cube_pose =C=> check_orientation
+        check_cube_pose =F=> ParentFails()
+
         check_orientation: self.CheckOrientation()
         check_orientation =C=> ParentCompletes()
         check_orientation =F=> goto_cube
 
         goto_cube: GoToCube()
-        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> Print('goto_cube has pilot.') =N=> get_ready
+        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> Print('goto_cube has pilot.') =N=> decide_roll_counts
         goto_cube =F=> Print('goto_cube has failed.') =N=> try_again
-        goto_cube =C=> Print('goto_cube has succeeded.') =N=> get_ready
-
-        get_ready: SetHeadAngle(-5) =C=> Forward(-60) =C=> StateNode() =T(1)=> decide_roll_counts
+        goto_cube =C=> Print('goto_cube has succeeded.') =N=> decide_roll_counts
 
         decide_roll_counts: self.CheckCounts()
-        decide_roll_counts =D(0)=> Print('No way to achieve from this side') =C=>check_orientation
-        decide_roll_counts =D(1)=> Print('Roll once') =C=> roll1
-        decide_roll_counts =D(2)=> Print('Roll twice') =C=> roll2
-        decide_roll_counts =D(3)=> Print('Roll thrice') =C=> roll3
+        decide_roll_counts =D(0)=> Print('No way to achieve from this side') =C=> check_cube_pose
+        decide_roll_counts =D(1)=> Print('Roll once') =C=> Forward(-10) =C=> roll1
+        decide_roll_counts =D(2)=> Print('Roll twice') =C=> Forward(-10) =C=> roll2
+        decide_roll_counts =D(3)=> Print('Roll thrice') =C=> Forward(-10) =C=> roll3
 
         roll1: RollCube()
-        roll1 =C=> check_orientation
+        roll1 =C=> Forward(-30) =C=> Print('Checking the new orientation...') =T(1)=> check_cube_pose
         roll1 =F=> try_again
 
         roll2: RollCube()
@@ -955,7 +1009,7 @@ class RollingCube(StateNode):
         roll3 =F=> try_again
 
         try_again:  self.TryAgain()
-        try_again =S=> check_orientation
+        try_again =S=> check_cube_pose
         try_again =F=> fail
 
         fail: SetNotFetching() =C=> ParentFails()
