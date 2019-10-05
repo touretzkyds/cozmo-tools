@@ -12,7 +12,7 @@ from .pilot0 import NavPlan, NavStep
 from .worldmap import WorldObject, LightCubeObj, ChargerObj, CustomMarkerObj, RoomObj, DoorwayObj
 from .rrt import RRT, RRTNode, StartCollides, GoalCollides, GoalUnreachable
 from .wavefront import WaveFront
-from .geometry import wrap_angle
+from .geometry import wrap_angle, segment_intersect_test
 
 from . import rrt
 
@@ -65,7 +65,7 @@ class PathPlanner():
         if isinstance(goal_object, (LightCubeObj,ChargerObj)):
             goal_shape = RRT.generate_cube_obstacle(goal_object)
         elif isinstance(goal_object, CustomMarkerObj):
-            goal_shape = RRT.generate_marker_obstacle(goal_objject)
+            goal_shape = RRT.generate_marker_obstacle(goal_object)
         elif isinstance(goal_object, RoomObj):
             goal_shape = RRT.generate_room_obstacle(goal_object)
         else:
@@ -150,7 +150,7 @@ class PathPlanner():
         rrt_instance.smooth_path()
 
         # Construct the navigation plan
-        navplan = NavPlan.from_path(rrt_instance.path, doorway_list)
+        navplan = PathPlanner.from_path(rrt_instance.path, doorway_list)
 
         # Insert the StartCollides escape move if there is one
         if start_escape_move:
@@ -172,7 +172,47 @@ class PathPlanner():
         result = (navplan, grid_display)
         return DataEvent(result)
 
+    @staticmethod
+    def intersects_doorway(node1, node2, doorways):
+        for door in doorways:
+            p1 = (node1.x, node1.y)
+            p2 = (node2.x, node2.y)
+            p3 = door[1][0]
+            p4 = door[1][1]
+            result = segment_intersect_test(p1, p2, p3, p4)
+            #label = '**INTERSECTS**' if result else 'no_int:'
+            #print(label,door[0].id,' (%.1f,%.1f)--(%.1f,%.1f)  vs  (%.1f,%.1f)--(%.1f,%.1f)' % (p1+p2+p3+p4))
+            if result:
+                return door[0]
+        return None
+
+    @staticmethod
+    def from_path(path, doorways):
+        steps = []
+        door = None
+        pt1 = path[0]
+        for i in range(1, len(path)):
+            pt2 = path[i]
+            door = PathPlanner.intersects_doorway(pt1,pt2,doorways)
+            #print('i=',i,'pt1=',pt1,'pt2=',pt2,'door=',door)
+            if door:
+                i -= 1
+                break
+            pt1 = pt2
+        new_path = path[0:i+1]
+        step1 = NavStep(NavStep.DRIVE, new_path)
+        steps.append(step1)
+        if door:
+            # *** adding *** gate = DoorPass.calculate_gate(self.robot, door, DoorPass.OUTER_GATE_DISTANCE)
+            # Should this from_path method be in NavPlan?  Maybe move it to PathPlanner?
+            step2 = NavStep(NavStep.DOORPASS, door)
+            steps.append(step2)
+        plan = NavPlan(steps)
+        return plan
+
 #----------------------------------------------------------------
+
+# This code is for running the path planner in a child process.
 
 class PathPlannerProcess(LaunchProcess):
     def start(self, event=None):
@@ -188,7 +228,7 @@ class PathPlannerProcess(LaunchProcess):
         use_doorways = True   # assume we're running on the robot
         (start_node, goal_shape, robot_parts, bbox,
          fat_obstacles, skinny_obstacles, doorway_list, need_grid_display) = \
-            PathPlanner.setup_problem(self.goal_object, self.robot, user_doorways)
+            PathPlanner.setup_problem(self.goal_object, self.robot, use_doorways)
         p = Process(target=self.__class__.process_workhorse,
                     args = [reply_token,
                             start_node, goal_shape, robot_parts, bbox,

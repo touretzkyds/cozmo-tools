@@ -169,16 +169,12 @@ class RRT():
     def plan_push_chip(self, start, goal, max_turn=20*(pi/180), arc_radius=40.):
         return self.plan_path(start, goal, max_turn, arc_radius)
 
-    def plan_path(self, start, goal, max_turn=pi, arc_radius=40, use_wf=False):
+    def plan_path(self, start, goal, max_turn=pi, arc_radius=40):
         self.max_turn = max_turn
         self.arc_radius = arc_radius
         if self.auto_obstacles:
-            if use_wf:
-                obstacle_inflation = 10  # must be << pilot's escape_distance
-                passageway_adjustment = -40  # narrow doorways for WaveFront
-            else: # use RRT
-                obstacle_inflation = 5
-                passageway_adjustment = +77  # widen doorways for RRT
+            obstacle_inflation = 5
+            passageway_adjustment = +77  # widen doorways for RRT
             self.generate_obstacles(obstacle_inflation, passageway_adjustment)
         self.start = start
         self.goal = goal
@@ -189,45 +185,6 @@ class RRT():
         collider = self.collides(start)
         if collider:
             raise StartCollides(start,collider,collider.obstacle_id)
-
-        # Use WaveFront
-        if use_wf:
-
-            temp_goal = goal.copy()
-            if isnan(temp_goal.q):
-                headings = range(0, 360, 10)
-            else:
-                headings = [temp_goal.q]
-            for phi in headings:
-                temp_goal.q = phi/180*pi
-                collider = self.collides(temp_goal)
-                if not collider:
-                    break
-            if collider:
-                raise GoalCollides(goal,collider,collider.obstacle_id)
-
-            self.wf.initialize_grid(bbox=self.bbox)
-            wf_start = (start.x, start.y)
-            wf_goal = (goal.x, goal.y)
-            inflation = 10
-            for obstacle in self.obstacles:
-                self.wf.add_obstacle(obstacle, inflation)
-            self.wf.set_goal_cell(*wf_goal)
-
-            try:
-                result = self.wf.propagate(*wf_start)
-            except ValueError:
-                raise StartCollides(start,None,None)
-
-            if result:
-                cpath = self.wf.extract(result)
-                self.path = self.coords_to_path(cpath)
-                # re-generate obstacles with normal doors so path smoothing will work
-                self.generate_obstacles(5, 0)
-                self.smooth_path()
-            else:
-                raise GoalUnreachable()
-            return [], [], self.path
 
         # Set up treeA with start node
         treeA = [start.copy()]
@@ -611,6 +568,7 @@ class RRT():
     def generate_room_obstacle(obj):
         """Rooms aren't really obstacles, but this is used by PathPlanner to encode goal locations."""
         r = Polygon(vertices=obj.points)
+        r.obstacle_id = obj.id
         return r
 
     @staticmethod

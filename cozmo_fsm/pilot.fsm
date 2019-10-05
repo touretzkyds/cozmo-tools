@@ -53,8 +53,8 @@ class PilotBase(StateNode):
             super().start(event)
             if not isinstance(event, DataEvent):
                 raise ValueError(event)
-            (navplan, path) = event.data
-            self.robot.world.rrt.draw_path = path
+            (navplan, grid_display) = event.data
+            self.robot.world.rrt.draw_path = navplan.extract_path()
             self.post_event(DataEvent(navplan))
 
     class PilotExecutePlan(StateNode):
@@ -131,6 +131,7 @@ class PilotBase(StateNode):
 #---------------- PilotToObject ----------------
 
 class PilotToObject(PilotBase):
+    "Use the wavefront planner to navigate to a distant object."
     def __init__(self, object=None):
         super().__init__()
         self.object=object
@@ -171,12 +172,12 @@ class PilotToObject(PilotBase):
 #---------------- PilotToPose ----------------
 
 class PilotToPose(PilotBase):
-    def __init__(self, target_pose=None, verbose=False, max_iter=RRT.DEFAULT_MAX_ITER, use_wf=False):
+    "Use the rrt path planner for short-range navigation to a specific pose."
+    def __init__(self, target_pose=None, verbose=False, max_iter=RRT.DEFAULT_MAX_ITER):
         super().__init__()
         self.target_pose = target_pose
         self.verbose = verbose
         self.max_iter = max_iter
-        self.use_wf = use_wf
 
     def start(self, event=None):
         self.robot.world.rrt.max_iter = self.max_iter
@@ -184,7 +185,7 @@ class PilotToPose(PilotBase):
 
     class PilotPlanner(StateNode):
         def planner(self,start_node,goal_node):
-            return self.robot.world.rrt.plan_path(start_node,goal_node, use_wf=self.parent.use_wf)
+            return self.robot.world.rrt.plan_path(start_node,goal_node)
 
         def start(self,event=None):
             super().start(event)
@@ -268,7 +269,7 @@ class PilotToPose(PilotBase):
             if self.parent.verbose:
                 [print(' ',x) for x in path]
 
-            doors = self.generate_doorway_list()
+            doors = self.robot.world.generate_doorway_list()
             navplan = NavPlan.from_path(path, doors)
             print('navplan=',navplan)
 
@@ -306,17 +307,6 @@ class PilotToPose(PilotBase):
             navplan = NavPlan.from_path(cpath, [])
             navplan.steps.append(last_step)  # Add the doorpass step
             self.post_data(navplan)
-
-        def generate_doorway_list(self):
-            doorways = []
-            for (key,obj) in self.robot.world.world_map.objects.items():
-                if isinstance(obj,DoorwayObj):
-                    w = obj.door_width
-                    door_theta = obj.theta + pi/2
-                    dx = w * sin(door_theta)
-                    dy = w * cos(door_theta)
-                    doorways.append((obj, ((obj.x-dx, obj.y-dy), (obj.x+dx, obj.y+dy))))
-            return doorways
 
         # ----- End of PilotPlanner -----
 
