@@ -10,7 +10,7 @@ from .events import PilotEvent
 from .transitions import CompletionTrans, FailureTrans, SuccessTrans, DataTrans
 from .cozmo_kin import wheelbase, center_of_rotation_offset
 from .worldmap import DoorwayObj
-from .path_planner import PathPlannerProcess
+from .path_planner import PathPlannerProcess, PathPlanner
 from .geometry import segment_intersect_test
 from .doorpass import DoorPass
 from .pilot0 import *
@@ -269,8 +269,8 @@ class PilotToPose(PilotBase):
             if self.parent.verbose:
                 [print(' ',x) for x in path]
 
-            doors = self.robot.world.generate_doorway_list()
-            navplan = NavPlan.from_path(path, doors)
+            doors = self.robot.world.world_map.generate_doorway_list()
+            navplan = PathPlanner.from_path(path, doors)
             print('navplan=',navplan)
 
             # Insert the StartCollides escape move if there is one
@@ -304,7 +304,7 @@ class PilotToPose(PilotBase):
             except Exception as e:
                 print('Pilot replanning for door gateway failed!', e.args)
             cpath = [(node.x,node.y) for node in path]
-            navplan = NavPlan.from_path(cpath, [])
+            navplan = PathPlanner.from_path(cpath, [])
             navplan.steps.append(last_step)  # Add the doorpass step
             self.post_data(navplan)
 
@@ -476,7 +476,7 @@ class PilotToPoseOld(PilotBase):
         # Construct and execute nav plan
         if self.verbose:
             [print(x) for x in path]
-        self.plan = NavPlan.from_path(path)
+        self.plan = PathPlanner.from_path(path)
         if self.verbose:
             print('Navigation Plan:')
             [print(y) for y in self.plan.steps]
