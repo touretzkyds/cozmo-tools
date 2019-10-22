@@ -163,16 +163,22 @@ class EventRouter:
         node_id = id(node)
         if node_id in self.processes:
             del self.processes[node_id]
+            print('Deleted id',node_id,'for',node)
+        else:
+            print('*** ERROR in delete_process_node: node',node_id,'not in process dict!')
 
     POLLING_INTERVAL = 0.1
 
     def poll_processes(self):
         while not self.interprocess_queue.empty():
             (id,event) = self.interprocess_queue.get()
-            node = self.processes[id]
-            event.source = node
-            print('Node %s returned %s' % (node,event))
-            self.post(event)
+            if id in self.processes:
+                node = self.processes[id]
+                event.source = node
+                print('Node %s returned %s' % (node,event))
+                self.post(event)
+            else:
+                print('*** ERROR in poll_processes: node',id,'not in process dict!', self.processes)
         self.robot.loop.call_later(self.POLLING_INTERVAL, self.poll_processes)
 
 #________________ Event Listener ________________

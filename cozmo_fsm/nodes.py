@@ -1255,10 +1255,9 @@ class LaunchProcess(StateNode):
         print('Launched', self.process)
 
     def stop(self):
-        self.robot.erouter.delete_process_node(self)
         if self.process:
-            print('Terminating',self.process)
-            #self.process.terminate()
+            print('Exiting',self.process,self.process.is_alive())
             self.process = None
         super().stop()
+        self.robot.erouter.delete_process_node(self)
 

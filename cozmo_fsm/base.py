@@ -70,7 +70,8 @@ class StateNode(EventListener):
         if TRACE.trace_level >= TRACE.statenode_startstop:
             print('TRACE%d:' % TRACE.statenode_startstop, self, 'is stopping its children')
         for child in self.children.values():
-            child.stop()
+            if child.running:
+                child.stop()
 
     def add_transition(self, trans):
         if not isinstance(trans, Transition):
