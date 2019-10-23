@@ -12,12 +12,13 @@ from .rrt import StartCollides
 from .rrt_shapes import *
 
 class WaveFront():
+    goal_marker = 2**31 - 1
+
     def __init__(self, square_size=5, bbox=None, grid_shape=(100,100), inflate_size=50):
         self.square_size = square_size  # in mm
         self.bbox = bbox  # in mm
         self.inflate_size = inflate_size  # in mm
         self.grid_shape = grid_shape  # array shape
-        self.goal_marker = 2**31 - 1
         self.initialize_grid(bbox=bbox)
 
     def initialize_grid(self,bbox=None):
@@ -209,32 +210,6 @@ class WaveFront():
                         y*square_size + ymin - self.inflate_size)
                        for (x,y) in path]
         return path_coords
-
-    def make_grid_display(self):
-        scale_factor = 4
-        s = self.grid_shape
-        x_max = s[0]*scale_factor - 1
-        y_max = s[1]*scale_factor - 1
-        maxval = float(self.maxdist)
-        image = np.zeros((x_max+1, y_max+1, 3), dtype='uint8')
-        for i in range(self.grid_shape[0]):
-            for j in range(self.grid_shape[1]):
-                cell = self.grid[i,j]
-                if cell == -1:   # obstacle
-                    pixel = (0,0,200)
-                elif cell == 0:  # never reached
-                    pixel = (255,0,0)
-                elif cell == 1:  # starting point
-                    pixel = (0,255,255)
-                elif cell == self.goal_marker:
-                    pixel = (0,200,0)
-                else:
-                    v = 20 + int(cell/maxval*200)
-                    pixel = (v,v,v)
-                for i1 in range(scale_factor):
-                    for j1 in range(scale_factor):
-                        image[x_max-(i*scale_factor+i1), y_max-(j*scale_factor+j1), :] = pixel
-        return image
 
 def wf_test():
     start = (261,263)

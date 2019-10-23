@@ -21,6 +21,7 @@ WINDOW_WF = None
 from . import opengl
 from .rrt import RRTNode
 from .rrt_shapes import *
+from .wavefront import WaveFront
 from . import geometry
 from .geometry import wrap_angle
 
@@ -253,29 +254,34 @@ class PathViewer():
                                 angle=obst.orient*(180/pi),
                                 width=width, height=height, color=color, fill=True)
 
-    def draw_wf(self):
-        grid = the_rrt.wf.grid
-        square_size = the_rrt.wf.square_size
+    def draw_wf(self, grid):
+        square_size = 6
         grid_flat = list(set(grid.flatten()))
         grid_flat.sort()
+        goal_marker = WaveFront.goal_marker
         try:
             max_val = grid_flat[-2]
         except IndexError:
             max_val = max(grid_flat)
-        if max_val <=0:
-            max_val = the_rrt.wf.goal_marker
-        for x in range(0, the_rrt.wf.grid_size[0]-square_size, square_size):
-            for y in range(0, the_rrt.wf.grid_size[1]-square_size, square_size):
+        if max_val <= 0:
+            max_val = goal_marker
+        max_val = float(max_val)
+
+        w = square_size * 0.5
+        h = square_size * 0.5
+        for x in range(0, grid.shape[0]):
+            for y in range(0, grid.shape[1]):
+                c = (x*square_size, y*square_size)
                 try:
-                    if the_rrt.wf.goal_marker in grid[x:(x+square_size), y:(y+square_size)]:
-                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(0, 1, 0)) # green for goal
-                    elif -1 in grid[x:(x+square_size), y:(y+square_size)]:
-                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(1, 0, 0)) # red for obstacle
-                    elif grid[x+square_size//2, y+square_size//2] < 0:
-                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(0, 0, 0)) # black
+                    if grid[x,y] == goal_marker:
+                        self.draw_rectangle(center=c, width=w, height=h, color=(0, 1, 0)) # green for goal
+                    elif  grid[x,y] == 1:
+                        self.draw_rectangle(center=c, width=w, height=h, color=(1, 1, 0)) # yellow for start
+                    elif  grid[x,y] == -1:
+                        self.draw_rectangle(center=c, width=w, height=h, color=(1, 0, 0)) # red for obstacle
                     else:
-                        value = grid[x+square_size//2, y+square_size//2]/max_val    # shades of gray for distance values
-                        self.draw_rectangle(center=(x, y), width=square_size*0.8, height=square_size*0.8, color=(value, value, value))
+                        value = grid[x,y]/max_val    # shades of gray for distance values
+                        self.draw_rectangle(center=c, width=w, height=h, color=(value, value, value))
                 except IndexError:
                     # print('index is out of bounds', x, y)
                     pass
@@ -316,20 +322,24 @@ class PathViewer():
         glutSwapBuffers()
 
     def display_wf(self):
+        grid = the_rrt.grid_display
+        if grid is None: return
+        square_size = 5
+        w = max(grid.shape) * square_size
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        w = max(the_rrt.wf.grid_size)/2
         glOrtho(-w, w, -w, w, 1, -1)
 
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         glRotatef(90,0,0,1)
-        glScalef(1+self.scale, 1+self.scale, 1+self.scale)
-        glTranslatef(-self.translation[0]-w, -self.translation[1]-w, 0.)
+        #glScalef(1+self.scale, 1+self.scale, 1+self.scale)
+        #glTranslatef(-self.translation[0]-w, -self.translation[1]-w, 0.)
+        glTranslatef(-w, -w, 0)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        self.draw_wf()
+        self.draw_wf(grid)
         glutSwapBuffers()
 
     def reshape(self,width,height):

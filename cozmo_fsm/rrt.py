@@ -79,6 +79,7 @@ class RRT():
         self.bbox = bbox
         self.path = []
         self.draw_path = []
+        self.grid_display = None  # *** HACK to display wavefront grid
 
     REACHED = 'reached'
     COLLISION = 'collision'

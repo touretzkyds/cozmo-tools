@@ -138,7 +138,7 @@ class PathPlanner():
         wf.set_goal_shape(goal_shape)
         wf_start = (start_node.x, start_node.y)
         goal_found = wf.propagate(*wf_start)
-        grid_display = None if not need_grid_display else wf.make_grid_display()
+        grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
             print('PathPlanner: goal unreachable!')
             return PilotEvent(GoalUnreachable, grid_display)
