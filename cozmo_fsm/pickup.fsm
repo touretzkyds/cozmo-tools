@@ -417,6 +417,18 @@ class GoToCube(StateNode):
             else:
                 self.post_completion()
 
+    class ReadyToRoll(StateNode):
+        def __init__(self):
+            super().__init__()
+
+        def start(self, event=None):
+            super().start(event)
+            if self.parent.roll_cube:
+                print('ReadyToRoll')
+                self.post_success()
+            else:
+                self.post_failure()
+
 
     $setup{
         # GoToCube machine
@@ -477,7 +489,11 @@ class GoToCube(StateNode):
             self.ReportPosition('approach') =T(0.75)=>
             self.ReportPosition('approach') =N=> Print('wait...') =N=>
             turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=> Print('wait...') =N=>
-            forward_to_cube_1a: self.ForwardToCube(15) =C=> success
+            exit_to_roll
+
+        exit_to_roll: self.ReadyToRoll()
+        exit_to_roll =F=> forward_to_cube_1a: self.ForwardToCube(15) =C=> success
+        exit_to_roll =S=> success
 
         turn_to_cube2: self.TurnToCube(check_vis=True)
         turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
@@ -486,7 +502,11 @@ class GoToCube(StateNode):
         forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3
 
         turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
-        turn_to_cube3 =C=> forward_to_cube3
+        turn_to_cube3 =C=> exit_to_roll2
+
+        exit_to_roll2: self.ReadyToRoll()
+        exit_to_roll2 =F=> forward_to_cube3
+        exit_to_roll2 =S=> success
 
         forward_to_cube3: self.ForwardToCube(20) =C=> success
 
@@ -802,15 +822,15 @@ class RollCube(StateNode):
         super().start(event)
 
     $setup {
-        start: SetLiftHeight(1) =C=> Forward(35) =C=> put_arm
+        start: SetLiftHeight(1) =C=> Forward(40) =C=> put_arm
 
         put_arm: SetLiftHeight(0.65) =C=> {drop, back}
 
         drop: SetLiftHeight(0.25)
         back: Forward(-60)
 
-        {drop, back} =C=> SetLiftHeight(0) =C=> ParentCompletes()
-        {drop, back} =F=> SetLiftHeight(0) =C=> ParentFails()
+        {drop, back} =C=> SetLiftHeight(0) =C=> Forward(-5) =C=> ParentCompletes()
+        {drop, back} =F=> SetLiftHeight(0) =C=> Forward(-5) =C=> ParentFails()
     }
 
 
