@@ -426,7 +426,7 @@ class GoToCube(StateNode):
         def start(self, event=None):
             super().start(event)
             if self.parent.roll_cube:
-                print('ReadyToRoll')
+                print('get ready to roll')
                 self.post_success()
             else:
                 self.post_failure()
@@ -494,8 +494,10 @@ class GoToCube(StateNode):
             exit_to_roll
 
         exit_to_roll: self.ReadyToRoll()
-        exit_to_roll =F=> forward_to_cube_1a: self.ForwardToCube(15) =C=> success
-        exit_to_roll =S=> success
+        exit_to_roll =F=> forward_to_cube_1a
+        exit_to_roll =S=> Forward(-5) =C=> SetLiftHeight(1) =C=> forward_to_cube_1a
+
+        forward_to_cube_1a: self.ForwardToCube(15) =C=> success
 
         turn_to_cube2: self.TurnToCube(check_vis=True)
         turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
@@ -508,7 +510,7 @@ class GoToCube(StateNode):
 
         exit_to_roll2: self.ReadyToRoll()
         exit_to_roll2 =F=> forward_to_cube3
-        exit_to_roll2 =S=> success
+        exit_to_roll2 =S=> Forward(-5) =C=> SetLiftHeight(1) =C=> forward_to_cube3
 
         forward_to_cube3: self.ForwardToCube(20) =C=> success
 
@@ -824,15 +826,22 @@ class RollCube(StateNode):
         super().start(event)
 
     $setup {
-        start: SetLiftHeight(1) =C=> Forward(40) =C=> put_arm
+        put_arm: SetLiftHeight(0.68)
+        put_arm =C=> {drop, back}
+        put_arm =F=> ParentFails()
 
-        put_arm: SetLiftHeight(0.65) =C=> {drop, back}
-
-        drop: SetLiftHeight(0.25)
+        drop: SetLiftHeight(0.28)
         back: Forward(-60)
 
-        {drop, back} =C=> SetLiftHeight(0) =C=> Forward(-5) =C=> ParentCompletes()
-        {drop, back} =F=> SetLiftHeight(0) =C=> Forward(-5) =C=> ParentFails()
+        drop =F=> ParentFails()
+        back =F=> ParentFails()
+
+        {drop, back} =C=> reset
+        {drop, back} =F=> ParentFails()
+
+        reset: SetLiftHeight(0)
+        reset =C=> Forward(-10) =C=> ParentCompletes()
+        reset =F=> ParentFails()
     }
 
 
@@ -993,6 +1002,23 @@ class RollingCube(StateNode):
                 print('try again', self.parent.try_roll_number)
                 self.post_success()
 
+    class ForwardToCube(Forward):
+        def __init__(self, offset):
+            self.offset = offset
+            super().__init__()
+
+        def start(self, event=None):
+            if self.running: return
+            cube = self.parent.object
+            dx = cube.pose.position.x - self.robot.pose.position.x
+            dy = cube.pose.position.y - self.robot.pose.position.y
+            dist = sqrt(dx*dx + dy*dy) - self.offset
+            if (dist < 0):
+                print('***** ForwardToCube %s negative distance: %.1f mm' % (self.name,dist))
+            self.distance = Distance(dist)
+            print('ForwardToCube %s: distance %.1f mm' % (self.name, self.distance.distance_mm))
+            super().start(event)
+
 
     $setup {
         start: SetFetching() =C=> {looker, check_cube_pose}
@@ -1014,20 +1040,20 @@ class RollingCube(StateNode):
 
         decide_roll_counts: self.CheckCounts()
         decide_roll_counts =D(0)=> Print('No way to achieve from this side') =C=> check_cube_pose
-        decide_roll_counts =D(1)=> Print('Roll once') =C=> Forward(-10) =C=> roll1
-        decide_roll_counts =D(2)=> Print('Roll twice') =C=> Forward(-10) =C=> roll2
-        decide_roll_counts =D(3)=> Print('Roll thrice') =C=> Forward(-10) =C=> roll3
+        decide_roll_counts =D(1)=> Print('Roll once') =C=> roll1
+        decide_roll_counts =D(2)=> Print('Roll twice') =C=> roll2
+        decide_roll_counts =D(3)=> Print('Roll thrice') =C=> roll3
 
         roll1: RollCube()
         roll1 =C=> Forward(-30) =C=> Print('Checking the new orientation...') =T(1)=> check_cube_pose
         roll1 =F=> try_again
 
         roll2: RollCube()
-        roll2 =C=> roll1
+        roll2 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll1
         roll2 =F=> try_again
 
         roll3: RollCube()
-        roll3 =C=> roll2
+        roll3 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll2
         roll3 =F=> try_again
 
         try_again:  self.TryAgain()
