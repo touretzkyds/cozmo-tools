@@ -833,7 +833,11 @@ class SLAMSensorModel(SensorModel):
             wall_markers[wall_id] = markers
         # Now infer the walls from the markers
         for (wall_id,markers) in wall_markers.items():
-            walls.append(self.infer_wall_from_corners_lists(wall_id,markers))
+            # Must see at least two markers to create a wall, but once it's
+            # in the world map we only require one marker to recognize it.
+            # Necessary to avoid spurious wall creation.
+            if len(markers) >= 2 or wall_id in self.robot.world.world_map.objects:
+                walls.append(self.infer_wall_from_corners_lists(wall_id,markers))
         return walls
 
     def evaluate(self, particles, force=False, just_looking=False):
@@ -859,6 +863,8 @@ class SLAMSensorModel(SensorModel):
                 else:
                     self.pf.state = ParticleFilter.LOCALIZING
                     force = True
+            else: # no landmarks, so we can't be lost
+                self.pf.state = ParticleFilter.LOCALIZED
 
         # Unless forced, don't evaluate unless the robot moved enough
         # for evaluation to be worthwhile.
