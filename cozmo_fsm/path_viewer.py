@@ -104,10 +104,10 @@ class PathViewer():
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)
-        # if not WINDOW_WF:
-        #     opengl.CREATION_QUEUE.append(self.window_creator_wf)
-        #     while not WINDOW_WF:
-        #         time.sleep(0.1)
+        if not WINDOW_WF:
+            opengl.CREATION_QUEUE.append(self.window_creator_wf)
+            while not WINDOW_WF:
+                time.sleep(0.1)
         if platform.system() == 'Darwin':
             print("Type 'option' + 'h' in the path viewer window for help.")
         else:
