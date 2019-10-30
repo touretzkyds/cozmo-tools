@@ -325,7 +325,7 @@ class PathViewer():
         grid = the_rrt.grid_display
         if grid is None: return
         square_size = 5
-        w = max(grid.shape) * square_size
+        w = max(grid.shape) * square_size / 2
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         glOrtho(-w, w, -w, w, 1, -1)
@@ -333,9 +333,8 @@ class PathViewer():
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         glRotatef(90,0,0,1)
-        #glScalef(1+self.scale, 1+self.scale, 1+self.scale)
-        #glTranslatef(-self.translation[0]-w, -self.translation[1]-w, 0.)
-        glTranslatef(-w, -w, 0)
+        glScalef(self.scale/2, self.scale/2, self.scale/2)
+        glTranslatef(-self.translation[0]-w, -self.translation[1]-w, 0.)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
