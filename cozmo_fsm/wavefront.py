@@ -44,16 +44,16 @@ class WaveFront():
         if x:
             self.grid[x,y] = -1
 
-    def add_obstacle(self, obstacle, inflate_size=25):
+    def add_obstacle(self, obstacle, inflate_size=25):  # was inflate 25
         if isinstance(obstacle, Rectangle):
             centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
             width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
             theta = wrap_angle(obstacle.orient)
-            for x in range(floor(centerX-width/10),
-                           ceil(centerX+width/10),
+            for x in range(floor(centerX-width/2),
+                           ceil(centerX+width/2),
                            int(self.square_size/2)):
-                for y in range(floor(centerY-height/10),
-                               ceil(centerY+height/10),
+                for y in range(floor(centerY-height/2),
+                               ceil(centerY+height/2),
                                int(self.square_size/2)):
                     new_x = ((x - centerX) * cos(theta) - (y - centerY) * sin(theta)) + centerX
                     new_y = ((x - centerX) * sin(theta) + (y - centerY) * cos(theta)) + centerY
