@@ -7,7 +7,7 @@ import cv2
 import heapq
 from math import floor, ceil, cos, sin
 
-from .geometry import wrap_angle
+from .geometry import wrap_angle, rotate_point
 from .rrt import StartCollides
 from .rrt_shapes import *
 
@@ -49,11 +49,11 @@ class WaveFront():
             centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
             width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
             theta = wrap_angle(obstacle.orient)
-            for x in range(floor(centerX-width/2),
-                           ceil(centerX+width/2),
+            for x in range(floor(centerX-width/10),
+                           ceil(centerX+width/10),
                            int(self.square_size/2)):
-                for y in range(floor(centerY-height/2),
-                               ceil(centerY+height/2),
+                for y in range(floor(centerY-height/10),
+                               ceil(centerY+height/10),
                                int(self.square_size/2)):
                     new_x = ((x - centerX) * cos(theta) - (y - centerY) * sin(theta)) + centerX
                     new_y = ((x - centerX) * sin(theta) + (y - centerY) * cos(theta)) + centerY
@@ -77,13 +77,19 @@ class WaveFront():
     def set_goal_shape(self,shape):
         """Temporary hack. Should me tracing interior perimeter of the room,
         or setting goal points at each face of the cube."""
+        goal_points = []
+        goal_buffer = 20
         if shape.obstacle_id.startswith('Room'):
             offset = 20   # for rooms
         else:
             offset = 50   # for cubes, charger, markers
-        self.set_goal_cell(shape.center[0,0], shape.center[1,0])
-        self.set_goal_cell(shape.center[0,0]+offset, shape.center[1,0]+offset)
-        self.set_goal_cell(shape.center[0,0]-offset, shape.center[1,0]-offset)
+        for buffer in range(goal_buffer):
+            goal_points.append([shape.center[0,0]+(offset+buffer), shape.center[1,0]])
+            goal_points.append([shape.center[0,0]-(offset+buffer), shape.center[1,0]])
+            goal_points.append([shape.center[0,0], shape.center[1,0]+(offset+buffer)])
+            goal_points.append([shape.center[0,0], shape.center[1,0]-(offset+buffer)])
+        for point in goal_points:
+            self.set_goal_cell(*rotate_point(point, shape.center[0:2,0], shape.orient))
 
     def check_start_collides(self,xstart,ystart):
         (x,y) = self.convert_coords(xstart,ystart)
@@ -99,7 +105,7 @@ class WaveFront():
         """
         if self.check_start_collides(xstart,ystart):
             raise StartCollides()
-            
+
         grid = self.grid
         (x,y) = self.convert_coords(xstart,ystart)
         goal_marker = self.goal_marker

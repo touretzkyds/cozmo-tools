@@ -119,6 +119,13 @@ def tprint(t):
     else:
         print(t)
 
+def rotate_point(point, center, angle):
+    pointX, pointY = point
+    centerX, centerY = center
+    rotatedX = cos(angle) * (pointX - centerX) - sin(angle) * (pointY-centerY) + centerX
+    rotatedY = sin(angle) * (pointX - centerX) + cos(angle) * (pointY - centerY) + centerY
+    return rotatedX, rotatedY
+
 #---------------- Quaternions ----------------
 
 def quat2rot(q0,q1,q2,q3):
