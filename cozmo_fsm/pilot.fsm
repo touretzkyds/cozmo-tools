@@ -184,7 +184,7 @@ class PilotToPose(PilotBase):
         self.robot.world.rrt.max_iter = self.max_iter
         super().start(self)
 
-    class PilotPlanner(StateNode):
+    class PilotRRTPlanner(StateNode):
         def planner(self,start_node,goal_node):
             return self.robot.world.rrt.plan_path(start_node,goal_node)
 
@@ -228,7 +228,7 @@ class PilotToPose(PilotBase):
                         start_node = new_start
                         break
                 if start_escape_move is None:
-                    print('PilotPlanner: Start collides!',e)
+                    print('PilotRRTPlanner: Start collides!',e)
                     self.parent.post_event(PilotEvent(StartCollides, e.args))
                     self.parent.post_failure()
                     return
@@ -236,24 +236,24 @@ class PilotToPose(PilotBase):
                 try:
                     (treeA, treeB, path) = self.planner(start_node, goal_node)
                 except GoalCollides as e:
-                    print('PilotPlanner: Goal collides!',e)
+                    print('PilotRRTPlanner: Goal collides!',e)
                     self.parent.post_event(PilotEvent(GoalCollides, e.args))
                     self.parent.post_failure()
                     return
                 except MaxIterations as e:
-                    print('PilotPlanner: Max iterations %d exceeded!' % e.args[0])
+                    print('PilotRRTPlanner: Max iterations %d exceeded!' % e.args[0])
                     self.parent.post_event(PilotEvent(MaxIterations, e.args))
                     self.parent.post_failure()
                     return
                 #print('replan',path)
 
             except GoalCollides as e:
-                print('PilotPlanner: Goal collides!',e)
+                print('PilotRRTPlanner: Goal collides!',e)
                 self.parent.post_event(PilotEvent(GoalCollides, e.args))
                 self.parent.post_failure()
                 return
             except MaxIterations as e:
-                print('PilotPlanner: Max iterations %d exceeded!' % e.args[0])
+                print('PilotRRTPlanner: Max iterations %d exceeded!' % e.args[0])
                 self.parent.post_event(PilotEvent(MaxIterations, e.args))
                 self.parent.post_failure()
                 return
@@ -309,7 +309,7 @@ class PilotToPose(PilotBase):
             navplan.steps.append(last_step)  # Add the doorpass step
             self.post_data(navplan)
 
-        # ----- End of PilotPlanner -----
+        # ----- End of PilotRRTPlanner -----
 
     class CheckArrival(StateNode):
         def start(self, event=None):
@@ -326,7 +326,7 @@ class PilotToPose(PilotBase):
 
 
     $setup{
-        planner: self.PilotPlanner() =D=> exec
+        planner: self.PilotRRTPlanner() =D=> exec
 
         exec: self.PilotExecutePlan()
         exec =C=> check

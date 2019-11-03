@@ -195,7 +195,9 @@ class PathViewer():
         glEnd()
 
     def draw_path(self,path):
-        """ Used if WaveFront generated the path and we want to display it."""
+        """ Also used if WaveFront generated the path and we want to display it."""
+        if isinstance(path[0], RRTNode):
+            path = [(node.x,node.y) for node in path]
         for i in range(len(path)-1):
             self.draw_line(path[i],path[i+1])
 
