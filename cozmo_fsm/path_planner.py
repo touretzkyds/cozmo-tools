@@ -140,11 +140,11 @@ class PathPlanner():
         goal_found = wf.propagate(*wf_start)
         grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
-            print('PathPlanner: goal unreachable!')
+            print('PathPlanner wavefront: goal unreachable!')
             return PilotEvent(GoalUnreachable, grid_display)
 
         # Extract and smooth the path
-        coords_pairs = wf.extract(goal_found)
+        coords_pairs = wf.extract(goal_found, wf_start)
         rrt_instance.path = rrt_instance.coords_to_path(coords_pairs)
         rrt_instance.obstacles = skinny_obstacles
         rrt_instance.smooth_path()
@@ -191,6 +191,7 @@ class PathPlanner():
         steps = []
         door = None
         pt1 = path[0]
+        i = 0  # in case len(path) is 1 and we skip the for loop
         for i in range(1, len(path)):
             pt2 = path[i]
             door = PathPlanner.intersects_doorway(pt1,pt2,doorways)

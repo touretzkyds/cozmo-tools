@@ -109,6 +109,8 @@ class WaveFront():
         grid = self.grid
         (x,y) = self.convert_coords(xstart,ystart)
         goal_marker = self.goal_marker
+        if grid[x,y] == goal_marker:
+            return (x,y)
         fringe = [(1,(x,y))]
         heapq.heapify(fringe)
         xmax = self.grid_shape[0] - 1
@@ -164,8 +166,11 @@ class WaveFront():
                     heapq.heappush(fringe, (dist10,(x,y+1)))
         return None
 
-    def extract(self,search_result):
+    def extract(self, search_result, wf_start):
         "Extract the path once the goal is found, and convert back to worldmap coordinates."
+        start_coords = self.convert_coords(*wf_start)
+        if search_result == start_coords:
+            return [search_result]
         (x,y) = search_result
         maxdist = self.goal_marker + 1
         grid = self.grid

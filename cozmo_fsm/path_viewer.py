@@ -194,6 +194,11 @@ class PathViewer():
         glVertex2f(*pt2)
         glEnd()
 
+    def draw_path(self,path):
+        """ Used if WaveFront generated the path and we want to display it."""
+        for i in range(len(path)-1):
+            self.draw_line(path[i],path[i+1])
+
     def draw_tree(self,tree,color):
         for node in tree:
             self.draw_node(node,color)
@@ -305,6 +310,9 @@ class PathViewer():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         self.draw_rectangle(center=(0,0), angle=45, width=5, height=5, color=(0.9, 0.5, 0), fill=False)
+
+        if the_rrt.draw_path:  # WaveFront-generated path
+            self.draw_path(the_rrt.draw_path)
 
         self.draw_tree(the_rrt.treeA, color=(0,1,0))
         self.draw_tree(the_rrt.treeB, color=(0,0,1))

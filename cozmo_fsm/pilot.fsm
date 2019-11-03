@@ -56,7 +56,6 @@ class PilotBase(StateNode):
             (navplan, grid_display) = event.data
             self.robot.world.rrt.draw_path = navplan.extract_path()
             self.robot.world.rrt.grid_display = grid_display
-            print('grid_display =', grid_display)
             self.post_event(DataEvent(navplan))
 
     class PilotExecutePlan(StateNode):

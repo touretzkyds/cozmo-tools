@@ -64,11 +64,12 @@ class Circle(Shape):
         return ((xmin,ymin), (xmax,ymax))
 
 class Polygon(Shape):
-    def __init__(self, vertices=None):
+    def __init__(self, vertices=None, orient=0):
         center = vertices.mean(1)
         center.resize(4,1)
         super().__init__(center)
         self.vertices = vertices
+        self.orient = orient # should move vertex rotation code from Rectangle to here
         N = vertices.shape[1]
         self.edges = tuple( (vertices[:,i:i+1], vertices[:,(i+1)%N:((i+1)%N)+1])
                             for i in range(N) )
@@ -111,7 +112,7 @@ class Rectangle(Polygon):
         self.max_Ey = max(extents[1,:])
         vertices = geometry.translate(center[0,0],center[1,0]).dot(
             geometry.aboutZ(orient).dot(relative_vertices))
-        super().__init__(vertices=vertices)
+        super().__init__(vertices=vertices, orient=orient)
 
     def __repr__(self):
         id = self.obstacle_id if self.obstacle_id else '[no obstacle]'

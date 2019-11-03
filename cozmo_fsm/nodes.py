@@ -548,6 +548,8 @@ class DriveWheels(CoroutineNode):
                 self.l_wheel_speed = lspeed
                 self.r_wheel_speed = rspeed
         super().start(event)
+        if self.robot.is_picked_up:
+            self.post_failure()
 
     def coroutine_launcher(self):
         return self.robot.drive_wheels(self.l_wheel_speed,self.r_wheel_speed,**self.kwargs)
@@ -610,6 +612,8 @@ class SmallTurn(CoroutineNode):
         # constants were determined empirically for speed 50
         self.counter = round((abs(self.angle) + 5) / 1.25) if self.angle else 0
         super().start(event)
+        if self.robot.is_picked_up:
+            self.post_failure()
 
     def coroutine_launcher(self):
         if self.angle:
@@ -919,6 +923,8 @@ class Forward(ActionNode):
         if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Distance):
             self.distance = event.data
         super().start(event)
+        if self.robot.is_picked_up:
+            self.post_failure()
 
     def action_launcher(self):
         return self.robot.drive_straight(self.distance, self.speed,
@@ -943,6 +949,8 @@ class Turn(ActionNode):
         if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
             self.angle = event.data
         super().start(event)
+        if self.robot.is_picked_up:
+            self.post_failure()
 
     def action_launcher(self):
         if self.angle is None:

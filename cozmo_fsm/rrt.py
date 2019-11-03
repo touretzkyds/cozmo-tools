@@ -311,7 +311,7 @@ class RRT():
         smoothed_path = self.path
         for _ in range(0,len(smoothed_path)):
             L = len(smoothed_path)
-            if L == 2: break
+            if L <= 2: break
             i = random.randrange(0,L-2)
             cur_x = smoothed_path[i].x
             cur_y = smoothed_path[i].y

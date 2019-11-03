@@ -63,6 +63,14 @@ class PilotEvent(Event):
         self.status = status
         self.args = args
 
+    def __repr__(self):
+        try:
+            src_string = self.source.name
+        except:
+            src_string = repr(self.source)
+        return '<%s %s from %s>' % (self.__class__.__name__, self.status.__name__, src_string)
+
+
 #________________ Cozmo-generated events ________________
 
 class CozmoGeneratedEvent(Event):

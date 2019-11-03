@@ -542,7 +542,7 @@ def cli_loop(robot):
         cli_loop._do_await = False
         if cli_loop._line[0:7] == 'import ' or cli_loop._line[0:5] == 'from '  or \
                cli_loop._line[0:7] == 'global ' or cli_loop._line[0:4] == 'del '   or \
-               cli_loop._line[0:4] == 'for ' or \
+               cli_loop._line[0:4] == 'for ' or cli_loop._line[0:6] == 'while ' or \
                cli_loop._line[0:4] == 'def '    or cli_loop._line[0:6] == 'async ' :
             # Can't use assignment to capture a return value, so None.
             ans = None
