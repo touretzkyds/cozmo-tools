@@ -52,6 +52,7 @@ class StartCollides(RRTException): pass
 class GoalCollides(RRTException): pass
 class MaxIterations(RRTException): pass
 class GoalUnreachable(RRTException): pass
+class NotLocalized(RRTException): pass
 
 class RRT():
     DEFAULT_MAX_ITER = 2000

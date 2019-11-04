@@ -77,7 +77,7 @@ class PathPlanner():
         if use_doorways:
             doorway_list = robot.world.world_map.generate_doorway_list()
         else:
-            doorway_list = []  # ignore doorways in simulator
+            doorway_list = []  # don't truncate path at  doorways in simulator
 
         need_grid_display = robot.world.path_viewer is not None
 
@@ -151,6 +151,7 @@ class PathPlanner():
 
         # Construct the navigation plan
         navplan = PathPlanner.from_path(rrt_instance.path, doorway_list)
+        print('navplan=',navplan)
 
         # Insert the StartCollides escape move if there is one
         if start_escape_move:
@@ -181,7 +182,7 @@ class PathPlanner():
             p4 = door[1][1]
             result = segment_intersect_test(p1, p2, p3, p4)
             #label = '**INTERSECTS**' if result else 'no_int:'
-            #print(label,door[0].id,' (%.1f,%.1f)--(%.1f,%.1f)  vs  (%.1f,%.1f)--(%.1f,%.1f)' % (p1+p2+p3+p4))
+            #print(label,door[0].id,' ( %.1f, %.1f )<=>( %.1f, %.1f )  vs  ( %.1f, %.1f )<=>( %.1f, %.1f )' % (p1+p2+p3+p4))
             if result:
                 return door[0]
         return None
@@ -195,7 +196,6 @@ class PathPlanner():
         for i in range(1, len(path)):
             pt2 = path[i]
             door = PathPlanner.intersects_doorway(pt1,pt2,doorways)
-            #print('i=',i,'pt1=',pt1,'pt2=',pt2,'door=',door)
             if door:
                 i -= 1
                 break

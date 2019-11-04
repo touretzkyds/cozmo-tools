@@ -112,6 +112,8 @@ class DoorPass(StateNode):
                 print("TurnToMarker failed to find marker %s or %s!" % marker_ids)
                 self.post_failure()
                 return
+            else:
+                print('TurnToMarker saw marker', marker)
             sensor_dist = marker.camera_distance
             sensor_bearing = atan2(marker.camera_coords[0],
                                    marker.camera_coords[2])

@@ -516,6 +516,7 @@ class WorldMap():
         self.update_aruco_landmarks()
         self.update_walls()
         self.update_doorways()
+        self.update_rooms()
         self.update_perched_cameras()
 
     def update_cube(self, cube):
@@ -692,6 +693,16 @@ class WorldMap():
             if key.startswith('Doorway'):
                 value.update()
 
+    def update_rooms(self):
+        LOCALIZED = 'localized' # should be from ParticleFilter.LOCALIZED
+        if self.robot.world.particle_filter.state == LOCALIZED:
+            confidence = +1
+        else:
+            confidence = -1
+        for obj in self.robot.world.world_map.objects.values():
+            if isinstance(obj, RoomObj):
+                obj.pose_confidence = confidence
+
     def lookup_face_obj(self,face):
         "Look up face by name, not by Face instance."
         for (key,value) in self.robot.world.world_map.objects.items():
@@ -855,10 +866,10 @@ class WorldMap():
         doorways = []
         for (key,obj) in self.objects.items():
             if isinstance(obj,DoorwayObj):
-                w = obj.door_width
+                w = obj.door_width / 2
                 doorway_threshold_theta = obj.theta + pi/2
-                dx = w * sin(doorway_threshold_theta)
-                dy = w * cos(doorway_threshold_theta)
+                dx = w * cos(doorway_threshold_theta)
+                dy = w * sin(doorway_threshold_theta)
                 doorways.append((obj, ((obj.x-dx, obj.y-dy), (obj.x+dx, obj.y+dy))))
         return doorways
 
