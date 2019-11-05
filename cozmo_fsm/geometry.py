@@ -6,6 +6,7 @@ kinematics.
 
 import numpy as np
 from math import sin, cos, tan, pi, atan2, asin, sqrt
+import sys
 
 def point(x=0,y=0,z=0):
     return np.array([ [x], [y], [z], [1.] ])
@@ -226,6 +227,10 @@ def get_orientation_state(quaternion, isPlanar=False):
         orientation = ORIENTATION_TILTED
 
     return orientation, x, y, z
+
+def same_orientation(q1, q2):
+    return (np.dot(np.array(q1), np.array(q2))) > (1-sys.float_info.epsilon)
+
 
 
 #---------------- General Geometric Calculations ----------------

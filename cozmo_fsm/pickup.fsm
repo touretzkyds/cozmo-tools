@@ -5,7 +5,7 @@ from .nodes import *
 from .transitions import *
 from .geometry import wrap_angle, line_equation, line_intersection
 from .geometry import ORIENTATION_UPRIGHT, ORIENTATION_INVERTED, ORIENTATION_SIDEWAYS, ORIENTATION_TILTED
-from .geometry import get_orientation_state
+from .geometry import get_orientation_state, same_orientation
 from .cozmo_kin import center_of_rotation_offset
 from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, InvalidPose
 from .rrt import StartCollides, GoalCollides, MaxIterations
@@ -260,10 +260,11 @@ class GoToCube(StateNode):
                             self.post_failure()
                     elif not cube.is_visible:
                         print('CheckAlmostDocked: cube not visible')
+                        self.post_success()
                     else:
                         print('CheckAlmostDocked: bad angle.  (dist=%.1f mm)  angle=%.1f deg.' %
                               (dist, relative_angle))
-                    self.post_success()
+                        self.post_success()
             else:
                 print('CheckAlmostDocked: too far away.  dist=%.1f mm.  (angle=%.1f deg.)' %
                       (dist, relative_angle))
@@ -846,10 +847,11 @@ class RollCube(StateNode):
 
 
 class RollingCube(StateNode):
-    def __init__(self, object=None, orientation=None):
+    def __init__(self, object=None, orientation=None, old_orientation=None):
         super().__init__()
         self.object = object
         self.target_orientation = orientation
+        self.old_orientation = old_orientation
         self.try_roll_number = 0
 
 
@@ -879,10 +881,27 @@ class RollingCube(StateNode):
         def start(self,event=None):
             self.parent.orientation, _, _, _ = get_orientation_state(self.parent.object.pose.rotation.q0_q1_q2_q3)
             super().start(event)
-            if self.parent.target_orientation == self.parent.orientation:
+            if self.parent.target_orientation == self.parent.orientation != None:
                 self.post_completion()
+            elif not self.parent.target_orientation:
+                if not self.parent.old_orientation:
+                    self.parent.old_orientation = self.parent.object.pose.rotation.q0_q1_q2_q3
+                    self.post_failure()
+                else:
+                    q1 = self.parent.old_orientation
+                    q2 = self.parent.object.pose.rotation.q0_q1_q2_q3
+                    if same_orientation(q1, q2):
+                        print('still the same orientation')
+                        self.post_failure()
+                    else:
+                        if self.parent.object.is_visible:
+                            self.parent.old_orientation = self.parent.object.pose.rotation.q0_q1_q2_q3
+                            print('roll it success')
+                            self.post_completion()
+                        else:
+                            print('cube is not visible')
+                            self.post_failure()
             else:
-                print('current orientation:', self.parent.orientation)
                 self.post_failure()
 
     class CheckCubePoseValidOnce(StateNode):
