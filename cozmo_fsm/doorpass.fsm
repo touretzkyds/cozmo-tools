@@ -19,7 +19,7 @@ class DoorPass(StateNode):
     def __init__(self, door=None):
         self.door = door
         super().__init__()
-        
+
     def start(self, event=None):
         door = self.door
         if isinstance(event,DataEvent):
@@ -84,7 +84,7 @@ class DoorPass(StateNode):
             else:
                 self.angle = Angle(radians=turn)
                 super().start(event)
-        
+
 
     class ForwardToGate(Forward):
         """Travel forward to reach the approach gate."""
@@ -131,6 +131,16 @@ class DoorPass(StateNode):
             print("TurnToMarker %s turning by %.1f degrees" % (self.name, self.angle.degrees))
             super().start(event)
 
+    class CheckCarrying(SetLiftHeight):
+        def __init__(self):
+            super().__init__()
+
+        def start(self,event=None):
+            if self.robot.carrying:
+                self.height = 0.4 if self.robot.lift_ratio > 0.5 else 1
+            super().start(event)
+
+
     $setup{
         droplift: self.AdjustLiftHeight() =N=>
             SetHeadAngle(0) =T(0.2)=> check_start  # Time for vision to process
@@ -149,11 +159,11 @@ class DoorPass(StateNode):
         forward_to_gate1: self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
             StateNode() =T(0.2)=> {look_up, turn_to_gate2}
 
-        # If we're carrying a cube, should we lower the lift so we can see?
+        # If we're carrying a cube, we lower the lift so we can see
         look_up: SetHeadAngle(35)
 
         turn_to_gate2: self.TurnToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
-            StateNode() =T(0.2)=> turn_to_marker1
+            StateNode() =T(0.2)=> self.CheckCarrying() =C=> turn_to_marker1
 
         turn_to_marker1: self.TurnToMarker()
         turn_to_marker1 =C=> marker_forward1
@@ -172,7 +182,6 @@ class DoorPass(StateNode):
 
         through_door: Forward(150)
 
-        {lower_head, through_door} =C=> ParentCompletes()
+        {lower_head, through_door} =C=> self.CheckCarrying() =C=> ParentCompletes()
 
     }
-
