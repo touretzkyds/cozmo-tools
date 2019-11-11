@@ -228,9 +228,37 @@ def get_orientation_state(quaternion, isPlanar=False):
 
     return orientation, x, y, z
 
-def same_orientation(q1, q2):
-    return (np.dot(np.array(q1), np.array(q2))) > (1-sys.float_info.epsilon)
+def same_orientation(old_object, new_object):
+    q1 = old_object.pose.rotation.q0_q1_q2_q3
+    q2 = new_object.pose.rotation.q0_q1_q2_q3
+    old_orientation, _, _, _ = get_orientation_state(q1)
+    new_orientation, _, _, _ = get_orientation_state(q2)
+    if old_orientation != new_orientation:
+        return False
+    elif old_orientation == ORIENTATION_SIDEWAYS:
+        old_pattern_number = get_pattern_number(old_object.pose.rotation.euler_angles)
+        new_pattern_number = get_pattern_number(new_object.pose.rotation.euler_angles)
+        if old_pattern_number == new_pattern_number:
+            return True
+        else:
+            return False
+    else:
+        return True
 
+def get_pattern_number(eulerAngles):
+    x, y, z = eulerAngles
+    pattern = -1
+    z = min([pi/2, 0, -pi/2], key=lambda val:abs(val-z))
+    if z == -pi/2:
+        pattern = 1
+    elif z == pi/2:
+        pattern = 3
+    else:
+        if min([0, -pi, pi], key=lambda val:abs(val-x)) == 0:
+            pattern = 2
+        else:
+            pattern = 4
+    return pattern
 
 
 #---------------- General Geometric Calculations ----------------
