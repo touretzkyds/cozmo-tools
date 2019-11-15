@@ -7,7 +7,7 @@ import cv2
 import heapq
 from math import floor, ceil, cos, sin
 
-from .geometry import wrap_angle, rotate_point
+from .geometry import wrap_angle, rotate_point, polygon_fill
 from .rrt import StartCollides
 from .rrt_shapes import *
 
@@ -80,14 +80,15 @@ class WaveFront():
         goal_points = []
         goal_buffer = 20
         if shape.obstacle_id.startswith('Room'):
-            offset = 20   # for rooms
+            offset = 10   # for rooms
+            goal_points = polygon_fill(shape, offset)
         else:
             offset = 50   # for cubes, charger, markers
-        for buffer in range(goal_buffer):
-            goal_points.append([shape.center[0,0]+(offset+buffer), shape.center[1,0]])
-            goal_points.append([shape.center[0,0]-(offset+buffer), shape.center[1,0]])
-            goal_points.append([shape.center[0,0], shape.center[1,0]+(offset+buffer)])
-            goal_points.append([shape.center[0,0], shape.center[1,0]-(offset+buffer)])
+            for buffer in range(goal_buffer):
+                goal_points.append([shape.center[0,0]+(offset+buffer), shape.center[1,0]])
+                goal_points.append([shape.center[0,0]-(offset+buffer), shape.center[1,0]])
+                goal_points.append([shape.center[0,0], shape.center[1,0]+(offset+buffer)])
+                goal_points.append([shape.center[0,0], shape.center[1,0]-(offset+buffer)])
         for point in goal_points:
             self.set_goal_cell(*rotate_point(point, shape.center[0:2,0], shape.orient))
 
