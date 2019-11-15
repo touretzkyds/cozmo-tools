@@ -383,7 +383,6 @@ def polygon_fill(polygon, offset):
     _edge_table = copy.copy(edge_table)
 
     while len(points) == 0 and offset >= 0:
-        print('offset=============', offset)
         for scanline in range(ymin, ymax+1):
             # Add match (ymin==scanline) edges to the active_list
             if len(edge_table[scanline]) > 0:
