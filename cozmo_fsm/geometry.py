@@ -5,8 +5,9 @@ kinematics.
 """
 
 import numpy as np
-from math import sin, cos, tan, pi, atan2, asin, sqrt
-import sys
+from math import sin, cos, tan, pi, atan2, asin, sqrt, floor, ceil
+from fractions import Fraction
+import copy
 
 def point(x=0,y=0,z=0):
     return np.array([ [x], [y], [z], [1.] ])
@@ -228,9 +229,37 @@ def get_orientation_state(quaternion, isPlanar=False):
 
     return orientation, x, y, z
 
-def same_orientation(q1, q2):
-    return (np.dot(np.array(q1), np.array(q2))) > (1-sys.float_info.epsilon)
+def same_orientation(old_object, new_object):
+    q1 = old_object.pose.rotation.q0_q1_q2_q3
+    q2 = new_object.pose.rotation.q0_q1_q2_q3
+    old_orientation, _, _, _ = get_orientation_state(q1)
+    new_orientation, _, _, _ = get_orientation_state(q2)
+    if old_orientation != new_orientation:
+        return False
+    elif old_orientation == ORIENTATION_SIDEWAYS:
+        old_pattern_number = get_pattern_number(old_object.pose.rotation.euler_angles)
+        new_pattern_number = get_pattern_number(new_object.pose.rotation.euler_angles)
+        if old_pattern_number == new_pattern_number:
+            return True
+        else:
+            return False
+    else:
+        return True
 
+def get_pattern_number(eulerAngles):
+    x, y, z = eulerAngles
+    pattern = -1
+    z = min([pi/2, 0, -pi/2], key=lambda val:abs(val-z))
+    if z == -pi/2:
+        pattern = 1
+    elif z == pi/2:
+        pattern = 3
+    else:
+        if min([0, -pi, pi], key=lambda val:abs(val-x)) == 0:
+            pattern = 2
+        else:
+            pattern = 4
+    return pattern
 
 
 #---------------- General Geometric Calculations ----------------
@@ -306,3 +335,84 @@ def rotation_matrix_to_euler_angles(R):
         z = 0
 
     return np.array([x, y, z])
+
+
+def polygon_fill(polygon, offset):
+    """
+    Implement the scanline polygon fill algorithm
+    Input a polygon (rrt shape) and return points inside the polygon
+    """
+    class Edge:
+        def __init__(self, ymax, x, sign, dx, dy, sum):
+            self.ymax = ymax
+            self.xval = x
+            self.sign = sign
+            self.dx = dx
+            self.dy = dy
+            self.sum = sum
+        def __repr__(self):
+            return '<Edge (ymax= %s, xval= %s, sign= %s, dx= %s, dy= %s, sum= %s )>' % \
+                   (self.ymax, self.xval, self.sign, self.dx, self.dy, self.sum)
+
+    edges = polygon.edges
+    ((xmin,ymin), (xmax,ymax)) = polygon.get_bounding_box()
+    xmin, ymin, xmax, ymax = floor(xmin), floor(ymin), ceil(xmax), ceil(ymax)
+    xdelta = abs(xmin) if xmin < 0 else 0
+    xmin += xdelta
+    xmax += xdelta
+    ydelta = abs(ymin) if ymin < 0 else 0
+    ymin += ydelta
+    ymax += ydelta
+    edge_table = [[] for i in range(ymax+1)]
+    active_list, points = [], []
+
+    for edge in edges:
+        ([[p1x], [p1y], _, _], [[p2x], [p2y], _, _]) = edge
+        if (p1y-p2y) != 0:  # Don't need to consider horizontal edges
+            p1x, p1y, p2x, p2y = p1x+xdelta, p1y+ydelta, p2x+xdelta, p2y+ydelta
+            end_points = [[p1x, p1y], [p2x, p2y]]
+            end_points = sorted(end_points, key = lambda pt: pt[1])   # Sort on y value
+            _xval, _ymin, _ymax = int(round(end_points[0][0])), int(round(end_points[0][1])), int(round(end_points[1][1]))
+            slope = Fraction((p1x-p2x)/(p1y-p2y)).limit_denominator(10)
+            _dx = slope.numerator
+            _dy = slope.denominator
+            _sign = 1 if (_dx > 0) == (_dy > 0) else -1
+            _edge = Edge(_ymax, _xval, _sign, abs(_dx), abs(_dy), 0)
+            edge_table[_ymin].append(_edge)
+
+    _edge_table = copy.copy(edge_table)
+
+    while len(points) == 0 and offset >= 0:
+        for scanline in range(ymin, ymax+1):
+            # Add match (ymin==scanline) edges to the active_list
+            if len(edge_table[scanline]) > 0:
+                for edge in edge_table[scanline]:
+                    active_list.append(edge)
+            if len(active_list) > 0:
+                if ymin+offset <= scanline <= ymax-offset:
+                    # Sort active_list on x value; if same x value, sort on slope (1/m)
+                    active_list = sorted(active_list, key = lambda x: (x.xval, x.sign*x.dx/x.dy))
+                    for _x in range(active_list[0].xval, active_list[1].xval):
+                        if (active_list[0].xval+offset) <= _x <= (active_list[1].xval-offset):
+                            points.append([_x-xdelta, scanline-ydelta])
+            if len(active_list) > 3:
+                if ymin+offset <= scanline <= ymax-offset:
+                    for _x in range(active_list[2].xval, active_list[3].xval):
+                        if (active_list[0].xval+offset) <= _x <= (active_list[1].xval-offset):
+                            points.append([_x-xdelta, scanline-ydelta])
+            # Remove form active_list if edge.ymax = scanline
+            active_list = [edge for edge in active_list if scanline < edge.ymax]
+            # Increase x-value
+            for edge in active_list:
+                # Add dx to sum
+                edge.sum += edge.dx
+                # While sum ≥ dy, adjust x, subtract dy from sum
+                while edge.sum >= edge.dy:
+                    edge.xval += edge.sign
+                    edge.sum -= edge.dy
+        # Reset edge_table, active_list, and offset value
+        offset -= 5
+        active_list = []
+        edge_table = copy.copy(_edge_table)
+
+    return points
