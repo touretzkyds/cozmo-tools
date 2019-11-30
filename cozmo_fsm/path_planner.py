@@ -95,6 +95,7 @@ class PathPlanner():
                            (+30/180*pi,   50),
                            (-30/180*pi,   50),
                            (pi,           40),
+                           (pi,           80),  # if we're wedged between two cubes
                            (+60/180*pi,   80),
                            (-60/180*pi,   80),
                            (+pi/2,        70),

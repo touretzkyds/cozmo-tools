@@ -253,8 +253,9 @@ class WallObj(WorldObject):
 
     def make_doorways(self, world_map):
         index = 0
+        wall = self
         for index in range(len(self.doorways)):
-            doorway = DoorwayObj(self, index)
+            doorway = DoorwayObj(wall, index)
             doorway.pose_confidence = +1
             world_map.objects[doorway.id] = doorway
 
