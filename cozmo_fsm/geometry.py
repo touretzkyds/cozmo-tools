@@ -354,15 +354,18 @@ def polygon_fill(polygon, offset):
             return '<Edge (ymax= %s, xval= %s, sign= %s, dx= %s, dy= %s, sum= %s )>' % \
                    (self.ymax, self.xval, self.sign, self.dx, self.dy, self.sum)
 
+    [xCenter, yCenter, _, _] = polygon.vertices.mean(1)
     edges = polygon.edges
     ((xmin,ymin), (xmax,ymax)) = polygon.get_bounding_box()
     xmin, ymin, xmax, ymax = floor(xmin), floor(ymin), ceil(xmax), ceil(ymax)
     xdelta = abs(xmin) if xmin < 0 else 0
     xmin += xdelta
     xmax += xdelta
+    xCenter += xdelta
     ydelta = abs(ymin) if ymin < 0 else 0
     ymin += ydelta
     ymax += ydelta
+    yCenter += ydelta
     edge_table = [[] for i in range(ymax+1)]
     active_list, points = [], []
 
@@ -380,39 +383,52 @@ def polygon_fill(polygon, offset):
             _edge = Edge(_ymax, _xval, _sign, abs(_dx), abs(_dy), 0)
             edge_table[_ymin].append(_edge)
 
-    _edge_table = copy.copy(edge_table)
-
-    while len(points) == 0 and offset >= 0:
-        for scanline in range(ymin, ymax+1):
-            # Add match (ymin==scanline) edges to the active_list
-            if len(edge_table[scanline]) > 0:
-                for edge in edge_table[scanline]:
-                    active_list.append(edge)
-            if len(active_list) > 0:
-                if ymin+offset <= scanline <= ymax-offset:
-                    # Sort active_list on x value; if same x value, sort on slope (1/m)
-                    active_list = sorted(active_list, key = lambda x: (x.xval, x.sign*x.dx/x.dy))
-                    for _x in range(active_list[0].xval, active_list[1].xval):
-                        if (active_list[0].xval+offset) <= _x <= (active_list[1].xval-offset):
-                            points.append([_x-xdelta, scanline-ydelta])
-            if len(active_list) > 3:
-                if ymin+offset <= scanline <= ymax-offset:
-                    for _x in range(active_list[2].xval, active_list[3].xval):
-                        if (active_list[0].xval+offset) <= _x <= (active_list[1].xval-offset):
-                            points.append([_x-xdelta, scanline-ydelta])
-            # Remove form active_list if edge.ymax = scanline
-            active_list = [edge for edge in active_list if scanline < edge.ymax]
-            # Increase x-value
-            for edge in active_list:
-                # Add dx to sum
-                edge.sum += edge.dx
-                # While sum ≥ dy, adjust x, subtract dy from sum
-                while edge.sum >= edge.dy:
-                    edge.xval += edge.sign
-                    edge.sum -= edge.dy
-        # Reset edge_table, active_list, and offset value
-        offset -= 5
-        active_list = []
-        edge_table = copy.copy(_edge_table)
+    for scanline in range(ymin, ymax+1):
+        # Add match (ymin==scanline) edges to the active_list
+        if len(edge_table[scanline]) > 0:
+            for edge in edge_table[scanline]:
+                active_list.append(edge)
+        if len(active_list) > 0:
+            y_lower_bound = yCenter - offset
+            y_upper_bound = yCenter + offset
+            if offset < 0:
+                y_lower_bound = ymin - offset
+                y_upper_bound = ymax + offset
+            if y_lower_bound <= scanline <= y_upper_bound:
+                # Sort active_list on x value; if same x value, sort on slope (1/m)
+                active_list = sorted(active_list, key = lambda x: (x.xval, x.sign*x.dx/x.dy))
+                for _x in range(active_list[0].xval, active_list[1].xval):
+                    x_lower_bound = xCenter - offset
+                    x_upper_bound = xCenter + offset
+                    if offset < 0:
+                        x_lower_bound = active_list[0].xval - offset
+                        x_upper_bound = active_list[1].xval + offset
+                    if x_lower_bound <= _x <= x_upper_bound:
+                        points.append([_x-xdelta, scanline-ydelta])
+        if len(active_list) > 3:
+            y_lower_bound = yCenter - offset
+            y_upper_bound = yCenter + offset
+            if offset < 0:
+                y_lower_bound = ymin - offset
+                y_upper_bound = ymax + offset
+            if y_lower_bound <= scanline <= y_upper_bound:
+                for _x in range(active_list[2].xval, active_list[3].xval):
+                    x_lower_bound = xCenter - offset
+                    x_upper_bound = xCenter + offset
+                    if offset < 0:
+                        x_lower_bound = active_list[2].xval - offset
+                        x_upper_bound = active_list[3].xval + offset
+                    if x_lower_bound <= _x <= x_upper_bound:
+                        points.append([_x-xdelta, scanline-ydelta])
+        # Remove form active_list if edge.ymax = scanline
+        active_list = [edge for edge in active_list if scanline < edge.ymax]
+        # Increase x-value
+        for edge in active_list:
+            # Add dx to sum
+            edge.sum += edge.dx
+            # While sum ≥ dy, adjust x, subtract dy from sum
+            while edge.sum >= edge.dy:
+                edge.xval += edge.sign
+                edge.sum -= edge.dy
 
     return points
