@@ -134,35 +134,28 @@ class PathPlanner():
                 print('PathPlanner: Start collides!', collider)
                 return PilotEvent(StartCollides,collider)
 
-        # Run the wavefront path finder
+        # Run the wavefront path planner
         rrt_instance.obstacles = fat_obstacles
         if goal_shape.obstacle_id.startswith('Room'):
-            goal_found = None
-            try_number = 0
-            offset = 5
-            while goal_found is None and try_number < 3:
+            offsets = [5, -25, -1]
+            for offset in offsets:
                 wf.set_goal_shape(goal_shape, offset)
+                for obstacle in fat_obstacles:
+                    wf.add_obstacle(obstacle)
                 wf_start = (start_node.x, start_node.y)
                 goal_found = wf.propagate(*wf_start)
-                grid_display = None if not need_grid_display else wf.grid
-                if goal_found is None:
-                    print('PathPlanner wavefront: goal unreachable! Try again.',)
-                    try_number += 1
-                    if try_number == 1:
-                        offset = -25
-                    elif try_number == 2:
-                        offset = -1
-            if goal_found is None:
-                print('PathPlanner wavefront: goal unreachable!')
-                return PilotEvent(GoalUnreachable, grid_display)
+                if goal_found: break
+                wf = WaveFront(bbox=rrt_instance.bbox)
         else:
             wf.set_goal_shape(goal_shape)
+            for obstacle in fat_obstacles:
+                wf.add_obstacle(obstacle)
             wf_start = (start_node.x, start_node.y)
             goal_found = wf.propagate(*wf_start)
-            grid_display = None if not need_grid_display else wf.grid
-            if goal_found is None:
-                print('PathPlanner wavefront: goal unreachable!')
-                return PilotEvent(GoalUnreachable, grid_display)
+        grid_display = None if not need_grid_display else wf.grid
+        if goal_found is None:
+            print('PathPlanner wavefront: goal unreachable!')
+            return PilotEvent(GoalUnreachable, grid_display)
 
         # Extract and smooth the path
         coords_pairs = wf.extract(goal_found, wf_start)
@@ -172,7 +165,7 @@ class PathPlanner():
 
         # Construct the navigation plan
         navplan = PathPlanner.from_path(rrt_instance.path, doorway_list)
-        print('navplan=',navplan)
+        print('navplan=',navplan, '   steps=',navplan.steps)
 
         # Insert the StartCollides escape move if there is one
         if start_escape_move:

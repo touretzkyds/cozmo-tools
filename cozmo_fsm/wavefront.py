@@ -76,9 +76,7 @@ class WaveFront():
                   '  x,y=', (x,y), '  xcoord,ycoord=', (xcoord,ycoord))
             raise ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord)))
 
-    def set_goal_shape(self,shape,default_offset=None):
-        """Temporary hack. Should me tracing interior perimeter of the room,
-        or setting goal points at each face of the cube."""
+    def set_goal_shape(self, shape, default_offset=None):
         goal_points = []
         goal_buffer = 20
         if shape.obstacle_id.startswith('Room'):
@@ -99,6 +97,7 @@ class WaveFront():
         if self.grid[x,y] == 0 or self.grid[x,y] == self.goal_marker:
             return False
         else:
+            print('start collides:', (xstart,ystart), (x,y), '  grid=', self.grid[x,y])
             return True
 
     def propagate(self,xstart,ystart):

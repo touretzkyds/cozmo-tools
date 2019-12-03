@@ -278,7 +278,7 @@ class PilotToPose(PilotBase):
 
             doors = self.robot.world.world_map.generate_doorway_list()
             navplan = PathPlanner.from_path(path, doors)
-            print('navplan=',navplan)
+            print('navplan=',navplan, '   steps=',navplan.steps)
 
             # Insert the StartCollides escape move if there is one
             if start_escape_move:
