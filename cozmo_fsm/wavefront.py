@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 import heapq
 from math import floor, ceil, cos, sin
+import copy
 
 from .geometry import wrap_angle, rotate_point, polygon_fill
 from .rrt import StartCollides
@@ -106,7 +107,7 @@ class WaveFront():
         """
         if self.check_start_collides(xstart,ystart):
             raise StartCollides()
-
+        _grid = copy.copy(self.grid)
         grid = self.grid
         (x,y) = self.convert_coords(xstart,ystart)
         goal_marker = self.goal_marker
@@ -165,6 +166,9 @@ class WaveFront():
                 if cell == goal_marker: return (x,y+1)
                 elif cell == 0:
                     heapq.heappush(fringe, (dist10,(x,y+1)))
+
+        # Reset grid if goal is not found
+        self.grid = _grid
         return None
 
     def extract(self, search_result, wf_start):
