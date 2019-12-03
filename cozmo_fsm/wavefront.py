@@ -76,13 +76,13 @@ class WaveFront():
                   '  x,y=', (x,y), '  xcoord,ycoord=', (xcoord,ycoord))
             raise ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord)))
 
-    def set_goal_shape(self,shape):
+    def set_goal_shape(self,shape,default_offset=None):
         """Temporary hack. Should me tracing interior perimeter of the room,
         or setting goal points at each face of the cube."""
         goal_points = []
         goal_buffer = 20
         if shape.obstacle_id.startswith('Room'):
-            offset = 10   # for rooms
+            offset = -1 if default_offset is None else default_offset # for rooms
             goal_points = polygon_fill(shape, offset)
         else:
             offset = 50   # for cubes, charger, markers

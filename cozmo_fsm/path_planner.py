@@ -136,13 +136,33 @@ class PathPlanner():
 
         # Run the wavefront path finder
         rrt_instance.obstacles = fat_obstacles
-        wf.set_goal_shape(goal_shape)
-        wf_start = (start_node.x, start_node.y)
-        goal_found = wf.propagate(*wf_start)
-        grid_display = None if not need_grid_display else wf.grid
-        if goal_found is None:
-            print('PathPlanner wavefront: goal unreachable!')
-            return PilotEvent(GoalUnreachable, grid_display)
+        if goal_shape.obstacle_id.startswith('Room'):
+            goal_found = None
+            try_number = 0
+            offset = 5
+            while goal_found is None and try_number < 3:
+                wf.set_goal_shape(goal_shape, offset)
+                wf_start = (start_node.x, start_node.y)
+                goal_found = wf.propagate(*wf_start)
+                grid_display = None if not need_grid_display else wf.grid
+                if goal_found is None:
+                    print('PathPlanner wavefront: goal unreachable! Try again.',)
+                    try_number += 1
+                    if try_number == 1:
+                        offset = -25
+                    elif try_number == 2:
+                        offset = -1
+            if goal_found is None:
+                print('PathPlanner wavefront: goal unreachable!')
+                return PilotEvent(GoalUnreachable, grid_display)
+        else:
+            wf.set_goal_shape(goal_shape)
+            wf_start = (start_node.x, start_node.y)
+            goal_found = wf.propagate(*wf_start)
+            grid_display = None if not need_grid_display else wf.grid
+            if goal_found is None:
+                print('PathPlanner wavefront: goal unreachable!')
+                return PilotEvent(GoalUnreachable, grid_display)
 
         # Extract and smooth the path
         coords_pairs = wf.extract(goal_found, wf_start)
@@ -248,4 +268,3 @@ class PathPlannerProcess(LaunchProcess):
                                     fat_obstacles, skinny_obstacles, doorway_list,
                                     need_grid_display)
         __class__.post_event(reply_token, result)
-
