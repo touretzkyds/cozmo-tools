@@ -414,8 +414,11 @@ class GoToCube(StateNode):
             except: # worldmap was cleared just before we were called
                 self.post_failure()
                 return
-
-            if wmobject.pose_confidence < 0:
+            if self.parent.robot.is_picked_up:
+                self.parent.robot.stop_all_motors()
+                print('CheckCubePoseValid: robot is picked up.')
+                self.post_failure()
+            elif wmobject.pose_confidence < 0:
                 print('CheckCubePoseValid: %s has invalid pose!' % cube_id)
                 self.post_failure()
             else:
