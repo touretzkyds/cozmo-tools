@@ -142,13 +142,14 @@ class PathPlanner():
             offsets = [None]
         for offset in offsets:
             wf.set_goal_shape(goal_shape, offset)
+            # obstacles come after the goal so they can overwrite goal pixels
             for obstacle in fat_obstacles:
                 wf.add_obstacle(obstacle)
             wf_start = (start_node.x, start_node.y)
             goal_found = wf.propagate(*wf_start)
             if goal_found: break
             print('Wavefront planning failed with offset', offset) 
-            wf = WaveFront(bbox=rrt_instance.bbox)
+            wf = WaveFront(bbox=rrt_instance.bbox)  # need a fresh grid
         grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
             print('PathPlanner wavefront: goal unreachable!')

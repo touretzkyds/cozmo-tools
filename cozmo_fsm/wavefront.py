@@ -29,7 +29,7 @@ class WaveFront():
         self.grid = np.zeros(self.grid_shape, dtype=np.int32)
         self.maxdist = 1
 
-    def convert_coords(self,xcoord,ycoord):
+    def coords_to_grid(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
         x = int(round((xcoord-self.bbox[0][0]+self.inflate_size)/self.square_size))
         y = int(round((ycoord-self.bbox[0][1]+self.inflate_size)/self.square_size))
@@ -39,8 +39,15 @@ class WaveFront():
         else:
             return (None,None)
 
+    def grid_to_coords(self,gridx,gridy):
+        xmin = self.bbox[0][0]
+        ymin = self.bbox[0][1]
+        x = gridx*self.square_size + xmin - self.inflate_size
+        y = gridy*self.square_size + ymin - self.inflate_size
+        return (x,y)
+
     def set_obstacle_cell(self,xcoord,ycoord):
-        (x,y) = self.convert_coords(xcoord,ycoord)
+        (x,y) = self.coords_to_grid(xcoord,ycoord)
         if x:
             self.grid[x,y] = -1
 
@@ -68,7 +75,7 @@ class WaveFront():
             raise Exception("%s has no add_obstacle() method defined for %s." % (self, obstacle))
 
     def set_goal_cell(self,xcoord,ycoord):
-        (x,y) = self.convert_coords(xcoord,ycoord)
+        (x,y) = self.coords_to_grid(xcoord,ycoord)
         if x:
             self.grid[x,y] = self.goal_marker
         else:
@@ -93,7 +100,7 @@ class WaveFront():
             self.set_goal_cell(*rotate_point(point, shape.center[0:2,0], shape.orient))
 
     def check_start_collides(self,xstart,ystart):
-        (x,y) = self.convert_coords(xstart,ystart)
+        (x,y) = self.coords_to_grid(xstart,ystart)
         if self.grid[x,y] == 0 or self.grid[x,y] == self.goal_marker:
             return False
         else:
@@ -109,7 +116,7 @@ class WaveFront():
             raise StartCollides()
 
         grid = self.grid
-        (x,y) = self.convert_coords(xstart,ystart)
+        (x,y) = self.coords_to_grid(xstart,ystart)
         goal_marker = self.goal_marker
         if grid[x,y] == goal_marker:
             return (x,y)
@@ -170,9 +177,9 @@ class WaveFront():
 
     def extract(self, search_result, wf_start):
         "Extract the path once the goal is found, and convert back to worldmap coordinates."
-        start_coords = self.convert_coords(*wf_start)
+        start_coords = self.coords_to_grid(*wf_start)
         if search_result == start_coords:
-            return [search_result]
+            return [self.grid_to_coords(*search_result)]
         (x,y) = search_result
         maxdist = self.goal_marker + 1
         grid = self.grid
@@ -219,9 +226,7 @@ class WaveFront():
         square_size = self.square_size
         xmin = self.bbox[0][0]
         ymin = self.bbox[0][1]
-        path_coords = [(x*square_size + xmin - self.inflate_size,
-                        y*square_size + ymin - self.inflate_size)
-                       for (x,y) in path]
+        path_coords = [self.grid_to_coords(x,y) for (x,y) in path]
         return path_coords
 
 def wf_test():
