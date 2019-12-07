@@ -208,7 +208,7 @@ def get_orientation_state(quaternion, isPlanar=False):
     elif dot_product <= -0.9:
         orientation = ORIENTATION_INVERTED
         z -= pi
-    elif -0.1 <= dot_product <= 0.1:
+    elif -0.15 <= dot_product <= 0.15:
         if isPlanar:
             # Markers
             if 0 < x < pi:
