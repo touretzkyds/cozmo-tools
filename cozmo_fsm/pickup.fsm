@@ -94,7 +94,7 @@ class GoToCube(StateNode):
                 side = side2
                 d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
                 print('  side 0: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
-                      (d, side[0], side[1], side[2]*180/math.pi))
+                      (d, side[0], side[1], side[2]*180/pi))
                 return side
         sorted_sides = sorted(sides, key=lambda pt: (pt[0]-rx)**2 + (pt[1]-ry)**2)
 
@@ -147,7 +147,7 @@ class GoToCube(StateNode):
         """Returns distance and relative angle to specified docking pose."""
         (rx, ry, rtheta) = self.get_robot_cor(use_world_map)
         (ox, oy, otheta) = side
-        dist = math.sqrt((rx-ox)**2 + (ry-oy)**2)
+        dist = sqrt((rx-ox)**2 + (ry-oy)**2)
         relative_angle = abs(wrap_angle(rtheta-otheta) % (pi/2)) * (180/pi)
         return (dist, relative_angle)
 
@@ -183,7 +183,7 @@ class GoToCube(StateNode):
             ry = self.robot.pose.position.y
             dx = cx - rx
             dy = cy - ry
-            dist = math.sqrt(dx*dx + dy*dy)
+            dist = sqrt(dx*dx + dy*dy)
             bearing = wrap_angle(atan2(dy,dx) - self.robot.pose.rotation.angle_z.radians) * 180/pi
             print('%scube %s at (%5.1f,%5.1f)  robot at (%5.1f,%5.1f)  dist=%5.1f  rel. brg=%5.1f' %
                   (self.id_string, vis, cx, cy, rx, ry, dist, bearing))
@@ -207,7 +207,7 @@ class GoToCube(StateNode):
                 (cx, cy, ctheta) = self.parent.get_robot_cor(False)
                 dx = sx - cx
                 dy = sy - cy
-                dist = math.sqrt(dx*dx + dy*dy)
+                dist = sqrt(dx*dx + dy*dy)
                 self.angle = Angle(degrees = wrap_angle(atan2(dy,dx) - ctheta) * 180/pi)
                 if abs(self.angle.degrees) <= 2:
                     self.angle = degrees(0)
@@ -730,7 +730,12 @@ class PickUpCube(StateNode):
            {raise_lift, raise_head}
 
         raise_lift: SetLiftHeight(0.4)
-        raise_head: SetHeadAngle(5) =C=> raise_head2: SetHeadAngle(0, num_retries=2)
+
+        raise_head: SetHeadAngle(5)
+        raise_head =C=> wait: StateNode() =T(0.1)=> raise_head2
+        raise_head =F=> wait 
+        raise_head2: SetHeadAngle(0, num_retries=2)
+        raise_head2 =F=> verify
 
         {raise_lift, raise_head2} =C=> verify
 
@@ -959,13 +964,13 @@ class RollingCube(StateNode):
                 robot_angle = self.robot.pose.rotation.angle_z.radians
                 pattern = get_pattern_number(self.parent.object.pose.rotation.euler_angles)
                 if pattern == 1:
-                    cube_rotate_angle = wrap_angle(x - math.pi/2)
+                    cube_rotate_angle = wrap_angle(x - pi/2)
                     new_robot_angle = wrap_angle(robot_angle + cube_rotate_angle)
                 elif pattern == 2:
-                    cube_rotate_angle = wrap_angle(y + math.pi)
+                    cube_rotate_angle = wrap_angle(y + pi)
                     new_robot_angle = wrap_angle(robot_angle + cube_rotate_angle)
                 elif pattern == 3:
-                    cube_rotate_angle = wrap_angle(- (x + math.pi/2))
+                    cube_rotate_angle = wrap_angle(- (x + pi/2))
                     new_robot_angle = wrap_angle(robot_angle + cube_rotate_angle)
                 elif pattern == 4:
                     cube_rotate_angle = y
@@ -975,12 +980,12 @@ class RollingCube(StateNode):
                     cube_rotate_angle = 0
                     new_robot_angle = 0
 
-                possible_angles = [-math.pi, -math.pi/2, 0, math.pi/2, math.pi]
+                possible_angles = [-pi, -pi/2, 0, pi/2, pi]
                 facing_side = None
                 new_robot_angle = min(possible_angles, key=lambda val:abs(val-new_robot_angle))
                 if new_robot_angle == 0:
                     facing_side = SIDEWAYS_FRONT
-                elif abs(new_robot_angle) == math.pi:
+                elif abs(new_robot_angle) == pi:
                     facing_side = SIDEWAYS_BACK
                 else:
                     facing_side = SIDEWAYS_SIDE

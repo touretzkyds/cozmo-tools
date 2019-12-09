@@ -4,10 +4,10 @@ import inspect
 import types
 import random
 import numpy as np
-import math
-from multiprocessing import Process, Queue
-from math import pi
 import cv2
+
+from math import pi, sqrt, atan2, inf
+from multiprocessing import Process, Queue
 
 import cozmo
 from cozmo.util import distance_mm, speed_mmps, degrees, Distance, Angle, Pose
@@ -140,26 +140,31 @@ class DriveContinuous(StateNode):
         self.mode = None
         self.pause_counter = 0
         self.handle = None
+        print('<><><>', self, 'starting')
         super().start(event)
 
     def stop(self):
         if self.handle:
             self.handle.cancel()
         self.robot.stop_all_motors()
+        print('<><><>', self, 'stopping')
         super().stop()
 
     def poll(self):
         # Quit if the robot is picked up.
-        if self.robot.is_picked_up:
+        if self.robot.really_picked_up():
             print('** Robot was picked up.')
             self.robot.stop_all_motors()
+            self.path_index = None
+            self.poll_handle.cancel()
             self.post_failure()
+            print('<><><>', self, 'punting')
             return
         # See where we are, and if we've passed the current waypoint.
         x = self.robot.world.particle_filter.pose[0]
         y = self.robot.world.particle_filter.pose[1]
         q = self.robot.world.particle_filter.pose[2]
-        dist = math.sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
+        dist = sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
         if self.pause_counter > 0:
             self.pause_counter -= 1
             #print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
@@ -195,14 +200,14 @@ class DriveContinuous(StateNode):
                 return
             self.prev = self.cur
             self.cur = self.path[self.path_index]
-            self.last_dist = math.inf
+            self.last_dist = inf
             self.reached_dist = False
-            self.target_q = math.atan2(self.cur.y-self.prev.y, self.cur.x-self.prev.x)
+            self.target_q = atan2(self.cur.y-self.prev.y, self.cur.x-self.prev.x)
             print(': [%.1f, %.1f] tgtQ is %.1f deg.' % (self.cur.x, self.cur.y, self.target_q*180/pi))
 
             # Is the target behind us?
             delta_q = wrap_angle(self.target_q - q)
-            delta_dist = math.sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
+            delta_dist = sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
             if False and abs(delta_q) > 135*pi/180:
                 #self.target_q = wrap_angle(self.target_q + pi)
                 self.drive_direction = -1
@@ -256,13 +261,13 @@ class DriveContinuous(StateNode):
         if self.mode == 'x':      # y = f(x)
             target_y = self.m * (x-self.prev.x) + self.b
             d_error = (y - target_y) * np.sign(pi/2 - abs(self.target_q))
-            correcting_q = - 0.8*q_error - 0.25*math.atan2(d_error,25)
+            correcting_q = - 0.8*q_error - 0.25*atan2(d_error,25)
         elif self.mode == 'y':    # x = f(y)
             target_x = self.m * (y-self.prev.y) + self.b
             d_error = (x - target_x) * np.sign(pi/2 - abs(self.target_q-pi/2))
-            correcting_q = - 0.8*q_error - 0.25*math.atan2(-d_error,25)
+            correcting_q = - 0.8*q_error - 0.25*atan2(-d_error,25)
         elif self.mode == 'q':
-            d_error = math.sqrt((x-self.cur.x)**2 + (y-self.cur.y)**2)
+            d_error = sqrt((x-self.cur.x)**2 + (y-self.cur.y)**2)
             correcting_q = - 0.8*q_error
         else:
             print("Bad mode value '%s'" % repr(self.mode))
@@ -339,7 +344,7 @@ class LookAtObject(StateNode):
                 rpos = self.robot.pose.position
                 dx = opos.x - rpos.x
                 dy = opos.y - rpos.y
-            dist = math.sqrt(dx**2 + dy**2)
+            dist = sqrt(dx**2 + dy**2)
             if dist < 60:
                 angle = -0.4
             elif dist < 80:
@@ -500,9 +505,13 @@ class CoroutineNode(StateNode):
     def __init__(self):
         super().__init__()
         self.handle = None
+        self.abort_launch = False
 
     def start(self, event=None):
         super().start(event)
+        if self.abort_launch:
+            self.handle = None
+            return
         cor = self.coroutine_launcher()
         if inspect.iscoroutine(cor):
             self.handle = self.robot.loop.create_task(cor)
@@ -547,9 +556,13 @@ class DriveWheels(CoroutineNode):
             if isinstance(lspeed,(int,float)) and isinstance(rspeed,(int,float)):
                 self.l_wheel_speed = lspeed
                 self.r_wheel_speed = rspeed
-        super().start(event)
-        if self.robot.is_picked_up:
+        self.abort_launch = False
+        if self.robot.really_picked_up():
+            self.abort_launch = True
+            super().start(event)
             self.post_failure()
+            return
+        super().start(event)
 
     def coroutine_launcher(self):
         return self.robot.drive_wheels(self.l_wheel_speed,self.r_wheel_speed,**self.kwargs)
@@ -594,7 +607,7 @@ class DriveForward(DriveWheels):
         p0 = self.start_position
         p1 = self.robot.pose.position
         diff = (p1.x - p0.x, p1.y - p0.y)
-        dist = math.sqrt(diff[0]*diff[0] + diff[1]*diff[1])
+        dist = sqrt(diff[0]*diff[0] + diff[1]*diff[1])
         if dist >= self.distance:
             self.poll_handle.cancel()
             self.stop_wheels()
@@ -611,9 +624,13 @@ class SmallTurn(CoroutineNode):
     def start(self,event=None):
         # constants were determined empirically for speed 50
         self.counter = round((abs(self.angle) + 5) / 1.25) if self.angle else 0
-        super().start(event)
-        if self.robot.is_picked_up:
+        self.abort_launch = False
+        if self.robot.really_picked_up():
+            self.abort_launch = True
+            super().start(event)
             self.post_failure()
+            return
+        super().start(event)
 
     def coroutine_launcher(self):
         if self.angle:
@@ -801,11 +818,13 @@ class ActionNode(StateNode):
         if 'num_retries' not in self.action_kwargs:
             self.action_kwargs['num_retries'] = 2
         self.cozmo_action_handle = None
+        self.abort_launch = False
 
     def start(self,event=None):
         super().start(event)
         self.retry_count = 0
-        self.launch_or_retry()
+        if not self.abort_launch:
+            self.launch_or_retry()
 
     def launch_or_retry(self):
         try:
@@ -922,9 +941,13 @@ class Forward(ActionNode):
         if self.running: return
         if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Distance):
             self.distance = event.data
-        super().start(event)
-        if self.robot.is_picked_up:
+        self.abort_launch = False
+        if self.robot.really_picked_up():
+            self.abort_launch = True
+            super().start(event)
             self.post_failure()
+            return
+        super().start(event)
 
     def action_launcher(self):
         return self.robot.drive_straight(self.distance, self.speed,
@@ -948,9 +971,13 @@ class Turn(ActionNode):
         if self.running: return
         if isinstance(event, DataEvent) and isinstance(event.data, cozmo.util.Angle):
             self.angle = event.data
-        super().start(event)
-        if self.robot.is_picked_up:
+        self.abort_launch = False
+        if self.robot.really_picked_up():
+            self.abort_launch = True
+            super().start(event)
             self.post_failure()
+            return
+        super().start(event)
 
     def action_launcher(self):
         if self.angle is None:

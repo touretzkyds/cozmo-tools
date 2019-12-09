@@ -229,7 +229,7 @@ class Transition(EventListener):
 
     def fire2(self,event):
         if not self.handle:
-            print('@ @ @ @ @ HANDLE GONE: I SHOULD BE DEAD', self, event)
+            pass # print('@ @ @ @ @ HANDLE GONE: I SHOULD BE DEAD', self, event)
         for dest in self.destinations:
             if TRACE.trace_level >= TRACE.transition_fire:
                 print('TRACE%d: ' % TRACE.transition_fire, self, 'starting', dest)

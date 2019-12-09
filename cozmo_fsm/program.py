@@ -142,6 +142,17 @@ class StateMachineProgram(StateNode):
         self.robot.carrying = None
         self.robot.fetching = None
 
+        # robot.is_picked_up uses just the cliff detector, and can be fooled.
+        # robot.pose.rotation does not encode pitch or roll, only yaw.
+        # So use accelerometer data as our backup method.
+        self.robot.really_picked_up = \
+            (lambda robot :
+             (lambda :
+              robot.is_picked_up
+              or (not robot.is_moving
+                  and (robot.accelerometer.z < 9000
+                       or robot.accelerometer.z > 10200))))(self.robot)
+
         # World map and path planner
         self.robot.enable_facial_expression_estimation(True)
         self.robot.world.world_map = \
@@ -225,7 +236,7 @@ class StateMachineProgram(StateNode):
         super().start()
 
     def robot_picked_up(self):
-        print('** Robot was picked up!')
+        print('** Robot was picked up!', self.robot.accelerometer)
         self.robot.stop_all_motors()
         self.run_picked_up_handler(self)
 
@@ -278,7 +289,7 @@ class StateMachineProgram(StateNode):
         self.robot.kine.get_pose()
 
         # Handle robot being picked up or put down
-        if self.robot.is_picked_up:
+        if self.robot.really_picked_up():
             # robot is in the air
             if self.robot.was_picked_up:
                 pass  # we already knew that
@@ -291,7 +302,7 @@ class StateMachineProgram(StateNode):
                     self.put_down_handler()
                 else:
                     pf.move()
-        self.robot.was_picked_up = self.robot.is_picked_up
+        self.robot.was_picked_up = self.robot.really_picked_up()
 
         # Handle robot being placed on the charger
         if self.robot.is_on_charger:
@@ -345,7 +356,7 @@ class StateMachineProgram(StateNode):
 
         # Use this heartbeat signal to look for new landmarks
         pf = self.robot.world.particle_filter
-        if pf and not self.robot.is_picked_up:
+        if pf and not self.robot.really_picked_up():
             pf.look_for_new_landmarks()
 
         # Finally update the world map

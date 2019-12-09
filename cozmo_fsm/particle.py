@@ -863,11 +863,13 @@ class SLAMSensorModel(SensorModel):
                 else:
                     self.pf.state = ParticleFilter.LOCALIZING
                     force = True
+                    just_looking = False
             else: # no landmarks, so we can't be lost
                 self.pf.state = ParticleFilter.LOCALIZED
 
         # Unless forced, don't evaluate unless the robot moved enough
         # for evaluation to be worthwhile.
+        #print('force=',force,'  dist=',dist, '  state=',self.pf.state)
         if (not force) and (dist < 5) and abs(turn_angle) < 2*pi/180:
             return False
         if not just_looking:
@@ -877,7 +879,8 @@ class SLAMSensorModel(SensorModel):
         for cube in self.robot.world.light_cubes.values():
             if self.landmark_test(cube):
                 id = 'Cube-'+str(cube.cube_id)
-                evaluated = self.process_landmark(id, cube, just_looking, []) or evaluated
+                evaluated = self.process_landmark(id, cube, just_looking, []) \
+                            or evaluated
 
         # Evaluate ArUco landmarks
         try:
@@ -888,7 +891,8 @@ class SLAMSensorModel(SensorModel):
         for marker in seen_marker_objects.values():
             if self.landmark_test(marker):
                 evaluated = self.process_landmark(marker.id_string, marker,
-                                                  just_looking, seen_marker_objects) or evaluated
+                                                  just_looking, seen_marker_objects) \
+                            or evaluated
 
         # Evaluate walls.  First find the set of "good" markers.
         # Good markers have been seen consistently enough to be deemed reliable.
@@ -899,7 +903,9 @@ class SLAMSensorModel(SensorModel):
                 good_markers.append(marker.id)
         walls = self.generate_walls_from_markers(seen_marker_objects, good_markers)
         for wall in walls:
-            evaluated = self.process_landmark(wall.id, wall, just_looking, seen_marker_objects) or evaluated
+            evaluated = self.process_landmark(wall.id, wall, just_looking, seen_marker_objects) \
+                        or evaluated
+            #print('for', wall, '  evaluated now', evaluated, '  just_looking=', just_looking, seen_marker_objects)
 
         # Evaluate perched cameras as landmarks
         if self.use_perched_cameras:
@@ -907,8 +913,10 @@ class SLAMSensorModel(SensorModel):
             perched = list(self.robot.world.perched.camera_pool.get(self.robot.aruco_id,{}).values())
             for cam in perched:
                 id = 'Cam-XXX'
-                evaluated = self.process_landmark(id, cam, just_looking, seen_marker_objects) or evaluated
+                evaluated = self.process_landmark(id, cam, just_looking, seen_marker_objects) \
+                            or evaluated
 
+        #print('nwalls=', len(walls), '  evaluated=',evaluated)
         if evaluated:
             wmax = - np.inf
             for p in particles:
@@ -916,7 +924,8 @@ class SLAMSensorModel(SensorModel):
             if wmax > -5.0 and self.pf.state != ParticleFilter.LOCALIZED:
                 print('::: LOCALIZED :::')
                 self.pf.state = ParticleFilter.LOCALIZED
-            elif self.pf.state != ParticleFilter.LOCALIZED: pass
+            elif self.pf.state != ParticleFilter.LOCALIZED:
+                print('not localized because wmax =', wmax)
             min_log_weight = self.robot.world.particle_filter.min_log_weight
             if wmax < min_log_weight:
                 wt_inc = min_log_weight - wmax
@@ -1016,7 +1025,7 @@ class SLAMSensorModel(SensorModel):
         if id in self.robot.world.world_map.objects:
             obj = self.robot.world.world_map.objects[id]
             should_update_landmark = (not obj.is_fixed) and \
-                                     (not self.pf.state == ParticleFilter.LOCALIZING)
+                                     (self.pf.state == ParticleFilter.LOCALIZED)
         else:
             should_update_landmark = True
 

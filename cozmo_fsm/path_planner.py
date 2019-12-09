@@ -13,6 +13,7 @@ from .worldmap import WorldObject, LightCubeObj, ChargerObj, CustomMarkerObj, Ro
 from .rrt import RRT, RRTNode, StartCollides, GoalCollides, GoalUnreachable
 from .wavefront import WaveFront
 from .geometry import wrap_angle, segment_intersect_test
+from .doorpass import DoorPass
 
 from . import rrt
 
@@ -216,10 +217,53 @@ class PathPlanner():
         step1 = NavStep(NavStep.DRIVE, new_path)
         steps.append(step1)
         if door:
+            print('door=', door)
             # *** adding *** gate = DoorPass.calculate_gate(self.robot, door, DoorPass.OUTER_GATE_DISTANCE)
             # Should this from_path method be in NavPlan?  Maybe move it to PathPlanner?
-            step2 = NavStep(NavStep.DOORPASS, door)
-            steps.append(step2)
+            (rx,ry) = (new_path[-1].x, new_path[-1].y)
+            DELTA = 15 # mm
+            gate = DoorPass.calculate_gate((rx,ry), door, DoorPass.OUTER_GATE_DISTANCE+DELTA)
+            gate_node = RRTNode(x=gate[0], y=gate[1])
+            print('gate_node=',gate_node)
+            """
+            *** TODO:  
+
+            (1) Dont' make step1 so early.  If new_path[-1] is closer
+            to the door than the gate node, replace this element.
+            Cheap solution: replae new_path[-1] with the gate node.
+            Correct solution: chek to see if there is a collision-free
+            path from new_path[-2] to the gate node.
+
+            (2) Robot doesn't relocalize when looking at a wall on
+            startup until we make it move.  Fix this.
+
+            FIXED (3) If "visit" fails because we're not localized or
+            we're on the charger, we never seem to recover from this
+            even if the robot is picked up and put down again.
+
+            (4) Right trigger freeze doesn't work on grab or roll
+            actions.
+
+            (5) If we're stuck in TurnTowardGoal, stopping the program
+            and restarting it immediately resumes TurnTowardGoal.  How
+            is this even possible?
+
+            (6) If visit fails, e.g., because robot is on charger,
+            can't get the system to run the action again even if we
+            pick the robot up and put it down again..
+
+            (7) "Roll upright" is behaving strangely if the cube is on
+            its side.  It plans a path to the wrong side of the cube,
+            gets there, then changes its mind.
+
+            """
+
+            if steps[-1].type == NavStep.DRIVE:
+                steps[-1].param.append(gate_node)
+            else:
+                steps.append(NavStep(NavStep.DRIVE, [gate_node]))
+            step3 = NavStep(NavStep.DOORPASS, door)
+            steps.append(step3)
         plan = NavPlan(steps)
         return plan
 
