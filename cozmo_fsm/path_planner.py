@@ -234,8 +234,8 @@ class PathPlanner():
             Correct solution: chek to see if there is a collision-free
             path from new_path[-2] to the gate node.
 
-            (2) Robot doesn't relocalize when looking at a wall on
-            startup until we make it move.  Fix this.
+            FIXED: (2) Robot doesn't relocalize when looking at a wall
+            on startup until we make it move.
 
             FIXED (3) If "visit" fails because we're not localized or
             we're on the charger, we never seem to recover from this
@@ -248,11 +248,7 @@ class PathPlanner():
             and restarting it immediately resumes TurnTowardGoal.  How
             is this even possible?
 
-            (6) If visit fails, e.g., because robot is on charger,
-            can't get the system to run the action again even if we
-            pick the robot up and put it down again..
-
-            (7) "Roll upright" is behaving strangely if the cube is on
+            (6) "Roll upright" is behaving strangely if the cube is on
             its side.  It plans a path to the wrong side of the cube,
             gets there, then changes its mind.
 
