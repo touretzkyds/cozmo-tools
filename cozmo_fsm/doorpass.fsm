@@ -142,6 +142,22 @@ class DoorPass(StateNode):
                 self.height = 0.4 if self.robot.lift_ratio > 0.5 else 1
             super().start(event)
 
+    class DriveThrough(Forward):
+        """Travel forward to drive through the gate."""
+        def __init__(self):
+            super().__init__()
+
+        def start(self,event=None):
+            (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
+            (gate_x, gate_y, gate_theta) = DoorPass.calculate_gate((rx,ry), self.parent.object, 0)
+            dist = sqrt((gate_x-rx)**2 + (gate_y-ry)**2)
+            offset = 120
+            delta_theta = wrap_angle(rtheta-(gate_theta+pi/2))
+            delta_dist = abs(offset/sin(delta_theta))
+            dist += delta_dist
+            self.distance = distance_mm(dist)
+            self.speed = speed_mmps(50)
+            super().start(event)
 
     $setup{
         droplift: self.AdjustLiftHeight() =N=>
@@ -182,7 +198,7 @@ class DoorPass(StateNode):
 
         lower_head: SetHeadAngle(0)
 
-        through_door: Forward(150)
+        through_door: self.DriveThrough()
 
         {lower_head, through_door} =C=> self.CheckCarrying() =C=> ParentCompletes()
 
