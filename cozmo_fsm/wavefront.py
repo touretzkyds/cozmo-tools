@@ -7,7 +7,7 @@ import cv2
 import heapq
 from math import floor, ceil, cos, sin
 
-from .geometry import wrap_angle, rotate_point, polygon_fill
+from .geometry import wrap_angle, rotate_point, polygon_fill, check_concave
 from .rrt import StartCollides
 from .rrt_shapes import *
 
@@ -88,7 +88,14 @@ class WaveFront():
         goal_buffer = 20
         if shape.obstacle_id.startswith('Room'):
             offset = -1 if default_offset is None else default_offset # for rooms
-            goal_points = polygon_fill(shape, offset)
+            isConcave, vertices_lst = False, []
+            if offset > 0:
+                isConcave, vertices_lst = check_concave(shape)
+            if isConcave:
+                for vertices in vertices_lst:
+                    goal_points += polygon_fill(Polygon(vertices), offset)
+            else:
+                goal_points = polygon_fill(shape, offset)
         else:
             offset = 50   # for cubes, charger, markers
             for buffer in range(goal_buffer):

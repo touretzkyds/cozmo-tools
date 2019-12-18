@@ -389,36 +389,24 @@ def polygon_fill(polygon, offset):
             for edge in edge_table[scanline]:
                 active_list.append(edge)
         if len(active_list) > 0:
-            y_lower_bound = yCenter - offset
-            y_upper_bound = yCenter + offset
-            if offset < 0:
-                y_lower_bound = ymin - offset
-                y_upper_bound = ymax + offset
-            if y_lower_bound <= scanline <= y_upper_bound:
+            y_lower_bound = (ymin - offset) if (offset < 0) else (yCenter - offset)
+            y_upper_bound = (ymax + offset) if (offset < 0) else (yCenter + offset)
+            if y_lower_bound < scanline < y_upper_bound:
                 # Sort active_list on x value; if same x value, sort on slope (1/m)
                 active_list = sorted(active_list, key = lambda x: (x.xval, x.sign*x.dx/x.dy))
                 for _x in range(active_list[0].xval, active_list[1].xval):
-                    x_lower_bound = xCenter - offset
-                    x_upper_bound = xCenter + offset
-                    if offset < 0:
-                        x_lower_bound = active_list[0].xval - offset
-                        x_upper_bound = active_list[1].xval + offset
-                    if x_lower_bound <= _x <= x_upper_bound:
+                    x_lower_bound = (active_list[0].xval - offset) if (offset < 0) else (xCenter - offset)
+                    x_upper_bound = (active_list[1].xval + offset) if (offset < 0) else (xCenter + offset)
+                    if x_lower_bound < _x < x_upper_bound:
                         points.append([_x-xdelta, scanline-ydelta])
         if len(active_list) > 3:
-            y_lower_bound = yCenter - offset
-            y_upper_bound = yCenter + offset
-            if offset < 0:
-                y_lower_bound = ymin - offset
-                y_upper_bound = ymax + offset
-            if y_lower_bound <= scanline <= y_upper_bound:
+            y_lower_bound = (ymin - offset) if (offset < 0) else (yCenter - offset)
+            y_upper_bound = (ymax + offset) if (offset < 0) else (yCenter + offset)
+            if y_lower_bound < scanline < y_upper_bound:
                 for _x in range(active_list[2].xval, active_list[3].xval):
-                    x_lower_bound = xCenter - offset
-                    x_upper_bound = xCenter + offset
-                    if offset < 0:
-                        x_lower_bound = active_list[2].xval - offset
-                        x_upper_bound = active_list[3].xval + offset
-                    if x_lower_bound <= _x <= x_upper_bound:
+                    x_lower_bound = (active_list[2].xval - offset) if (offset < 0) else (xCenter - offset)
+                    x_upper_bound = (active_list[3].xval + offset) if (offset < 0) else (xCenter + offset)
+                    if x_lower_bound < _x < x_upper_bound:
                         points.append([_x-xdelta, scanline-ydelta])
         # Remove form active_list if edge.ymax = scanline
         active_list = [edge for edge in active_list if scanline < edge.ymax]
@@ -432,3 +420,24 @@ def polygon_fill(polygon, offset):
                 edge.sum -= edge.dy
 
     return points
+
+def check_concave(polygon):
+    """
+    Input a polygon (rrt shape)
+    Return a boolean(is concave or not) and
+           a list of triangle vertices divided from the concave polygon
+    """
+    # Currently only works for quadrilateral
+    vertices = np.transpose(polygon.vertices).tolist()
+    edges = [[p1x-p2x, p1y-p2y] for [[p1x], [p1y], _, _], [[p2x], [p2y], _, _] in polygon.edges]
+    crossProducts = [np.cross(edges[i], edges[i-1]) > 0 for i in range(len(edges))]
+    if all(crossProducts) or not any(crossProducts):
+        return False, None
+    else:
+        trues = [i for i in range(len(crossProducts)) if crossProducts[i] == True]
+        falses = [i for i in range(len(crossProducts)) if crossProducts[i] == False]
+        idx = trues[0] if len(trues) < len(falses) else falses[0]
+        vertices += vertices
+        tri1 = vertices[:][idx:idx+3]
+        tri2 = vertices[:][idx+2:idx+5]
+        return True, [np.transpose(tri1), np.transpose(tri2)]
