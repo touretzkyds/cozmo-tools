@@ -217,7 +217,8 @@ def get_orientation_state(quaternion, isPlanar=False):
                 orientation = ORIENTATION_LEFT
         else:
             # Cubes
-            orientation = ORIENTATION_SIDEWAYS
+            isSideways = (round(y, 2)==0 or abs(round(y, 2))==round(pi/2, 2))
+            orientation = ORIENTATION_SIDEWAYS if isSideways else ORIENTATION_TILTED
             if round(y, 1) == 0:
                 z = z-pi/2 if x>0 else z+pi/2
             else:
