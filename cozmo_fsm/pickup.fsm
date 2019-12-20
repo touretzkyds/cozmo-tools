@@ -16,7 +16,6 @@ from math import sin, cos, atan2, pi, sqrt
 import copy
 
 
-
 class GoToCube(StateNode):
     def __init__(self, cube=None):
         self.object = cube
@@ -38,6 +37,8 @@ class GoToCube(StateNode):
         self.children['looker'].object = self.object
         self.sides = []
         self.side = None
+        self.side_index = 0
+        self.try_number = 0
         super().start(event)
         if self.wmobject.pose_confidence < 0:
             print('GoToCube: cube has invalid pose!', self.wmobject, self.object.pose)
@@ -45,38 +46,30 @@ class GoToCube(StateNode):
             self.post_failure()
 
     def pick_side(self, offset, use_world_map):
-        "*** BUG: This code is only correct for upright cubes"
+        # If use_world_map is True, use the LightCubeObj pose.
+        # If False, use the LightCube's pose as determined by vision.
         cube = self.object
         if use_world_map:
             wmobj = self.object.wm_obj
             x = wmobj.x
             y = wmobj.y
-
-            # bug: ang =\= wmobj.theta, why?
             ang = wmobj.theta
-
             orientation = wmobj.orientation
             print('Pick side from', self.object.wm_obj)
         else:
             x = cube.pose.position.x
             y = cube.pose.position.y
-            ang = cube.pose.rotation.angle_z.radians
             orientation, _, _, z = get_orientation_state(cube.pose.rotation.q0_q1_q2_q3)
             if orientation == ORIENTATION_SIDEWAYS:
                 ang = wrap_angle(z)
+            else:
+                ang = cube.pose.rotation.angle_z.radians
         (rx, ry, rtheta) = self.get_robot_cor(use_world_map=use_world_map)
         dist = LightCubeObj.light_cube_size[0]/2 + offset
         side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
-        if use_world_map:
-            side1 = [ (x + cos(wmobj.theta)*dist), (y + sin(wmobj.theta)*dist), wrap_angle(wmobj.theta + pi)   ]
-            side2 = [ (x - cos(wmobj.theta)*dist), (y - sin(wmobj.theta)*dist), wmobj.theta]
-            side3 = [ (x + sin(wmobj.theta)*dist), (y - cos(wmobj.theta)*dist), wrap_angle(wmobj.theta + pi/2) ]
-            side4 = [ (x - sin(wmobj.theta)*dist), (y + cos(wmobj.theta)*dist), wrap_angle(wmobj.theta - pi/2) ]
-        else:
-            side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
-            side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)    ]
-            side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
-            side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
+        side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)    ]
+        side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
+        side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
         # sides = (side1, side2, side3, side4)
         sides = (side2, side3, side1, side4)
 
@@ -107,7 +100,7 @@ class GoToCube(StateNode):
         if self.try_number == 0:
             # initialize first try side index as the closest one
             self.side_index = sides.index(sorted_sides[0])
-        print('Go to side %i' %self.side_index)
+        print('Go to side %i' % self.side_index)
         return sides[self.side_index]
 
     def get_robot_pose(self, use_world_map):
@@ -202,8 +195,9 @@ class GoToCube(StateNode):
                 self.angle = None
                 super().start(event)
                 self.post_failure()
+                print('TurnToCube %s posted failure' % self.name)
             else:
-                (sx, sy, _) = self.parent.pick_side(0, False)
+                (sx, sy, _) = self.parent.pick_side(0, use_world_map=False)
                 (cx, cy, ctheta) = self.parent.get_robot_cor(False)
                 dx = sx - cx
                 dy = sy - cy
@@ -224,7 +218,7 @@ class GoToCube(StateNode):
             if self.running: return
             super().start(event)
             cube = self.parent.object
-            side = self.parent.pick_side(0, True)
+            side = self.parent.pick_side(0, use_world_map=True)
             self.parent.side = side
             (dist, relative_angle) = self.parent.measure_dockedness(side,True)
             max_distance_from_dock_point = 150 # millimeters
@@ -391,7 +385,7 @@ class GoToCube(StateNode):
             else:
                 self.parent.try_number += 1
                 self.parent.side_index = (self.parent.side_index + 1) % 4
-                print('Haven\'t tired out all sides of cube. Going to try the side', self.parent.side_index)
+                print('Haven\'t tried out all sides of cube. Going to try the side', self.parent.side_index)
                 self.post_success()
 
 
@@ -490,7 +484,11 @@ class GoToCube(StateNode):
             self.ReportPosition('turn_to_cube1_deccel')
             =T(0.75)=> self.ReportPosition('turn_to_cube1_stopped')
             =N=> Print('wait to approach...') =N=> approach
-        turn_to_cube1 =F=> Forward(-50) =C=> StateNode() =T(1)=> turn_to_cube2
+        turn_to_cube1 =F=> recover1
+        turn_to_cube1 =T(5)=> recover1  # failsafe in case the failure event is missed??
+
+        recover1: Forward(-50) =C=> StateNode() =T(1)=> turn_to_cube2
+        
 
         approach: self.ForwardToCube(60) =C=> StateNode() =T(0.75)=>
             self.ReportPosition('approach') =T(0.75)=>

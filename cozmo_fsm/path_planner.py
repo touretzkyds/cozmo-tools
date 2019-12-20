@@ -119,16 +119,18 @@ class PathPlanner():
             for (phi, escape_distance) in escape_options:
                 if phi != pi:
                     new_q = wrap_angle(q + phi)
+                    escape_type = NavStep.DRIVE
                 else:
-                    new_q = q
+                    new_q = q   # drive backwards on current heading
+                    escape_type = NavStep.BACKUP
                 new_start = RRTNode(x=start_node.x + escape_distance*cos(q+phi),
                                     y=start_node.y + escape_distance*sin(q+phi),
                                     q=new_q)
                 collider2 = rrt_instance.collides(new_start)
-                print('trying escape', new_start, collider2)
+                print('trying escape', new_start, 'collision:', collider2)
                 if not collider2  and \
                    not wf.check_start_collides(new_start.x,new_start.y):
-                    start_escape_move = (phi, start_node, new_start)
+                    start_escape_move = (escape_type, phi, start_node, new_start)
                     start_node = new_start
                     break
             if start_escape_move is None:
@@ -164,12 +166,11 @@ class PathPlanner():
 
         # Construct the navigation plan
         navplan = PathPlanner.from_path(rrt_instance.path, doorway_list)
-        print('navplan=',navplan, '   steps=',navplan.steps)
 
         # Insert the StartCollides escape move if there is one
         if start_escape_move:
-            phi, start, new_start = start_escape_move
-            if phi == pi:
+            escape_type, phi, start, new_start = start_escape_move
+            if escape_type == NavStep.BACKUP:
                 escape_step = NavStep(NavStep.BACKUP, (RRTNode(x=new_start.x, y=new_start.y),))
                 navplan.steps.insert(0, escape_step)
             elif navplan.steps[0].type == NavStep.DRIVE:
@@ -183,6 +184,7 @@ class PathPlanner():
                 navplan.steps.insert(0, escape_step)
 
         # Return the navigation plan
+        print('navplan=',navplan, '   steps=',navplan.steps)
         result = (navplan, grid_display)
         return DataEvent(result)
 
