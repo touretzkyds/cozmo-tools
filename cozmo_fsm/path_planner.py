@@ -140,7 +140,7 @@ class PathPlanner():
         # Run the wavefront path planner
         rrt_instance.obstacles = fat_obstacles
         if goal_shape.obstacle_id.startswith('Room'):
-            offsets = [5, -25, -1]
+            offsets = [1, -25, -1]
         else:
             offsets = [None]
         for offset in offsets:
@@ -151,7 +151,7 @@ class PathPlanner():
             wf_start = (start_node.x, start_node.y)
             goal_found = wf.propagate(*wf_start)
             if goal_found: break
-            print('Wavefront planning failed with offset', offset) 
+            print('Wavefront planning failed with offset', offset)
             wf = WaveFront(bbox=rrt_instance.bbox)  # need a fresh grid
         grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
@@ -228,7 +228,7 @@ class PathPlanner():
             gate_node = RRTNode(x=gate[0], y=gate[1])
             print('gate_node=',gate_node)
             """
-            *** TODO:  
+            *** TODO:
 
             (1) Dont' make step1 so early.  If new_path[-1] is closer
             to the door than the gate node, replace this element.
