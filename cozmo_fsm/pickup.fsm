@@ -105,6 +105,11 @@ class GoToCube(StateNode):
         print('Go to side %i' % self.side_index)
         return sorted_sides[self.side_index]
 
+    def pick_another_side(self):
+        # put the code from ChooseAnotherSide here
+        pass
+    
+
     def get_robot_pose(self, use_world_map):
         if use_world_map:
             rx = self.robot.world.particle_filter.pose[0]
@@ -378,6 +383,11 @@ class GoToCube(StateNode):
 
         def start(self, event=None):
             super().start(event)
+            # Replace the code below with:
+            #  if self.parent.pick_another_side():
+            #     self.post_success();
+            #  else:
+            #     self.post_failure()
             if self.parent.try_number >= self.parent.try_max:
                 # Have tried all sides, reset counter
                 print('Have tried all sides.')
