@@ -68,28 +68,26 @@ class GoToCube(StateNode):
                 ang = cube.pose.rotation.angle_z.radians
         (rx, ry, rtheta) = self.get_robot_cor(use_world_map=use_world_map)
         dist = LightCubeObj.light_cube_size[0]/2 + offset
-        side1 = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
-        side2 = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)    ]
-        side3 = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
-        side4 = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
-        # sides = (side1, side2, side3, side4)
-        sides = (side2, side3, side1, side4)
+        sideTop    = [ (x + cos(ang)*dist), (y + sin(ang)*dist), wrap_angle(ang + pi)   ]
+        sideBottom = [ (x - cos(ang)*dist), (y - sin(ang)*dist), wrap_angle(ang)    ]
+        sideA      = [ (x + sin(ang)*dist), (y - cos(ang)*dist), wrap_angle(ang + pi/2) ]
+        sideB      = [ (x - sin(ang)*dist), (y + cos(ang)*dist), wrap_angle(ang - pi/2) ]
+        sides = (sideTop, sideBottom, sideA, sideB)
 
         if orientation == ORIENTATION_SIDEWAYS:
             if self.roll_cube:
                 # if the orientation is sideways, only two valid sides to roll cube to upright/inverted
                 if self.roll_target == ORIENTATION_UPRIGHT or self.roll_target == ORIENTATION_INVERTED:
                     self.try_max = 1
-                    sorted_sides = (side2, side1) if self.roll_target == ORIENTATION_UPRIGHT else (side1, side2)
-                    self.side_index = self.side_index%2
+                    sorted_sides = (sideBottom, sideTop) if self.roll_target == ORIENTATION_UPRIGHT else (sideTop, sideBottom)
                 else:
-                    sides12 = sorted((side1, side2), key=lambda pt: ((pt[0]-rx)**2 + (pt[1]-ry)**2))
-                    sides34 = sorted((side3, side4), key=lambda pt: ((pt[0]-rx)**2 + (pt[1]-ry)**2))
-                    sorted_sides = sides12 + sides34
+                    sides_vertical = sorted((sideTop, sideBottom), key=lambda pt: ((pt[0]-rx)**2 + (pt[1]-ry)**2))
+                    sides_horizontal = sorted((sideA, sideB), key=lambda pt: ((pt[0]-rx)**2 + (pt[1]-ry)**2))
+                    sorted_sides = sides_vertical + sides_horizontal
             else:
                 # if the orientation is sideways, only one valid side to pickup cube
                 self.try_max = 0
-                side = side2
+                side = sideBottom
                 d = sqrt((side[0]-rx)**2 + (side[1]-ry)**2)
                 print('  side 0: %5.1f mm   %5.1f , %5.1f @ %5.1f deg.' %
                       (d, side[0], side[1], side[2]*180/pi))
@@ -106,9 +104,19 @@ class GoToCube(StateNode):
         return sorted_sides[self.side_index]
 
     def pick_another_side(self):
-        # put the code from ChooseAnotherSide here
-        pass
-    
+        if self.try_number >= self.try_max:
+            # Have tried all sides, reset counter
+            print('Have tried all sides.')
+            self.try_number = 0
+            self.side_index = 0
+            self.try_max = 3
+            return False
+        else:
+            self.try_number += 1
+            self.side_index += 1
+            print('Haven\'t tried out all sides of cube. Going to try the side', self.side_index)
+            return True
+
 
     def get_robot_pose(self, use_world_map):
         if use_world_map:
@@ -383,23 +391,10 @@ class GoToCube(StateNode):
 
         def start(self, event=None):
             super().start(event)
-            # Replace the code below with:
-            #  if self.parent.pick_another_side():
-            #     self.post_success();
-            #  else:
-            #     self.post_failure()
-            if self.parent.try_number >= self.parent.try_max:
-                # Have tried all sides, reset counter
-                print('Have tried all sides.')
-                self.parent.try_number = 0
-                self.parent.side_index = 0
-                self.parent.try_max = 3
-                self.post_failure()
-            else:
-                self.parent.try_number += 1
-                self.parent.side_index = (self.parent.side_index + 1) % 4
-                print('Haven\'t tried out all sides of cube. Going to try the side', self.parent.side_index)
+            if self.parent.pick_another_side():
                 self.post_success()
+            else:
+                self.post_failure()
 
 
     class CheckCubePoseValid(StateNode):
@@ -462,32 +457,41 @@ class GoToCube(StateNode):
 
         check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
         check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
-        check_almost_docked =S=> Forward(-10) =C=> manual_dock1   # we're close: skip the Pilot and set up dock manually
+        check_almost_docked =S=> setup_manual_dock   # we're close: skip the Pilot and set up dock manually
         check_almost_docked =F=> pilot_check_start   # not close: use the Pilot to path plan
+
+        setup_manual_dock: Forward(-10)
+        setup_manual_dock =C=> manual_dock1
+        setup_manual_dock =F=> failure
 
         manual_dock1: self.ManualDock1()
         manual_dock1 =D=> Turn() =C=> Print('turned. wait...') =N=> manual_dock1
         manual_dock1 =C=> Print('wait...') =N=> manual_dock2
         manual_dock1 =T(10)=> Print('Cannot manual dock from here') =N=> pilot_check_start  # temporary
 
-        manual_dock2: self.ManualDock2() =C=> Print('wait...') =N=> turn_to_cube1
+        manual_dock2: self.ManualDock2()
+        manual_dock2 =C=> Print('wait...') =N=> turn_to_cube1
+        manual_dock2 =F=> failure
 
         pilot_check_start: PilotCheckStart()
         pilot_check_start =S=> Print('Start collision check passed.') =N=> go_side
         # TODO: instead of blindly backing up, find the best direction to move.
-        pilot_check_start =F=> Print('Backing up to escape start collision...') =N=>
-           Forward(-80) =C=> StateNode() =T(0.5)=> pilot_check_start2
+        pilot_check_start =F=> Print('Backing up to escape start collision...') =N=> backup_for_escape
+
+        backup_for_escape: Forward(-80)
+        backup_for_escape =C=> pilot_check_start2
+        backup_for_escape =F=> failure
 
         # Second chance to avoid StartCollides.  There is no third chance.
         pilot_check_start2: PilotCheckStart()
         pilot_check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
-        pilot_check_start2 =PILOT(StartCollides)=> check_start2_pilot: ParentPilotEvent()
+        pilot_check_start2 =PILOT(StartCollides)=> check_start2_pilot: ParentPilotEvent() =N=> failure
         pilot_check_start2 =F=> failure
 
         go_side: self.PilotToSide()
         go_side =PILOT(GoalCollides)=> failure
         go_side =PILOT(MaxIterations)=> failure
-        go_side =PILOT=> go_side_pilot: ParentPilotEvent()
+        go_side =PILOT=> go_side_pilot: ParentPilotEvent() =N=> failure
         go_side =F=> failure
         go_side =C=> self.ReportPosition('go_side_deccel')
             =T(0.75)=> self.ReportPosition('go_side_stopped')
@@ -498,15 +502,18 @@ class GoToCube(StateNode):
             =T(0.75)=> self.ReportPosition('turn_to_cube1_stopped')
             =N=> Print('wait to approach...') =N=> approach
         turn_to_cube1 =F=> recover1
-        turn_to_cube1 =T(5)=> recover1  # failsafe in case the failure event is missed??
 
-        recover1: Forward(-50) =C=> StateNode() =T(1)=> turn_to_cube2
+        recover1: Forward(-50)
+        recover1 =C=> turn_to_cube2
+        recover1 =F=> failure
 
         approach: self.ForwardToCube(60) =C=> StateNode() =T(0.75)=>
             self.ReportPosition('approach') =T(0.75)=>
             self.ReportPosition('approach') =N=> Print('wait...') =N=>
             turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=> Print('wait...') =N=>
             exit_to_roll
+
+        approach =F=> failure
 
         exit_to_roll: self.ReadyToRoll()
         exit_to_roll =F=> forward_to_cube_1a
@@ -518,10 +525,13 @@ class GoToCube(StateNode):
         turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
         turn_to_cube2 =C=> forward_to_cube2
 
-        forward_to_cube2: self.ForwardToCube(60) =C=> turn_to_cube3
+        forward_to_cube2: self.ForwardToCube(60)
+        forward_to_cube2 =C=> turn_to_cube3
+        forward_to_cube2 =F=> failure
 
         turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
         turn_to_cube3 =C=> exit_to_roll2
+        turn_to_cube3 =F=> failure
 
         exit_to_roll2: self.ReadyToRoll()
         exit_to_roll2 =F=> forward_to_cube3
@@ -900,6 +910,17 @@ class RollingCube(StateNode):
             self.post_failure()
 
 
+    def try_again(self):
+        if self.try_roll_number > 2:
+            self.try_roll_number = 0
+            print('Reach max trying number.')
+            return False
+        else:
+            self.try_roll_number += 1
+            print('try again', self.try_roll_number)
+            return True
+
+
     class CheckOrientation(StateNode):
         def start(self,event=None):
             self.parent.orientation, _, _, _ = get_orientation_state(self.parent.object.pose.rotation.q0_q1_q2_q3)
@@ -908,7 +929,7 @@ class RollingCube(StateNode):
                 print('roll it successfully to', self.parent.target_orientation)
                 self.post_completion()
             elif not self.parent.target_orientation:
-                if not self.parent.old_object:
+                if not self.parent.old_object or self.parent.old_object.wm_obj.id != self.parent.object.wm_obj.id:
                     self.parent.old_object = copy.copy(self.parent.object)
                     self.post_failure()
                 elif same_orientation(self.parent.old_object, self.parent.object):
@@ -1025,16 +1046,16 @@ class RollingCube(StateNode):
 
 
     class TryAgain(StateNode):
+        def __init__(self):
+            super().__init__()
+
         def start(self, event=None):
             super().start(event)
-
-            if self.parent.try_roll_number > 2:
-                self.parent.try_roll_number = 0
+            if self.parent.try_again():
                 self.post_failure()
             else:
-                self.parent.try_roll_number += 1
-                print('try again', self.parent.try_roll_number)
                 self.post_success()
+
 
     class ForwardToCube(Forward):
         def __init__(self, offset):
@@ -1061,7 +1082,7 @@ class RollingCube(StateNode):
 
         check_cube_pose: self.CheckCubePoseValidOnce(check_vis=False)
         check_cube_pose =C=> check_orientation
-        check_cube_pose =F=> ParentFails()
+        check_cube_pose =F=> fail
 
         check_orientation: self.CheckOrientation()
         check_orientation =C=> ParentCompletes()
@@ -1079,11 +1100,15 @@ class RollingCube(StateNode):
 
         check_cube_pose_valid: self.CheckCubePoseValidOnce(check_vis=True)
         check_cube_pose_valid =C=> check_orientation
-        check_cube_pose_valid =F=> Forward(-30) =C=> Print('backing up...') =T(1)=> check_cube_pose_valid2
+        check_cube_pose_valid =F=> setup_check_again
+
+        setup_check_again: Forward(-30)
+        setup_check_again =C=> Print('backing up...') =T(1)=> check_cube_pose_valid2
+        setup_check_again =F=> try_again
 
         check_cube_pose_valid2:self.CheckCubePoseValidOnce(check_vis=True, reset=True)
         check_cube_pose_valid2 =C=> check_orientation
-        check_cube_pose_valid2 =F=> fail
+        check_cube_pose_valid2 =F=> try_again
 
         roll1: RollCube()
         roll1 =C=> Forward(-30) =C=> Print('Checking the new orientation...') =T(1)=> check_cube_pose_valid
