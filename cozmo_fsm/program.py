@@ -256,6 +256,7 @@ class StateMachineProgram(StateNode):
 
     def stop(self):
         super().stop()
+        self.robot.erouter.clear()
         try:
             self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage,
                                                   self.process_image)

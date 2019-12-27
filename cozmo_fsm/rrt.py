@@ -509,11 +509,11 @@ class RRT():
                 obstacles = obstacles + \
                             self.generate_wall_obstacles(obj, obstacle_inflation, passageway_adjustment)
             elif isinstance(obj, (LightCubeObj,CustomCubeObj,ChargerObj)):
-                obstacles.append(self.generate_cube_obstacle(obj))
+                obstacles.append(self.generate_cube_obstacle(obj, obstacle_inflation))
             elif isinstance(obj, CustomMarkerObj):
-                obstacles.append(self.generate_marker_obstacle(obj))
+                obstacles.append(self.generate_marker_obstacle(obj,obstacle_inflation))
             elif isinstance(obj, ChipObj):
-                obstacles.append(self.generate_chip_obstacle(obj))
+                obstacles.append(self.generate_chip_obstacle(obj,obstacle_inflation))
             elif isinstance(obj, RobotForeignObj):
                obstacles.append(self.generate_foreign_obstacle(obj))
         self.obstacles = obstacles
@@ -550,18 +550,18 @@ class RRT():
         return obst
 
     @staticmethod
-    def generate_cube_obstacle(obj):
+    def generate_cube_obstacle(obj, obstacle_inflation=0):
         r = Rectangle(center=geometry.point(obj.x, obj.y),
-                      dimensions=obj.size[0:2],
+                      dimensions=[obj.size[0]+2*obstacle_inflation, obj.size[1]+2*obstacle_inflation],
                       orient=obj.theta)
         r.obstacle_id = obj.id
         return r
 
     @staticmethod
-    def generate_marker_obstacle(obj):
+    def generate_marker_obstacle(obj, obstacle_inflation=0):
         sx,sy,sz = obj.size
         r = Rectangle(center=geometry.point(obj.x+sx/2, obj.y),
-                      dimensions=(sx,sy),
+                      dimensions=(sx+2*obstacle_inflation,sy+2*obstacle_inflation),
                       orient=obj.theta)
         r.obstacle_id = obj.id
         return r
@@ -574,9 +574,9 @@ class RRT():
         return r
 
     @staticmethod
-    def generate_chip_obstacle(obj):
+    def generate_chip_obstacle(obj, obstacle_inflation=0):
         r = Circle(center=geometry.point(obj.x,obj.y),
-                   radius=obj.radius)
+                   radius=obj.radius+obstacle_inflation)
         r.obstacle_id = obj.id
         return r
 

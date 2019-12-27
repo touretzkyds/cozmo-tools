@@ -78,7 +78,7 @@ class PathPlanner():
         if use_doorways:
             doorway_list = robot.world.world_map.generate_doorway_list()
         else:
-            doorway_list = []  # don't truncate path at  doorways in simulator
+            doorway_list = []  # don't truncate path at doorways in simulator
 
         need_grid_display = robot.world.path_viewer is not None
 
@@ -127,11 +127,12 @@ class PathPlanner():
                                     y=start_node.y + escape_distance*sin(q+phi),
                                     q=new_q)
                 collider2 = rrt_instance.collides(new_start)
-                print('trying escape', new_start, 'collision:', collider2)
+                # print('trying escape', new_start, 'collision:', collider2)
                 if not collider2  and \
                    not wf.check_start_collides(new_start.x,new_start.y):
                     start_escape_move = (escape_type, phi, start_node, new_start)
                     start_node = new_start
+                    print('Path planner found escape move', start_escape_move)
                     break
             if start_escape_move is None:
                 print('PathPlanner: Start collides!', collider)
@@ -204,10 +205,11 @@ class PathPlanner():
 
     @staticmethod
     def from_path(path, doorways):
-        steps = []
+        # Consider each segment (consecutive pair of points) of path
+        # and see if it crosses a doorway.
         door = None
-        pt1 = path[0]
         i = 0  # in case len(path) is 1 and we skip the for loop
+        pt1 = path[i]
         for i in range(1, len(path)):
             pt2 = path[i]
             door = PathPlanner.intersects_doorway(pt1,pt2,doorways)
@@ -215,55 +217,55 @@ class PathPlanner():
                 i -= 1
                 break
             pt1 = pt2
+
+        # If no doorway, we're good to go
+        if door is None:
+            step = NavStep(NavStep.DRIVE, path)
+            plan = NavPlan([step])
+            return plan
+
+        # Truncate the path at the doorway, and ajust to make sure
+        # we're outside the approach gate.
+        print('door=', door)
+        (dx,dy) = (door.x, door.y)
+        DELTA = 15 # mm
+        gate = DoorPass.calculate_gate((rx,ry), door, DoorPass.OUTER_GATE_DISTANCE + DELTA)
+        (gx,gy) = (gate[0],gate[1])
+        gate_node = RRTNode(x=gx, y=gy)
+        print('gate_node=',gate_node)
+
+        while i > 0:
+            (px,py) = (path[i].x, path[i].y)
+            if ((px-dx)**2 + (py-dy)**2) >  (DoorPass.OUTER_GATE_DISTANCE + DELTA)**2:
+                break
+            i -= 1
+        
+        # For now, just truncate the path and insert an approach gate node.
         new_path = path[0:i+1]
+        new_path.append(gate_node)
         step1 = NavStep(NavStep.DRIVE, new_path)
-        steps.append(step1)
-        if door:
-            print('door=', door)
-            # *** adding *** gate = DoorPass.calculate_gate(self.robot, door, DoorPass.OUTER_GATE_DISTANCE)
-            # Should this from_path method be in NavPlan?  Maybe move it to PathPlanner?
-            (rx,ry) = (new_path[-1].x, new_path[-1].y)
-            DELTA = 15 # mm
-            gate = DoorPass.calculate_gate((rx,ry), door, DoorPass.OUTER_GATE_DISTANCE+DELTA)
-            gate_node = RRTNode(x=gate[0], y=gate[1])
-            print('gate_node=',gate_node)
-            """
+        step2 = NavStep(NavStep.DOORPASS, door)
+        plan = NavPlan(list(step1, step2))
+        return plan
+
+"""
             *** TODO:
 
             (1) Dont' make step1 so early.  If new_path[-1] is closer
             to the door than the gate node, replace this element.
-            Cheap solution: replae new_path[-1] with the gate node.
+            Cheap solution: replace new_path[-1] with the gate node.
             Correct solution: chek to see if there is a collision-free
             path from new_path[-2] to the gate node.
 
-            FIXED: (2) Robot doesn't relocalize when looking at a wall
-            on startup until we make it move.
-
-            FIXED (3) If "visit" fails because we're not localized or
-            we're on the charger, we never seem to recover from this
-            even if the robot is picked up and put down again.
-
-            (4) Right trigger freeze doesn't work on grab or roll
-            actions.
-
-            (5) If we're stuck in TurnTowardGoal, stopping the program
+            (2) If we're stuck in TurnTowardGoal, stopping the program
             and restarting it immediately resumes TurnTowardGoal.  How
             is this even possible?
 
-            (6) "Roll upright" is behaving strangely if the cube is on
+            (3) "Roll upright" is behaving strangely if the cube is on
             its side.  It plans a path to the wrong side of the cube,
             gets there, then changes its mind.
 
-            """
-
-            if steps[-1].type == NavStep.DRIVE:
-                steps[-1].param.append(gate_node)
-            else:
-                steps.append(NavStep(NavStep.DRIVE, [gate_node]))
-            step3 = NavStep(NavStep.DOORPASS, door)
-            steps.append(step3)
-        plan = NavPlan(steps)
-        return plan
+"""
 
 #----------------------------------------------------------------
 

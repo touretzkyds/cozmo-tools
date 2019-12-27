@@ -421,9 +421,10 @@ class GoToCube(StateNode):
                 print('CheckCubePoseValid: robot is picked up.')
                 self.post_failure()
             elif wmobject.pose_confidence < 0:
-                print('CheckCubePoseValid: %s has invalid pose!' % cube_id)
+                print('CheckCubePoseValid %s: %s has invalid pose!' % (self.name, cube_id))
                 self.post_failure()
             else:
+                # print('CheckCubePoseValid %s: valid pose for %s.' % (self.name, cube_id))
                 self.post_completion()
 
     class ReadyToRoll(StateNode):
@@ -443,17 +444,19 @@ class GoToCube(StateNode):
         # GoToCube machine
 
         droplift: SetLiftHeight(0)
-        droplift =C=> Print('droplift succeeded') =N=> {looker, waitlift, check_cube_pose_valid}
-        droplift =F=> Print('droplift failed') =N=> {looker, waitlift, check_cube_pose_valid}   # lift motion fails if on charger
+        droplift =C=> Print('droplift succeeded') =N=> after_drop
+        droplift =F=> Print('droplift failed') =N=> after_drop
+
+        after_drop: StateNode() =N=> {looker, waitlift, monitor_cube_pose}
 
         looker: LookAtObject()
 
         waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
            check_almost_docked
 
-        check_cube_pose_valid: self.CheckCubePoseValid()
-        check_cube_pose_valid =C=> check_cube_pose_valid
-        check_cube_pose_valid =F=> ParentFails()
+        monitor_cube_pose: self.CheckCubePoseValid()
+        monitor_cube_pose =C=> StateNode() =T(1)=> monitor_cube_pose
+        monitor_cube_pose =F=> ParentFails()
 
         check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
         check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
@@ -545,7 +548,7 @@ class GoToCube(StateNode):
 
         check_cube_pose: self.CheckCubePoseValid()
         check_cube_pose =C=> choose_another_side
-        check_cube_pose =F=> ParentFails()
+        # let monitor_cube_pose handle the failure case
 
         choose_another_side: self.ChooseAnotherSide()
         choose_another_side =F=> ParentFails()
@@ -716,7 +719,6 @@ class PickUpCube(StateNode):
     def picked_up_handler(self):
         print("PickUpCube aborting because robot was picked up.")
         self.post_failure()
-        self.stop()
 
     def start(self, event=None):
         if isinstance(self.cube, LightCube):
@@ -778,16 +780,19 @@ class PickUpCube(StateNode):
                                         ignore_head_track=True,
                                         ignore_lift_track=True)
         satisfied =C=> {final_raise, drop_head}
+        satisfied =F=> StopAllMotors() =T(1)=> {final_raise, drop_head}  # in case of tracks locked error
 
         final_raise: SetLiftHeight(1.0)
         drop_head: SetHeadAngle(0)
 
         {final_raise, drop_head} =C=> ParentCompletes()
 
-        frustrated: StateNode() =N=> AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
+        frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
                                          ignore_body_track=True,
                                          ignore_head_track=True,
-                                         ignore_lift_track=True) =C=>
+                                         ignore_lift_track=True) =C=> missed_cube
+        frustrated =F=> StopAllMotors() =T(1)=> missed_cube
+
         missed_cube: SetNotCarrying() =C=> Forward(-5) =C=> {drop_lift, drop_head_low}
 
         drop_lift: SetLiftHeight(0)
@@ -926,18 +931,18 @@ class RollingCube(StateNode):
             self.parent.orientation, _, _, _ = get_orientation_state(self.parent.object.pose.rotation.q0_q1_q2_q3)
             super().start(event)
             if self.parent.target_orientation == self.parent.orientation != None:
-                print('roll it successfully to', self.parent.target_orientation)
+                print('rolled it successfully to', self.parent.target_orientation)
                 self.post_completion()
             elif not self.parent.target_orientation:
                 if not self.parent.old_object or self.parent.old_object.wm_obj.id != self.parent.object.wm_obj.id:
                     self.parent.old_object = copy.copy(self.parent.object)
                     self.post_failure()
                 elif same_orientation(self.parent.old_object, self.parent.object):
-                    print('still the same orientation')
+                    print('failed: still the same orientation')
                     self.post_failure()
                 else:
                     self.parent.old_object = copy.copy(self.parent.object)
-                    print('roll it successfully')
+                    print('rolled it successfully')
                     self.post_completion()
             else:
                 self.post_failure()

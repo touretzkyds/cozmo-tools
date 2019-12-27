@@ -81,7 +81,7 @@ class WaveFront():
         else:
             print('**** bbox=', self.bbox, '  grid_shape=', self.grid_shape,
                   '  x,y=', (x,y), '  xcoord,ycoord=', (xcoord,ycoord))
-            raise ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord)))
+            print(ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord))))
 
     def set_goal_shape(self, shape, default_offset=None):
         goal_points = []

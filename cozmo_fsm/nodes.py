@@ -6,7 +6,7 @@ import random
 import numpy as np
 import cv2
 
-from math import pi, sqrt, atan2, inf
+from math import pi, sqrt, atan2, inf, nan
 from multiprocessing import Process, Queue
 
 import cozmo
@@ -155,32 +155,38 @@ class DriveContinuous(StateNode):
         if self.robot.really_picked_up():
             print('** Robot was picked up.')
             self.robot.stop_all_motors()
-            self.path_index = None
             self.poll_handle.cancel()
-            self.post_failure()
+            self.path_index = None
             print('<><><>', self, 'punting')
+            self.post_failure()
             return
-        # See where we are, and if we've passed the current waypoint.
+        # See where we are
         x = self.robot.world.particle_filter.pose[0]
         y = self.robot.world.particle_filter.pose[1]
         q = self.robot.world.particle_filter.pose[2]
         dist = sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
+
+        # If we're pausing, print our position and exit
         if self.pause_counter > 0:
             self.pause_counter -= 1
-            #print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
-            #      (x, y, q*180/pi, dist))
+            print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
+                  (x, y, q*180/pi, dist))
             return
+
+        # See if we've passed the closest approach to the waypoint:
+        # distance to the waypoint is now consistently increasing
         if not self.reached_dist:
             self.reached_dist = \
                 (dist - self.last_dist) > 0.1 and \
                 ( (self.mode == 'x' and np.sign(x-self.cur.x) == np.sign(self.cur.x-self.prev.x)) or
                   (self.mode == 'y' and np.sign(y-self.cur.y) == np.sign(self.cur.y-self.prev.y)) )
-        # Once reached_dist is true, we can enter mode 'q' where we'll turn  until
-        # the heading error is < 5 degrees, then we've reached the waypoint.
+        self.last_dist = dist
+
+        # Is it time to switch to the next waypoint?
         reached_waypoint = (self.path_index == 0) or \
                            (self.reached_dist and \
-                            abs(wrap_angle(q - self.target_q)) < 5*pi/180)
-        self.last_dist = dist
+                            (self.path_index < len(self.path)-1 or \
+                             abs(wrap_angle(q - self.target_q)) < 5*pi/180))
 
         # Advance to next waypoint if indicated
         if reached_waypoint:
@@ -208,98 +214,110 @@ class DriveContinuous(StateNode):
             # Is the target behind us?
             delta_q = wrap_angle(self.target_q - q)
             delta_dist = sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
-            if False and abs(delta_q) > 135*pi/180:
+            if abs(delta_q) > 135*pi/180:
                 #self.target_q = wrap_angle(self.target_q + pi)
-                self.drive_direction = -1
-                print('Driving backwards --> delta_q = %.1f deg., new target_q = %.1f deg., dist = %.1f' %
+                print('New waypoint is behind us --> delta_q = %.1f deg., new target_q = %.1f deg., dist = %.1f' %
                       (delta_q*180/pi, self.target_q*180/pi, delta_dist))
+                self.drive_direction = +1  # was -1
             else:
                 self.drive_direction = +1
 
             # Heading determines whether we're solving y=f(x) or x=f(y)
             if abs(self.target_q) < pi/4 or abs(abs(self.target_q)-pi) < pi/4:
-                self.mode = 'x'
+                self.mode = 'x'    # y = m*x + b
                 self.m = (self.cur.y-self.prev.y) / (self.cur.x-self.prev.x)
-                self.b = self.cur.y - self.m * (self.cur.x-self.prev.x)
+                self.b = self.cur.y - self.m * self.cur.x
+                print('   y =', self.m, ' * x +', self.b)
             else:
-                self.mode = 'y'
+                self.mode = 'y'    # x = m*y + b
                 self.m = (self.cur.x-self.prev.x) / (self.cur.y-self.prev.y)
-                self.b = self.cur.x - self.m * (self.cur.y-self.prev.y)
+                self.b = self.cur.x - self.m * self.cur.y
+                print('   x =', self.m, ' * y +', self.b)
 
             # Do we need to turn in place before setting off toward new waypoint?
-            if abs(wrap_angle(q-self.target_q)) > 45*pi/180:
+            if abs(wrap_angle(q-self.target_q)) > 30*pi/180:
                 self.saved_mode = self.mode
                 self.mode = 'q'
                 print('DriveContinuous: turning to %.1f deg. before driving to waypoint.' %
                       (self.target_q*180/pi))
 
+            # If we were moving, come to a full stop before trying to change direction
             if self.path_index > 1:
-                # come to a full stop before trying to change direction
                 self.robot.stop_all_motors()
                 self.pause_counter = 5
                 return
 
         # Haven't reached waypoint yet
         elif self.reached_dist:
-            # But we have traveled far enough, so come to a stop and then fix heading
+            # But we have traveled far enough, and this is the last waypoint, so
+            # come to a stop and then fix heading
             if self.mode != 'q':
-                self.robot.stop_all_motors()
-                self.robot.pause_counter = 5
-                self.mode = 'q'  # We're there; now fix our heading
-                if abs(wrap_angle(q-self.target_q)) > 5*pi/180:
-                    print('DriveContinuous: waypoint reached; adjusting heading to %.1f deg.' %
+                if abs(wrap_angle(q-self.target_q)) > 5:
+                    self.robot.stop_all_motors()
+                    self.robot.pause_counter = 5
+                    self.mode = 'q'
+                    print('DriveContinuous: final waypoint reached; adjusting heading to %.1f deg.' %
                           (self.target_q*180/pi))
-                return
-        elif self.mode == 'q' and abs(wrap_angle(q-self.target_q)) < 5*pi/180:
+        elif self.mode == 'q' and abs(wrap_angle(q-self.target_q)) < 10*pi/180:
+            # If within 10 degrees, cut motors and let inertia carry us the rest of the way.
             print('DriveContinuous: turn to heading complete: heading is %.1f deg.' %
                   (q*180/pi))
+            self.robot.stop_all_motors()
             self.mode = self.saved_mode
+            self.pause_counter = 5
+            return
 
         # Calculate error and correction based on present x/y/q position
         q_error = wrap_angle(q - self.target_q)
-        #print('DriveCont--> q_error is',q*180/pi,'degrees')
-        if self.mode == 'x':      # y = f(x)
-            target_y = self.m * (x-self.prev.x) + self.b
-            d_error = (y - target_y) * np.sign(pi/2 - abs(self.target_q))
-            correcting_q = - 0.8*q_error - 0.25*atan2(d_error,25)
-        elif self.mode == 'y':    # x = f(y)
-            target_x = self.m * (y-self.prev.y) + self.b
-            d_error = (x - target_x) * np.sign(pi/2 - abs(self.target_q-pi/2))
-            correcting_q = - 0.8*q_error - 0.25*atan2(-d_error,25)
+        intercept_distance = 100 # was 25
+        if self.mode == 'x':      # y = m*x + b
+            target_y = self.m * x + self.b
+            d_error = (y - target_y) * np.sign(pi/2 - abs(self.target_q))  # *** CHECK THIS
+            correcting_q = - 0.8*q_error - 0.8*atan2(d_error,intercept_distance)
+        elif self.mode == 'y':    # x = m*y + b
+            target_x = self.m * y + self.b
+            d_error = (x - target_x) * np.sign(pi/2 - abs(self.target_q-pi/2))  # *** CHECK THIS
+            correcting_q = - 0.8*q_error - 0.8*atan2(-d_error,intercept_distance)
         elif self.mode == 'q':
-            d_error = sqrt((x-self.cur.x)**2 + (y-self.cur.y)**2)
-            correcting_q = - 0.8*q_error
+            d_error = nan
+            correcting_q = - nan # 0.8*q_error
         else:
             print("Bad mode value '%s'" % repr(self.mode))
             return
 
         # Calculate wheel speeds based on correction value
-        if self.mode == 'q' or abs(q_error*180/pi) >= 10:
+        if self.mode == 'q' or abs(q_error)*180/pi >= 15:
             # For large heading error, turn in place
-            speed = 0
-            qscale = 50
-            correcting_q = - 1.0 * np.sign(q_error) * max(abs(q_error), 25*pi/180)
             flag = "<>"
-        elif abs(q_error*180/pi) > 5 and abs(d_error) < 100:
+            speed = 0
+            qscale = 150 # was 50
+            correcting_q = nan #  - 1.0 * np.sign(q_error) * min(abs(q_error), 25*pi/180)
+            speedinc = qscale * 15*pi/180 * -np.sign(q_error)
+        elif abs(q_error)*180/pi > 5 and abs(d_error) < 100:
             # For moderate heading error where  distance error isn't huge,
             # slow down and turn more slowly
-            speed = 20
-            qscale = 75
-            flag = "**"
+            flag = "* "
+            speed = 50 # was 20
+            qscale = 150
+            speedinc = qscale * correcting_q
         else:
             # We're doing pretty well; go fast and make minor corrections
-            speed = 100
-            qscale = 150
             flag = "  "
-        speedinc = qscale * correcting_q
+            speed = 100
+            qscale = 150 # was 150
+            speedinc = qscale * correcting_q
         lspeed = self.drive_direction * (speed - self.drive_direction*speedinc)
         rspeed = self.drive_direction * (speed + self.drive_direction*speedinc)
 
-        """print('%s x: %5.1f  y: %5.1f  q:%6.1f     derr: %5.1f  qerr:%6.1f  corq: %5.1f  inc: %5.1f  dist: %5.1f' %
-              (self.mode+flag, x, y, q*180/pi, d_error, q_error*180/pi,
-               correcting_q*180/pi, speedinc, dist))
-        """
-        self.robot.drive_wheel_motors(lspeed, rspeed, 200, 200)
+        if self.mode == 'x': display_target = target_y
+        elif self.mode == 'y': display_target = target_x
+        elif self.mode == 'q': display_target = self.target_q*180/pi
+        elif self.mode == 'p': display_target = inf
+        else: display_target = nan
+        print('%s x: %5.1f  y: %5.1f  q:%6.1f  tgt:%6.1f   derr: %5.1f  qerr:%6.1f  corq: %5.1f  inc: %5.1f  dist: %5.1f   speeds: %4.1f/%4.1f' %
+              (self.mode+flag, x, y, q*180/pi, display_target, d_error, q_error*180/pi,
+               correcting_q*180/pi, speedinc, dist, lspeed, rspeed))
+        self.robot.drive_wheel_motors(lspeed, rspeed, 500, 500)
 
 class LookAtObject(StateNode):
     "Continuously adjust head angle to fixate object."
