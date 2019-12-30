@@ -116,7 +116,6 @@ class GoToCube(StateNode):
             print('Haven\'t tried out all sides of cube. Going to try the side', self.side_index)
             return True
 
-
     def get_robot_pose(self, use_world_map):
         if use_world_map:
             rx = self.robot.world.particle_filter.pose[0]
@@ -157,6 +156,7 @@ class GoToCube(StateNode):
         dist = sqrt((rx-ox)**2 + (ry-oy)**2)
         relative_angle = abs(wrap_angle(rtheta-otheta) % (pi/2)) * (180/pi)
         return (dist, relative_angle)
+
 
     class PilotToSide(PilotToPose):
         def __init__(self):
@@ -426,6 +426,7 @@ class GoToCube(StateNode):
                 #print('CheckCubePoseValid %s: valid pose for %s.' % (self.name, cube_id))
                 self.post_completion()
 
+
     class ReadyToRoll(StateNode):
         def __init__(self):
             super().__init__()
@@ -437,7 +438,6 @@ class GoToCube(StateNode):
                 self.post_success()
             else:
                 self.post_failure()
-
 
     $setup{
         # GoToCube machine
@@ -756,7 +756,7 @@ class PickUpCube(StateNode):
         raise_lift: SetLiftHeight(0.4)
 
         raise_head: SetHeadAngle(5)
-        raise_head =C=> wait_head: AbortHeadAction() =C=> StateNode() =T(0.5)=> raise_head2
+        raise_head =C=> wait_head: AbortHeadAction() =C=> StateNode() =T(0.2)=> raise_head2
         raise_head =F=> wait_head
         raise_head2: SetHeadAngle(0, num_retries=2)
         raise_head2 =F=> verify

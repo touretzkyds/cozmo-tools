@@ -138,7 +138,7 @@ class DriveContinuous(StateNode):
         self.reached_dist = False
         self.mode = None
         self.pause_counter = 0
-        print('<><><>', self, "%x" % (self.__hash__() & 0xffffffffffffffff),  end='')
+        #print('<><><>', self, "%x" % self.__hash__(),  end='')
         p = self.parent
         while p is not None:
             print(' of', p.name, end='')
@@ -148,7 +148,7 @@ class DriveContinuous(StateNode):
 
     def stop(self):
         self.robot.stop_all_motors()
-        print('<><><>', self, "%x" % (self.__hash__() & 0xffffffffffffffff), end='')
+        #print('<><><>', self, "%x" % self.__hash__(), end='')
         p = self.parent
         while p is not None:
             print(' of', p.name, end='')
@@ -164,7 +164,7 @@ class DriveContinuous(StateNode):
             self.robot.stop_all_motors()
             self.poll_handle.cancel()
             self.path_index = None
-            print('<><><>', self, 'punting')
+            #print('<><><>', self, 'punting')
             self.post_failure()
             return
         # See where we are
