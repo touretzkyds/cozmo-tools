@@ -229,7 +229,7 @@ class PathPlanner():
         print('door=', door)
         (dx,dy) = (door.x, door.y)
         DELTA = 15 # mm
-        gate = DoorPass.calculate_gate((rx,ry), door, DoorPass.OUTER_GATE_DISTANCE + DELTA)
+        gate = DoorPass.calculate_gate((dx,dy), door, DoorPass.OUTER_GATE_DISTANCE + DELTA)
         (gx,gy) = (gate[0],gate[1])
         gate_node = RRTNode(x=gx, y=gy)
         print('gate_node=',gate_node)
@@ -245,7 +245,7 @@ class PathPlanner():
         new_path.append(gate_node)
         step1 = NavStep(NavStep.DRIVE, new_path)
         step2 = NavStep(NavStep.DOORPASS, door)
-        plan = NavPlan(list(step1, step2))
+        plan = NavPlan([step1, step2])
         return plan
 
 """
