@@ -241,14 +241,15 @@ class WorldMapViewer():
         glNewList(c, GL_COMPILE)
         glPushMatrix()
         glTranslatef(*pos)
-        if lcube.is_visible:
+        s = light_cube_size_mm
+        glTranslatef(0,0,s/2)
+        if valid_pose:
             t = geometry.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)
         else:
             t = geometry.aboutZ(cube_obj.theta)
         t = t.transpose()   # Transpose the matrix for sending to OpenGL
         rotmat = array.array('f',t.flatten()).tobytes()
         glMultMatrixf(rotmat)
-        s = light_cube_size_mm
         if valid_pose:
             # make solid cube and highlight if visible
             self.make_cube((s,s,s), highlight=lcube.is_visible, color=color)

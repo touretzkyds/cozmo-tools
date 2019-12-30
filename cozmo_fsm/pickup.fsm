@@ -10,7 +10,6 @@ from .cozmo_kin import center_of_rotation_offset
 from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, InvalidPose
 from .rrt import StartCollides, GoalCollides, MaxIterations
 from .worldmap import LightCubeObj
-from .trace import tracefsm
 
 from math import sin, cos, atan2, pi, sqrt
 import copy
@@ -424,7 +423,7 @@ class GoToCube(StateNode):
                 print('CheckCubePoseValid %s: %s has invalid pose!' % (self.name, cube_id))
                 self.post_failure()
             else:
-                # print('CheckCubePoseValid %s: valid pose for %s.' % (self.name, cube_id))
+                #print('CheckCubePoseValid %s: valid pose for %s.' % (self.name, cube_id))
                 self.post_completion()
 
     class ReadyToRoll(StateNode):
@@ -512,9 +511,10 @@ class GoToCube(StateNode):
 
         approach: self.ForwardToCube(60) =C=> StateNode() =T(0.75)=>
             self.ReportPosition('approach') =T(0.75)=>
-            self.ReportPosition('approach') =N=> Print('wait...') =N=>
-            turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=> Print('wait...') =N=>
-            exit_to_roll
+            self.ReportPosition('approach') =N=> turn_to_cube_1a
+
+        turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=> Print('wait...') =N=> exit_to_roll
+        turn_to_cube_1a =F=> failure
 
         approach =F=> failure
 
@@ -548,7 +548,7 @@ class GoToCube(StateNode):
 
         check_cube_pose: self.CheckCubePoseValid()
         check_cube_pose =C=> choose_another_side
-        # let monitor_cube_pose handle the failure case
+        check_cube_pose =F=> ParentFails()
 
         choose_another_side: self.ChooseAnotherSide()
         choose_another_side =F=> ParentFails()
@@ -738,7 +738,9 @@ class PickUpCube(StateNode):
         print('Picking up',self.wmobject)
         super().start(event)
 
-    $setup{  # PickUpCube machine
+    $setup{
+        # PickUpCube machine
+
         fetch: SetFetching() =C=> check_carry
 
         check_carry: CheckCarrying()
@@ -746,16 +748,16 @@ class PickUpCube(StateNode):
         check_carry =F=> goto_cube
 
         goto_cube: GoToCube()
-        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> fail
-        goto_cube =F=> fail
         goto_cube =C=> AbortHeadAction() =T(0.1) => # clear head track
            {raise_lift, raise_head}
+        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> fail
+        goto_cube =F=> fail
 
         raise_lift: SetLiftHeight(0.4)
 
         raise_head: SetHeadAngle(5)
-        raise_head =C=> wait: StateNode() =T(0.1)=> raise_head2
-        raise_head =F=> wait
+        raise_head =C=> wait_head: AbortHeadAction() =C=> StateNode() =T(0.5)=> raise_head2
+        raise_head =F=> wait_head
         raise_head2: SetHeadAngle(0, num_retries=2)
         raise_head2 =F=> verify
 
@@ -764,16 +766,17 @@ class PickUpCube(StateNode):
         verify: self.VerifyPickup()
         verify =S=> set_carrying
         verify =F=> StateNode() =T(0.5)=> verify2
+
         verify2: self.VerifyPickup()
         verify2 =S=> set_carrying
-        verify2 =F=> frustrated # was StateNode() =T(0.5)=> verify3
+        verify2 =F=> StateNode() =T(0.2)=> frustrated   # Time delay before animation
 
         # verify3 is dead code
         verify3: self.VerifyPickup()
         verify3 =S=> set_carrying
         verify3 =F=> frustrated
 
-        set_carrying: SetCarrying() =N=> satisfied
+        set_carrying: SetCarrying() =N=> StateNode() =T(0.2)=> satisfied  # Time delay before animation
 
         satisfied: AnimationTriggerNode(trigger=cozmo.anim.Triggers.ReactToBlockPickupSuccess,
                                         ignore_body_track=True,
@@ -1081,6 +1084,8 @@ class RollingCube(StateNode):
 
 
     $setup {
+        # RollingCube machine
+        
         start: SetFetching() =C=> {looker, check_cube_pose}
 
         looker: LookAtObject()

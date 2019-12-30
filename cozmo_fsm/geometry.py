@@ -228,7 +228,7 @@ def get_orientation_state(quaternion, isPlanar=False):
     else:
         orientation = ORIENTATION_TILTED
 
-    return orientation, x, y, z
+    return orientation, x, y, wrap_angle(z)
 
 def same_orientation(old_object, new_object):
     q1 = old_object.pose.rotation.q0_q1_q2_q3

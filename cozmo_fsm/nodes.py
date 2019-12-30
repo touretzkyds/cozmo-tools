@@ -123,7 +123,6 @@ class DriveContinuous(StateNode):
     def __init__(self,path=[]):
         self.path = path
         self.polling_interval = 0.05
-        self.handle = None
         super().__init__()
 
     def start(self,event=None):
@@ -139,18 +138,26 @@ class DriveContinuous(StateNode):
         self.reached_dist = False
         self.mode = None
         self.pause_counter = 0
-        self.handle = None
-        print('<><><>', self, 'starting')
+        print('<><><>', self, "%x" % (self.__hash__() & 0xffffffffffffffff),  end='')
+        p = self.parent
+        while p is not None:
+            print(' of', p.name, end='')
+            p = p.parent
+        print(' starting')
         super().start(event)
 
     def stop(self):
-        if self.handle:
-            self.handle.cancel()
         self.robot.stop_all_motors()
-        print('<><><>', self, 'stopping')
+        print('<><><>', self, "%x" % (self.__hash__() & 0xffffffffffffffff), end='')
+        p = self.parent
+        while p is not None:
+            print(' of', p.name, end='')
+            p = p.parent
+        print(' stopping')
         super().stop()
 
     def poll(self):
+        if not self.running: return
         # Quit if the robot is picked up.
         if self.robot.really_picked_up():
             print('** Robot was picked up.')
@@ -165,18 +172,21 @@ class DriveContinuous(StateNode):
         y = self.robot.world.particle_filter.pose[1]
         q = self.robot.world.particle_filter.pose[2]
         dist = sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
+        delta_q = wrap_angle(q - self.target_q) if self.target_q is not None else inf
 
         # If we're pausing, print our position and exit
         if self.pause_counter > 0:
+            #print('%x p%1d. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
+            #      (self.__hash__() & 0xffffffffffffffff, self.pause_counter, x, y, q*180/pi, dist))
             self.pause_counter -= 1
-            print('p.. x: %5.1f  y: %5.1f  q:%6.1f     dist: %5.1f' %
-                  (x, y, q*180/pi, dist))
             return
 
-        # See if we've passed the closest approach to the waypoint:
-        # distance to the waypoint is now consistently increasing
+        # See if we've passed the closest approach to the waypoint,
+        # i.e., distance to the waypoint is consistently INCREASING
+        # or waypoint is behind us.
         if not self.reached_dist:
             self.reached_dist = \
+                abs(delta_q) > 135*pi/180 or \
                 (dist - self.last_dist) > 0.1 and \
                 ( (self.mode == 'x' and np.sign(x-self.cur.x) == np.sign(self.cur.x-self.prev.x)) or
                   (self.mode == 'y' and np.sign(y-self.cur.y) == np.sign(self.cur.y-self.prev.y)) )
@@ -186,7 +196,7 @@ class DriveContinuous(StateNode):
         reached_waypoint = (self.path_index == 0) or \
                            (self.reached_dist and \
                             (self.path_index < len(self.path)-1 or \
-                             abs(wrap_angle(q - self.target_q)) < 5*pi/180))
+                             abs(delta_q) < 5*pi/180))
 
         # Advance to next waypoint if indicated
         if reached_waypoint:
@@ -212,9 +222,8 @@ class DriveContinuous(StateNode):
             print(': [%.1f, %.1f] tgtQ is %.1f deg.' % (self.cur.x, self.cur.y, self.target_q*180/pi))
 
             # Is the target behind us?
-            delta_q = wrap_angle(self.target_q - q)
             delta_dist = sqrt((self.cur.x-x)**2 + (self.cur.y-y)**2)
-            if abs(delta_q) > 135*pi/180:
+            if delta_q < inf and  abs(delta_q) > 135*pi/180:
                 #self.target_q = wrap_angle(self.target_q + pi)
                 print('New waypoint is behind us --> delta_q = %.1f deg., new target_q = %.1f deg., dist = %.1f' %
                       (delta_q*180/pi, self.target_q*180/pi, delta_dist))
@@ -227,12 +236,12 @@ class DriveContinuous(StateNode):
                 self.mode = 'x'    # y = m*x + b
                 self.m = (self.cur.y-self.prev.y) / (self.cur.x-self.prev.x)
                 self.b = self.cur.y - self.m * self.cur.x
-                print('   y =', self.m, ' * x +', self.b)
+                #print('   y =', self.m, ' * x +', self.b)
             else:
                 self.mode = 'y'    # x = m*y + b
                 self.m = (self.cur.x-self.prev.x) / (self.cur.y-self.prev.y)
                 self.b = self.cur.x - self.m * self.cur.y
-                print('   x =', self.m, ' * y +', self.b)
+                #print('   x =', self.m, ' * y +', self.b)
 
             # Do we need to turn in place before setting off toward new waypoint?
             if abs(wrap_angle(q-self.target_q)) > 30*pi/180:
@@ -314,9 +323,12 @@ class DriveContinuous(StateNode):
         elif self.mode == 'q': display_target = self.target_q*180/pi
         elif self.mode == 'p': display_target = inf
         else: display_target = nan
-        print('%s x: %5.1f  y: %5.1f  q:%6.1f  tgt:%6.1f   derr: %5.1f  qerr:%6.1f  corq: %5.1f  inc: %5.1f  dist: %5.1f   speeds: %4.1f/%4.1f' %
-              (self.mode+flag, x, y, q*180/pi, display_target, d_error, q_error*180/pi,
+        """
+        print('%x %s x: %5.1f  y: %5.1f  q:%6.1f  tgt:%6.1f   derr: %5.1f  qerr:%6.1f  corq: %5.1f  inc: %5.1f  dist: %5.1f   speeds: %4.1f/%4.1f' %
+              (self.__hash__() & 0xffffffffffffffff,
+               self.mode+flag, x, y, q*180/pi, display_target, d_error, q_error*180/pi,
                correcting_q*180/pi, speedinc, dist, lspeed, rspeed))
+        """
         self.robot.drive_wheel_motors(lspeed, rspeed, 500, 500)
 
 class LookAtObject(StateNode):
@@ -337,6 +349,7 @@ class LookAtObject(StateNode):
         super().stop()
 
     def poll(self):
+        if not self.running: return
         if isinstance(self.object, FaceObj) or isinstance(self.object, CustomMarkerObj):
             image_box =  self.object.sdk_obj.last_observed_image_box
             camera_center = self.robot.camera.config.center.y
@@ -621,6 +634,7 @@ class DriveForward(DriveWheels):
         super().start(event)
 
     def poll(self):
+        if not self.running: return
         """See how far we've traveled"""
         p0 = self.start_position
         p1 = self.robot.pose.position
@@ -659,6 +673,7 @@ class SmallTurn(CoroutineNode):
             return False
 
     def poll(self):
+        if not self.running: return
         self.counter -= 1
         if self.counter <= 0:
             self.poll_handle.cancel()
@@ -694,6 +709,7 @@ class DriveTurn(DriveWheels):
         super().start(event)
 
     def poll(self):
+        if not self.running: return
         """See how far we've traveled"""
         p0 = self.last_heading
         p1 = self.robot.pose.rotation.angle_z.degrees
@@ -783,6 +799,7 @@ class DriveArc(DriveWheels):
         super().start(event)
 
     def poll(self):
+        if not self.running: return
         """See how far we've traveled"""
         p0 = self.last_heading
         p1 = self.robot.pose.rotation.angle_z.degrees
@@ -890,9 +907,9 @@ class ActionNode(StateNode):
                     print("*** %s ACTION RETRY COUNT EXCEEDED: FAILING" % self.name)
                     self.post_failure(self.cozmo_action_handle)
             else:
-                print("*** ACTION %s OF NODE %s FAILED DUE TO %s AND CAN'T BE RETRIED." %
-                      (self.cozmo_action_handle,
-                       self.name,
+                print("*** ACTION NODE %s %s FAILED DUE TO %s AND CAN'T BE RETRIED." %
+                      (self.name,
+                       self.cozmo_action_handle,
                        self.cozmo_action_handle.failure_reason[0] or 'unknown reason'))
                 self.post_failure(self.cozmo_action_handle)
 

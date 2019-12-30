@@ -12,7 +12,18 @@ class NullTrans(Transition):
         super().start()
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
-        self.robot.loop.call_soon(self.fire)
+        self.handle = self.robot.loop.call_soon(self.fire)
+
+    def stop(self):
+        if self.handle:
+            print(self, 'cancelling', self.handle)
+            self.handle.cancel()
+            self.handle = None
+        super().stop()
+
+    def fire(self, event=None):
+        self.handle = None
+        super().fire(event)
 
 
 class CSFEventBase(Transition):
@@ -236,6 +247,7 @@ class TextMsgTrans(PatternMatchTrans):
     def __init__(self,pattern=None):
         super().__init__(pattern,TextMsgEvent)
 
+
 class HearTrans(PatternMatchTrans):
     """Transition fires if speech event matches pattern."""
     def __init__(self,pattern=None):
@@ -271,7 +283,13 @@ class RandomTrans(Transition):
         super().start()
         # Don't fire immediately on start because the source node(s) may
         # have other startup calls to make. Give them time to finish.
-        self.robot.loop.call_soon(self.fire)  # okay to use Transition.fire
+        self.handle = self.robot.loop.call_soon(self.fire)  # okay to use Transition.fire
+
+    def stop(self):
+        if self.handle:
+            self.handle.cancel()
+            self.handle = None
+        super().stop()
 
     def fire2(self,event):
         """Overrides Transition.fire2 to only start one randomly-chosen destination node."""

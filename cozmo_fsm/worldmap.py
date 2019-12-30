@@ -892,8 +892,11 @@ class WorldMap():
             return
         cube.movement_start_time = time.time()
         cube_id = 'Cube-' + str(cube.cube_id)
-        wmobject = self.robot.world.world_map.objects[cube_id]
-        wmobject.pose_confidence = min(0, wmobject.pose_confidence)
+        try: # wmobj may not have been created yet
+            wmobject = self.robot.world.world_map.objects[cube_id]
+            wmobject.pose_confidence = min(0, wmobject.pose_confidence)
+        except:
+            pass
 
     def handle_object_move_stopped(self, evt, **kwargs):
         cube = evt.obj

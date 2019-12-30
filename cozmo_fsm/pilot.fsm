@@ -110,6 +110,8 @@ class PilotBase(StateNode):
                     self.post_completion()
 
         $setup{
+            # PilotExecutePlan machine
+            
             dispatch: self.DispatchStep()
             dispatch =D(NavStep.DRIVE)=> drive
             dispatch =D(NavStep.DOORPASS)=> doorpass
@@ -161,6 +163,8 @@ class PilotToObject(PilotBase):
                 self.post_failure()
 
     $setup{
+        # PilotToObject machine
+
         launch: self.SendObject() =D=> planner
 
         planner: PathPlannerProcess() =D=> recv

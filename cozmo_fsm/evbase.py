@@ -163,7 +163,7 @@ class EventRouter:
         node_id = id(node)
         if node_id in self.processes:
             del self.processes[node_id]
-            print('Deleted id',node_id,'for',node)
+            # print('Deleted id',node_id,'for',node)
         else:
             print('*** ERROR in delete_process_node: node',node_id,'not in process dict!')
 
@@ -208,6 +208,8 @@ class EventListener:
         if self.polling_interval:
             self.poll_handle = \
                 self.robot.loop.call_later(self.polling_interval, self._next_poll)
+        else:
+            self.poll_handle = None
 
     def stop(self):
         if not self.running: return
@@ -225,12 +227,12 @@ class EventListener:
             raise TypeError('interval must be a number')
 
     def _next_poll(self):
-        """Called to poll the node and then schedule the next polling interval."""
+        """Called to schedule the next polling interval and then poll the node."""
+        # Schedule the next poll first because self.poll may cancel it.
         if self.running and self.polling_interval:
             self.poll_handle = \
                 self.robot.loop.call_later(self.polling_interval, self._next_poll)
-        # schedule the next poll first because self.poll may cancel it
-        self.poll()
+            self.poll()
 
     def poll(self):
         """Dummy polling function in case sublass neglects to supply one."""

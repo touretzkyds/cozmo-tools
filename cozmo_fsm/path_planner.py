@@ -273,12 +273,20 @@ class PathPlanner():
 
 class PathPlannerProcess(LaunchProcess):
     def start(self, event=None):
+        print('<><><>', self, 'parent', self.parent, 'running=', self.parent.running)
+
         if not isinstance(event,DataEvent):
             raise ValueError('PathPlanner node must be invoked with a DataEvent for the goal.')
         goal_object = event.data
         if not isinstance(goal_object, WorldObject):
             raise ValueError('Path planner goal %s is not a WorldObject' % goal_object)
         self.goal_object = goal_object
+        print('<><><> ', self, end='')
+        p = self.parent
+        while p is not None:
+            print(' of', p.name, end='')
+            p = p.parent
+        print(' started')
         super().start(event)  # will call create_process
 
     def create_process(self, reply_token):

@@ -205,9 +205,9 @@ class Transition(EventListener):
             super().stop()
         # stop pending fire2 if fire already stopped this transition
         if self.handle:
+            self.handle.cancel()
             if TRACE.trace_level >= TRACE.task_cancel:
                 print('TRACE%d:' % TRACE.task_cancel, self.handle, 'cancelled')
-            self.handle.cancel()
             self.handle = None
 
     def fire(self,event=None):
@@ -228,8 +228,15 @@ class Transition(EventListener):
         self.handle = self.robot.loop.call_later(action_cancel_delay, self.fire2, event)
 
     def fire2(self,event):
-        if not self.handle:
-            pass # print('@ @ @ @ @ HANDLE GONE: I SHOULD BE DEAD', self, event)
+        if self.handle is None:
+            print('@ @ @ @ @ HANDLE GONE:', self, 'SHOULD BE DEAD', self, event)
+            return
+        else:
+            self.handle = None
+        parent = self.sources[0].parent
+        if not parent.running:
+            # print('@ @ @ @ @ PARENT OF', self, 'IS', parent, 'IS DEAD!  event=', event, '%x' % event.__hash__())
+            return
         for dest in self.destinations:
             if TRACE.trace_level >= TRACE.transition_fire:
                 print('TRACE%d: ' % TRACE.transition_fire, self, 'starting', dest)
