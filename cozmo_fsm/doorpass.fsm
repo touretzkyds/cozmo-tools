@@ -51,7 +51,6 @@ class DoorPass(StateNode):
         pt2y = dy + offset * sin(dtheta+pi)
         dist1sq = (pt1x-rx)**2 + (pt1y-ry)**2
         dist2sq = (pt2x-rx)**2 + (pt2y-ry)**2
-        print('dist1sq=',dist1sq,'  pt1=',(pt1x,pt1y),'\n   dist2sq=',dist2sq,'  pt2=',(pt2x,pt2y))
         if dist1sq < dist2sq:
             return (pt1x, pt1y, wrap_angle(dtheta+pi))
         else:
@@ -77,8 +76,8 @@ class DoorPass(StateNode):
             (gate_x, gate_y, _) = DoorPass.calculate_gate((rx,ry), self.parent.object, self.offset)
             bearing = atan2(gate_y-ry, gate_x-rx)
             turn = wrap_angle(bearing - rtheta)
-            print('^^ TurnToGate: gate=(%.1f, %.1f)  rtheta=%.1f  bearing=%.1f  turn=%.1f' %
-                  (gate_x, gate_y, rtheta*180/pi, bearing*180/pi, turn*180/pi))
+            print('^^ TurnToGate: gate=(%.1f, %.1f)  offset=%.1f rtheta=%.1f  bearing=%.1f  turn=%.1f' %
+                  (gate_x, gate_y, self.offset, rtheta*180/pi, bearing*180/pi, turn*180/pi))
             if False and abs(turn) < 0.1:
                 self.angle = Angle(0)
                 super().start(event)
@@ -149,7 +148,7 @@ class DoorPass(StateNode):
 
         def start(self,event=None):
             (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
-            (gate_x, gate_y, gate_theta) = DoorPass.calculate_gate((rx,ry), self.parent.object, 0)
+            (gate_x, gate_y, gate_theta) = DoorPass.calculate_gate((rx,ry), self.parent.object, 5)
             dist = sqrt((gate_x-rx)**2 + (gate_y-ry)**2)
             offset = 120
             delta_theta = wrap_angle(rtheta-(gate_theta+pi/2))

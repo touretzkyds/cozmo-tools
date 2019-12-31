@@ -5,9 +5,11 @@ import asyncio
 
 from .base import *
 from .rrt import *
-from .nodes import ParentFails, ParentCompletes, DriveArc, DriveContinuous, Forward
+#from .nodes import ParentFails, ParentCompletes, DriveArc, DriveContinuous, Forward, Turn
+from .nodes import *
 from .events import PilotEvent
-from .transitions import CompletionTrans, FailureTrans, SuccessTrans, DataTrans
+#from .transitions import CompletionTrans, FailureTrans, SuccessTrans, DataTrans, NullTrans
+from .transitions import *
 from .cozmo_kin import wheelbase, center_of_rotation_offset
 from .worldmap import DoorwayObj
 from .path_planner import PathPlannerProcess, PathPlanner
@@ -168,6 +170,7 @@ class PilotToObject(PilotBase):
         launch: self.SendObject() =D=> planner
 
         planner: PathPlannerProcess() =D=> recv
+        planner =PILOT=> ParentPilotEvent() =N=> Print('Path planner failed')
 
         recv: self.ReceivePlan() =D=> exec
 
@@ -356,6 +359,42 @@ class PilotPushToPose(PilotToPose):
     def planner(self,start_node,goal_node):
         self.robot.world.rrt.step_size=20
         return self.robot.world.rrt.plan_push_chip(start_node,goal_node)
+
+
+class PilotFrustration(StateNode):
+
+    class SayObject(Say):
+        def start(self, event=None):
+            try:
+                self.text = self.parent.parent.object.name
+            except:
+                self.text = 'stuck'
+            super().start(event)
+
+
+    $setup{
+        launcher: AbortAllActions() =N=> StopAllMotors() =N=> {speak, turn}
+
+        speak: self.SayObject()
+
+        turn: StateNode() =RND=> {left, right}
+
+        left: Turn(5) =C=> left2: Turn(-5)
+
+        right: Turn(-5) =C=> right2: Turn(5)
+
+        {speak, left2, right2} =C(2)=> animate
+
+        animate: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
+                                      ignore_body_track=True,
+                                      ignore_head_track=True,
+                                      ignore_lift_track=True)
+        animate =C=> done
+        animate =F=> done
+
+        done: ParentCompletes()
+    }
+
 
 
 """

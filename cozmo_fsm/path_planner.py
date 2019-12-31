@@ -226,13 +226,12 @@ class PathPlanner():
 
         # Truncate the path at the doorway, and ajust to make sure
         # we're outside the approach gate.
-        print('door=', door)
         (dx,dy) = (door.x, door.y)
         DELTA = 15 # mm
         gate = DoorPass.calculate_gate((dx,dy), door, DoorPass.OUTER_GATE_DISTANCE + DELTA)
         (gx,gy) = (gate[0],gate[1])
         gate_node = RRTNode(x=gx, y=gy)
-        print('gate_node=',gate_node)
+        print('door=', door, 'gate_node=', gate_node)
 
         while i > 0:
             (px,py) = (path[i].x, path[i].y)
@@ -273,20 +272,13 @@ class PathPlanner():
 
 class PathPlannerProcess(LaunchProcess):
     def start(self, event=None):
-        print('<><><>', self, 'parent', self.parent, 'running=', self.parent.running)
-
         if not isinstance(event,DataEvent):
             raise ValueError('PathPlanner node must be invoked with a DataEvent for the goal.')
         goal_object = event.data
         if not isinstance(goal_object, WorldObject):
             raise ValueError('Path planner goal %s is not a WorldObject' % goal_object)
         self.goal_object = goal_object
-        print('<><><> ', self, end='')
-        p = self.parent
-        while p is not None:
-            print(' of', p.name, end='')
-            p = p.parent
-        print(' started')
+        self.print_trace_message('started:', 'goal=%s' % goal_object)
         super().start(event)  # will call create_process
 
     def create_process(self, reply_token):

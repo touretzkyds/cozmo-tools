@@ -15,7 +15,7 @@ class StateNode(EventListener):
     """Base class for state nodes; does nothing."""
     def __init__(self):
         super().__init__()
-        self.parent = b'No parent defined yet.'
+        self.parent = None
         self.children = {}
         self.transitions = []
         self.start_node = None
@@ -144,6 +144,13 @@ class StateNode(EventListener):
         self.robot.loop.call_soon(self.start)
         return self
 
+    def print_trace_message(self, msg1='', msg2=''):
+        print('<><><> %s' % msg1, self, end='')
+        p = self.parent
+        while p is not None:
+            print(' of', p.name, end='')
+            p = p.parent
+        print(' ', msg2)
 
 class Transition(EventListener):
     """Base class for transitions: does nothing."""

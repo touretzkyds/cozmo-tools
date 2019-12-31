@@ -138,22 +138,10 @@ class DriveContinuous(StateNode):
         self.reached_dist = False
         self.mode = None
         self.pause_counter = 0
-        #print('<><><>', self, "%x" % self.__hash__(),  end='')
-        p = self.parent
-        while p is not None:
-            print(' of', p.name, end='')
-            p = p.parent
-        print(' starting')
         super().start(event)
 
     def stop(self):
         self.robot.stop_all_motors()
-        #print('<><><>', self, "%x" % self.__hash__(), end='')
-        p = self.parent
-        while p is not None:
-            print(' of', p.name, end='')
-            p = p.parent
-        print(' stopping')
         super().stop()
 
     def poll(self):

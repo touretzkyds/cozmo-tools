@@ -7,7 +7,7 @@ from .geometry import wrap_angle, line_equation, line_intersection
 from .geometry import ORIENTATION_UPRIGHT, ORIENTATION_INVERTED, ORIENTATION_SIDEWAYS, ORIENTATION_TILTED
 from .geometry import get_orientation_state, same_orientation, get_pattern_number
 from .cozmo_kin import center_of_rotation_offset
-from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, InvalidPose
+from .pilot import PilotToPose, PilotCheckStart, ParentPilotEvent, InvalidPose, PilotFrustration
 from .rrt import StartCollides, GoalCollides, MaxIterations
 from .worldmap import LightCubeObj
 
@@ -443,8 +443,8 @@ class GoToCube(StateNode):
         # GoToCube machine
 
         droplift: SetLiftHeight(0)
-        droplift =C=> Print('droplift succeeded') =N=> after_drop
-        droplift =F=> Print('droplift failed') =N=> after_drop
+        droplift =C=> after_drop
+        droplift =F=> after_drop
 
         after_drop: StateNode() =N=> {looker, waitlift, monitor_cube_pose}
 
@@ -750,8 +750,8 @@ class PickUpCube(StateNode):
         goto_cube: GoToCube()
         goto_cube =C=> AbortHeadAction() =T(0.1) => # clear head track
            {raise_lift, raise_head}
-        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> fail
-        goto_cube =F=> fail
+        goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> pilot_frustrated
+        goto_cube =F=> pilot_frustrated
 
         raise_lift: SetLiftHeight(0.4)
 
@@ -807,6 +807,8 @@ class PickUpCube(StateNode):
         drop_head_low: SetHeadAngle(-20)
 
         {backupmore, drop_head_low} =C=> fail
+
+        pilot_frustrated: PilotFrustration() =C=> fail
 
         fail: SetNotFetching() =C=> ParentFails()
 
