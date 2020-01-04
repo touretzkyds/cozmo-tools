@@ -58,7 +58,7 @@ class SpeechEvent(Event):
 
 class PilotEvent(Event):
     """Results of a pilot request."""
-    def __init__(self,status,*args):
+    def __init__(self,status,**args):
         super().__init__()
         self.status = status
         self.args = args

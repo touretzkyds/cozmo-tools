@@ -37,7 +37,11 @@ class ParentPilotEvent(StateNode):
         super().start(event)
         if not isinstance(event,PilotEvent):
             raise TypeError("ParentPilotEvent must be invoked with a PilotEvent, not %s" % event)
-        self.parent.post_event(PilotEvent(event.status,*event.args))
+        if 'grid_display' in event.args:
+            self.robot.world.rrt.grid_display = event.args['grid_display']
+        event2 = PilotEvent(event.status)
+        event2.args = event.args
+        self.parent.post_event(event2)
 
 #---------------- PilotBase ----------------
 
@@ -50,7 +54,7 @@ class PilotBase(StateNode):
           super().start()
           object = self.parent.object
           if object.pose_confidence < 0:
-              self.parent.post_event(PilotEvent(NotLocalized,object))
+              self.parent.post_event(PilotEvent(NotLocalized,object=object))
               self.parent.post_failure()
               return
           self.post_event(DataEvent(self.parent.object))
@@ -207,7 +211,7 @@ class PilotToPose(PilotBase):
             if tpose is None or (tpose.position.x == 0 and tpose.position.y == 0 and
                                  tpose.rotation.angle_z.radians == 0 and not tpose.is_valid):
                 print("Pilot: target pose is invalid: %s" % tpose)
-                self.parent.post_event(PilotEvent(InvalidPose, tpose))
+                self.parent.post_event(PilotEvent(InvalidPose, pose=tpose))
                 self.parent.post_failure()
                 return
             (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
@@ -242,7 +246,7 @@ class PilotToPose(PilotBase):
                         break
                 if start_escape_move is None:
                     print('PilotRRTPlanner: Start collides!',e)
-                    self.parent.post_event(PilotEvent(StartCollides, e.args))
+                    self.parent.post_event(PilotEvent(StartCollides, args=e.args))
                     self.parent.post_failure()
                     return
                 print('escape=', start_escape_move)
@@ -250,24 +254,24 @@ class PilotToPose(PilotBase):
                     (treeA, treeB, path) = self.planner(start_node, goal_node)
                 except GoalCollides as e:
                     print('PilotRRTPlanner: Goal collides!',e)
-                    self.parent.post_event(PilotEvent(GoalCollides, e.args))
+                    self.parent.post_event(PilotEvent(GoalCollides, args=e.args))
                     self.parent.post_failure()
                     return
                 except MaxIterations as e:
                     print('PilotRRTPlanner: Max iterations %d exceeded!' % e.args[0])
-                    self.parent.post_event(PilotEvent(MaxIterations, e.args))
+                    self.parent.post_event(PilotEvent(MaxIterations, args=e.args))
                     self.parent.post_failure()
                     return
                 #print('replan',path)
 
             except GoalCollides as e:
                 print('PilotRRTPlanner: Goal collides!',e)
-                self.parent.post_event(PilotEvent(GoalCollides, e.args))
+                self.parent.post_event(PilotEvent(GoalCollides, args=e.args))
                 self.parent.post_failure()
                 return
             except MaxIterations as e:
                 print('PilotRRTPlanner: Max iterations %d exceeded!' % e.args[0])
-                self.parent.post_event(PilotEvent(MaxIterations, e.args))
+                self.parent.post_event(PilotEvent(MaxIterations, args=e.args))
                 self.parent.post_failure()
                 return
 

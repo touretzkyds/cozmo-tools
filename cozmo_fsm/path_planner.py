@@ -41,6 +41,13 @@ class PathPlanner():
             __class__.do_planning(robot.world.rrt, start_node, goal_shape,
                                   fat_obstacles, skinny_obstacles, doorway_list,
                                   need_grid_display)
+        if isinstance(result, PilotEvent):
+            grid_display = result.args['grid_display']
+        elif isinstance(result, DataEvent):
+            (navplan, grid_display) = result.data
+        else:
+            ValueError('Bad result type:', result)
+        self.robot.world.rrt.grid_display = grid_display
         return result
 
     @staticmethod
@@ -136,7 +143,7 @@ class PathPlanner():
                     break
             if start_escape_move is None:
                 print('PathPlanner: Start collides!', collider)
-                return PilotEvent(StartCollides,collider)
+                return PilotEvent(StartCollides,collider=collider)
 
         # Run the wavefront path planner
         rrt_instance.obstacles = fat_obstacles
@@ -144,7 +151,10 @@ class PathPlanner():
             offsets = [1, -25, -1]
         else:
             offsets = [None]
-        for offset in offsets:
+        for i in range(len(offsets)):
+            offset = offsets[i]
+            if i > 0:
+                wf = WaveFront(bbox=rrt_instance.bbox)  # need a fresh grid
             wf.set_goal_shape(goal_shape, offset)
             # obstacles come after the goal so they can overwrite goal pixels
             for obstacle in fat_obstacles:
@@ -153,11 +163,10 @@ class PathPlanner():
             goal_found = wf.propagate(*wf_start)
             if goal_found: break
             print('Wavefront planning failed with offset', offset)
-            wf = WaveFront(bbox=rrt_instance.bbox)  # need a fresh grid
         grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
             print('PathPlanner wavefront: goal unreachable!')
-            return PilotEvent(GoalUnreachable, grid_display)
+            return PilotEvent(GoalUnreachable, grid_display=grid_display)
 
         # Extract and smooth the path
         coords_pairs = wf.extract(goal_found, wf_start)
@@ -295,7 +304,7 @@ class PathPlannerProcess(LaunchProcess):
 
     @staticmethod
     def process_workhorse(reply_token, start_node, goal_shape, robot_parts, bbox,
-                          fat_obstacles, skinny_obstacles, doorway_list, need_grid_display):
+                          fat_obstacles, skinny_obstacles, doorway_list, need_grid_display): 
         cv2.startWindowThread()
         rrt_instance = RRT(robot_parts=robot_parts, bbox=bbox)
         result = \
