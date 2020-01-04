@@ -937,20 +937,25 @@ class RollingCube(StateNode):
             super().start(event)
             if self.parent.target_orientation == self.parent.orientation != None:
                 print('rolled it successfully to', self.parent.target_orientation)
-                self.post_completion()
+                self.post_success()
             elif not self.parent.target_orientation:
                 if not self.parent.old_object or self.parent.old_object.wm_obj.id != self.parent.object.wm_obj.id:
                     self.parent.old_object = copy.copy(self.parent.object)
-                    self.post_failure()
+                    self.post_completion()
                 elif same_orientation(self.parent.old_object, self.parent.object):
                     print('failed: still the same orientation')
                     self.post_failure()
                 else:
                     self.parent.old_object = copy.copy(self.parent.object)
                     print('rolled it successfully')
-                    self.post_completion()
+                    self.post_success()
             else:
-                self.post_failure()
+                if not self.parent.old_object:
+                    self.parent.old_object = copy.copy(self.parent.object)
+                    self.post_completion()
+                else:
+                    print('failed: orientation is not', self.parent.target_orientation)
+                    self.post_failure()
 
     class CheckCubePoseValidOnce(StateNode):
         def __init__(self, check_vis=False, reset=False):
@@ -1087,7 +1092,7 @@ class RollingCube(StateNode):
 
     $setup {
         # RollingCube machine
-        
+
         start: SetFetching() =C=> {looker, check_cube_pose}
 
         looker: LookAtObject()
@@ -1097,8 +1102,24 @@ class RollingCube(StateNode):
         check_cube_pose =F=> fail
 
         check_orientation: self.CheckOrientation()
-        check_orientation =C=> ParentCompletes()
-        check_orientation =F=> goto_cube
+        check_orientation =C=> goto_cube
+        check_orientation =S=> StateNode() =T(0.5)=> satisfied
+        check_orientation =F=> StateNode() =T(0.5)=> frustrated
+
+        satisfied: AnimationTriggerNode(trigger=cozmo.anim.Triggers.RollBlockSuccess,
+                                        ignore_body_track=True,
+                                        ignore_head_track=True,
+                                        ignore_lift_track=True)
+
+        satisfied =C=> ParentCompletes()
+        satisfied =F=> StopAllMotors() =T(1)=> ParentCompletes()
+
+        frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
+                                         ignore_body_track=True,
+                                         ignore_head_track=True,
+                                         ignore_lift_track=True)
+        frustrated =C=> goto_cube
+        frustrated =F=> StopAllMotors() =T(1)=> goto_cube
 
         goto_cube: GoToCube()
         goto_cube =F=> Print('goto_cube has failed.') =N=> try_again
