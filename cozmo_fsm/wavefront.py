@@ -3,7 +3,6 @@ Wavefront path planning algorithm.
 """
 
 import numpy as np
-import cv2
 import heapq
 from math import floor, ceil, cos, sin
 

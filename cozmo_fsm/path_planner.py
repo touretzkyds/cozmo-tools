@@ -4,7 +4,6 @@ Path planner using RRT and Wavefront algorithms.
 
 from math import pi, sin, cos
 from multiprocessing import Process
-import cv2
 
 from .nodes import LaunchProcess
 from .events import DataEvent, PilotEvent
@@ -47,7 +46,7 @@ class PathPlanner():
             (navplan, grid_display) = result.data
         else:
             ValueError('Bad result type:', result)
-        self.robot.world.rrt.grid_display = grid_display
+        robot.world.rrt.grid_display = grid_display
         return result
 
     @staticmethod
@@ -256,25 +255,6 @@ class PathPlanner():
         plan = NavPlan([step1, step2])
         return plan
 
-"""
-            *** TODO:
-
-            (1) Dont' make step1 so early.  If new_path[-1] is closer
-            to the door than the gate node, replace this element.
-            Cheap solution: replace new_path[-1] with the gate node.
-            Correct solution: chek to see if there is a collision-free
-            path from new_path[-2] to the gate node.
-
-            (2) If we're stuck in TurnTowardGoal, stopping the program
-            and restarting it immediately resumes TurnTowardGoal.  How
-            is this even possible?
-
-            (3) "Roll upright" is behaving strangely if the cube is on
-            its side.  It plans a path to the wrong side of the cube,
-            gets there, then changes its mind.
-
-"""
-
 #----------------------------------------------------------------
 
 # This code is for running the path planner in a child process.
@@ -305,7 +285,6 @@ class PathPlannerProcess(LaunchProcess):
     @staticmethod
     def process_workhorse(reply_token, start_node, goal_shape, robot_parts, bbox,
                           fat_obstacles, skinny_obstacles, doorway_list, need_grid_display): 
-        cv2.startWindowThread()
         rrt_instance = RRT(robot_parts=robot_parts, bbox=bbox)
         result = \
             PathPlanner.do_planning(rrt_instance, start_node, goal_shape,
