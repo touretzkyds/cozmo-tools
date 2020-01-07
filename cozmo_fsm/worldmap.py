@@ -78,6 +78,8 @@ class LightCubeObj(WorldObject):
 
 
 class ChargerObj(WorldObject):
+    charger_size = (104, 98, 10)
+
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
         if id is None:
             id = 'Charger'
@@ -88,7 +90,7 @@ class ChargerObj(WorldObject):
             self.update_from_sdk = True
         self.orientation = geometry.ORIENTATION_UPRIGHT
         self.theta = theta
-        self.size = (104, 98, 10)
+        self.size = self.charger_size
         if self.sdk_obj and self.sdk_obj.pose:
             self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
 
@@ -106,6 +108,8 @@ class ChargerObj(WorldObject):
 
 
 class CustomMarkerObj(WorldObject):
+    custom_marker_size = (4,44,44)
+
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
         if id is None:
             custom_type = sdk_obj.object_type.name[-2:]
@@ -113,7 +117,7 @@ class CustomMarkerObj(WorldObject):
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
-        self.size = (4,44,44)
+        self.size = self.custom_marker_size
         if self.sdk_obj:
             self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
         else:

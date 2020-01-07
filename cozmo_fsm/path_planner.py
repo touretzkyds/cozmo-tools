@@ -29,6 +29,22 @@ class PathPlanner():
     methods in the main process and return the result.
     """
 
+    # Note: the obstacle inflation parameter is a radius, not a diameter.
+
+    # Fat obstacles for the wavefefront algorithm because the robot
+    # itself is treated as a point.  Since the robot is longer than it is wide,
+    # an inflation value less than the length (95 mm) could miss a collision if
+    # the robot turns.
+    fat_obstacle_inflation = 50  # must be << pilot's escape_distance
+    fat_wall_inflation = 35
+    fat_doorway_adjustment = -62
+
+    # Skinny obstacles for the RRT are skinny because we model the
+    # robot's shape explicitly.
+    skinny_obstacle_inflation = 10
+    skinny_wall_inflation = 10
+    skinny_doorway_adjustment = 0
+
     @staticmethod
     def plan_path_this_process(goal_object, robot, use_doorways=False):
         # Get pickle-able data structures
@@ -55,15 +71,15 @@ class PathPlanner():
         be available in the child process."""
 
         # Fat obstacles and narrow doorways for WaveFront
-        obstacle_inflation = 20  # must be << pilot's escape_distance
-        passageway_adjustment = -40  # narrow doorways for WaveFront
-        robot.world.rrt.generate_obstacles(obstacle_inflation, passageway_adjustment)
+        robot.world.rrt.generate_obstacles(PathPlanner.fat_obstacle_inflation,
+                                           PathPlanner.fat_wall_inflation,
+                                           PathPlanner.fat_doorway_adjustment)
         fat_obstacles = robot.world.rrt.obstacles
 
-        # Skinny obstacles and wide doorways for RRT
-        obstacle_inflation = 10
-        passageway_adjustment = 0  # normal doorways for RRT
-        robot.world.rrt.generate_obstacles(obstacle_inflation, passageway_adjustment)
+        # Skinny obstacles and normal doorways for RRT
+        robot.world.rrt.generate_obstacles(PathPlanner.skinny_obstacle_inflation,
+                                           PathPlanner.skinny_wall_inflation,
+                                           PathPlanner.skinny_doorway_adjustment)
         skinny_obstacles = robot.world.rrt.obstacles
 
         (pose_x, pose_y, pose_theta) = robot.world.particle_filter.pose
@@ -120,7 +136,7 @@ class PathPlanner():
         if not collider:
             collider = wf.check_start_collides(start_node.x, start_node.y)
 
-        if collider:
+        if collider and collider.obstacle_id is not goal_shape.obstacle_id:
             q = start_node.q
             for (phi, escape_distance) in escape_options:
                 if phi != pi:
@@ -142,7 +158,7 @@ class PathPlanner():
                     break
             if start_escape_move is None:
                 print('PathPlanner: Start collides!', collider)
-                return PilotEvent(StartCollides,collider=collider)
+                return PilotEvent(StartCollides,collider=collider,grid_display=None)
 
         # Run the wavefront path planner
         rrt_instance.obstacles = fat_obstacles
@@ -154,10 +170,10 @@ class PathPlanner():
             offset = offsets[i]
             if i > 0:
                 wf = WaveFront(bbox=rrt_instance.bbox)  # need a fresh grid
-            wf.set_goal_shape(goal_shape, offset)
             # obstacles come after the goal so they can overwrite goal pixels
             for obstacle in fat_obstacles:
                 wf.add_obstacle(obstacle)
+            wf.set_goal_shape(goal_shape, offset, obstacle_inflation=PathPlanner.fat_obstacle_inflation)
             wf_start = (start_node.x, start_node.y)
             goal_found = wf.propagate(*wf_start)
             if goal_found: break
@@ -171,6 +187,7 @@ class PathPlanner():
         coords_pairs = wf.extract(goal_found, wf_start)
         rrt_instance.path = rrt_instance.coords_to_path(coords_pairs)
         rrt_instance.obstacles = skinny_obstacles
+        #rrt_instance.obstacles = fat_obstacles
         rrt_instance.smooth_path()
 
         # Construct the navigation plan

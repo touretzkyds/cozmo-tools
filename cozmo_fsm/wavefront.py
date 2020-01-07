@@ -9,6 +9,7 @@ from math import floor, ceil, cos, sin
 from .geometry import wrap_angle, rotate_point, polygon_fill, check_concave
 from .rrt import StartCollides
 from .rrt_shapes import *
+from .worldmap import LightCubeObj, ChargerObj, CustomMarkerObj
 
 class WaveFront():
     goal_marker = 2**31 - 1
@@ -19,6 +20,7 @@ class WaveFront():
         self.inflate_size = inflate_size  # in mm
         self.grid_shape = grid_shape  # array shape
         self.initialize_grid(bbox=bbox)
+        self.obstacles = dict()
 
     def initialize_grid(self,bbox=None):
         if bbox:
@@ -45,15 +47,17 @@ class WaveFront():
         y = gridy*self.square_size + ymin - self.inflate_size
         return (x,y)
 
-    def set_obstacle_cell(self,xcoord,ycoord):
+    def set_obstacle_cell(self, xcoord, ycoord, obstacle_id):
         (x,y) = self.coords_to_grid(xcoord,ycoord)
-        if x:
-            self.grid[x,y] = -1
+        if x is not None:
+            self.grid[x,y] = obstacle_id
 
-    def add_obstacle(self, obstacle, inflate_size=25):  # was inflate 25
+    def add_obstacle(self, obstacle):
+        obstacle_id = -(1 + len(self.obstacles))
+        self.obstacles[obstacle_id] = obstacle
         if isinstance(obstacle, Rectangle):
             centerX, centerY = obstacle.center[0,0], obstacle.center[1,0]
-            width, height = obstacle.dimensions[0]+inflate_size*2, obstacle.dimensions[1]+inflate_size*2
+            width, height = obstacle.dimensions[0], obstacle.dimensions[1]
             theta = wrap_angle(obstacle.orient)
             for x in range(floor(centerX-width/2),
                            ceil(centerX+width/2),
@@ -63,7 +67,7 @@ class WaveFront():
                                int(self.square_size/2)):
                     new_x = ((x - centerX) * cos(theta) - (y - centerY) * sin(theta)) + centerX
                     new_y = ((x - centerX) * sin(theta) + (y - centerY) * cos(theta)) + centerY
-                    self.set_obstacle_cell(new_x, new_y)
+                    self.set_obstacle_cell(new_x, new_y, obstacle_id)
         elif isinstance(obstacle, Polygon):
             raise NotImplemented(obstacle)
         elif isinstance(obstacle, Circle):
@@ -74,44 +78,79 @@ class WaveFront():
             raise Exception("%s has no add_obstacle() method defined for %s." % (self, obstacle))
 
     def set_goal_cell(self,xcoord,ycoord):
+        self.set_cell_contents(xcoord,ycoord,self.goal_marker)
+
+    def set_empty_cell(self,xcoord,ycoord):
+        self.set_cell_contents(xcoord, ycoord, 0)
+
+    def set_cell_contents(self,xcoord,ycoord,contents):
         (x,y) = self.coords_to_grid(xcoord,ycoord)
-        if x:
-            self.grid[x,y] = self.goal_marker
+        if x is not None:
+            self.grid[x,y] = contents
         else:
             print('**** bbox=', self.bbox, '  grid_shape=', self.grid_shape,
                   '  x,y=', (x,y), '  xcoord,ycoord=', (xcoord,ycoord))
             print(ValueError('Coordinates (%s, %s) are outside the wavefront grid' % ((xcoord,ycoord))))
 
-    def set_goal_shape(self, shape, default_offset=None):
+    def set_goal_shape(self, shape, default_offset=None, obstacle_inflation=0):
         goal_points = []
-        goal_buffer = 20
         if shape.obstacle_id.startswith('Room'):
-            offset = -1 if default_offset is None else default_offset # for rooms
-            isConcave, vertices_lst = False, []
-            if offset > 0:
-                isConcave, vertices_lst = check_concave(shape)
-            if isConcave:
-                for vertices in vertices_lst:
-                    goal_points += polygon_fill(Polygon(vertices), offset)
-            else:
-                goal_points = polygon_fill(shape, offset)
-        else:
-            offset = 50   # for cubes, charger, markers
-            for buffer in range(goal_buffer):
-                goal_points.append([shape.center[0,0]+(offset+buffer), shape.center[1,0]])
-                goal_points.append([shape.center[0,0]-(offset+buffer), shape.center[1,0]])
-                goal_points.append([shape.center[0,0], shape.center[1,0]+(offset+buffer)])
-                goal_points.append([shape.center[0,0], shape.center[1,0]-(offset+buffer)])
+            empty_points, goal_points = self.generate_room_goal_points(shape, default_offset)
+        else:   # cubes, charger, markers
+            empty_points, goal_points = self.generate_cube_goal_points(shape, obstacle_inflation)
+        for point in empty_points:
+            self.set_empty_cell(*rotate_point(point, shape.center[0:2,0], shape.orient))
         for point in goal_points:
             self.set_goal_cell(*rotate_point(point, shape.center[0:2,0], shape.orient))
 
+    def generate_room_goal_points(self, shape, default_offset):
+        offset = -1 if default_offset is None else default_offset
+        if offset > 0:
+            isConcave, vertices_lst = check_concave(shape)
+        else:
+            isConcave, vertices_lst = False, []
+        if isConcave:
+            for vertices in vertices_lst:
+                goal_points += polygon_fill(Polygon(vertices), offset)
+        else:
+            goal_points = polygon_fill(shape, offset)
+        empty_points = []
+        return (empty_points, goal_points)
+
+    def generate_cube_goal_points(self,shape,obstacle_inflation):
+        # for cubes, charger, markers
+        if shape.obstacle_id.startswith('Cube'):
+            (xsize,ysize,_) = LightCubeObj.light_cube_size
+        elif shape.obstacle_id.startswith('Charger'):
+            (xsize,ysize,_) = ChargerObj.charger_size
+        elif shape.obstacle_id.startswith('CustomMarkerObj'):
+            (xsize,ysize,_) = CustomMarkerObj.custom_marker_size
+        else:
+            raise ValueError('Unrecognized goal shape', shape)
+        ((xmin,ymin), (xmax,ymax)) = shape.get_bounding_box()
+        goal_points, empty_points = [], []
+        for offset in range(floor(xsize/2), ceil(xsize/2)+obstacle_inflation):
+                empty_points.append([shape.center[0,0]-offset, shape.center[1,0]])
+                empty_points.append([shape.center[0,0]+offset, shape.center[1,0]])
+        for offset in range(floor(ysize/2), ceil(ysize/2)+obstacle_inflation):
+                empty_points.append([shape.center[0,0], shape.center[1,0]-offset])
+                empty_points.append([shape.center[0,0], shape.center[1,0]+offset])
+        goal_offset = 15 # distance from edge in mm
+        goal_points.append([shape.center[0,0]-xsize/2-goal_offset, shape.center[1,0]])
+        goal_points.append([shape.center[0,0]+xsize/2+goal_offset, shape.center[1,0]])
+        goal_points.append([shape.center[0,0], shape.center[1,0]-ysize/2-goal_offset])
+        goal_points.append([shape.center[0,0], shape.center[1,0]+ysize/2+goal_offset])
+        return (empty_points, goal_points)
+
     def check_start_collides(self,xstart,ystart):
         (x,y) = self.coords_to_grid(xstart,ystart)
-        if self.grid[x,y] == 0 or self.grid[x,y] == self.goal_marker:
+        contents = self.grid[x,y]
+        if contents == 0 or contents == self.goal_marker:
             return False
         else:
-            print('start collides:', (xstart,ystart), (x,y), '  grid=', self.grid[x,y])
-            return True
+            collider = self.obstacles[contents]
+            print('start collides:', (xstart,ystart), (x,y), collider)
+            return collider
 
     def propagate(self,xstart,ystart):
         """

@@ -26,6 +26,7 @@ from . import geometry
 from .geometry import wrap_angle
 
 the_rrt = None
+old_grid = None
 the_items = []  # each item is a tuple (tree,color)
 
 help_text = """
@@ -284,7 +285,7 @@ class PathViewer():
                         self.draw_rectangle(center=c, width=w, height=h, color=(0, 1, 0)) # green for goal
                     elif  grid[x,y] == 1:
                         self.draw_rectangle(center=c, width=w, height=h, color=(1, 1, 0)) # yellow for start
-                    elif  grid[x,y] == -1:
+                    elif  grid[x,y] < 0:
                         self.draw_rectangle(center=c, width=w, height=h, color=(1, 0, 0)) # red for obstacle
                     else:
                         value = grid[x,y]/max_val    # shades of gray for distance values
@@ -332,8 +333,10 @@ class PathViewer():
         glutSwapBuffers()
 
     def display_wf(self):
-        grid = the_rrt.grid_display
+        global old_grid
+        grid = the_rrt.grid_display if the_rrt.grid_display is not None else old_grid
         if grid is None: return
+        old_grid = grid
         square_size = 5
         w = max(grid.shape) * square_size / 2
         glMatrixMode(GL_PROJECTION)

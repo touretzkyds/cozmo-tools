@@ -7,7 +7,7 @@ class Shape():
         if center is None: raise ValueError()
         self.center = center
         self.rotmat = geometry.identity()
-        self.obstacle_id = None
+        self.obstacle_id = None  # only store the string, so shape is pickle-able
     
     def __repr__(self):
         return "<%s >" % (self.__class__.__name__)
