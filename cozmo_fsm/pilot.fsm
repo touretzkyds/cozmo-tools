@@ -367,11 +367,28 @@ class PilotPushToPose(PilotToPose):
 
 class PilotFrustration(StateNode):
 
+    def __init__(self, text_template=None):
+        super().__init__()
+        self.text_template = text_template  # contains at most one '%s'
+
     class SayObject(Say):
         def start(self, event=None):
+            text_template = self.parent.text_template
             try:
-                self.text = self.parent.parent.object.name
+                object_name = self.parent.parent.object.name   # for rooms
             except:
+                try:
+                    object_name = self.parent.parent.object.id   # for cubes
+                except:
+                    object_name = None
+            if text_template is not None:
+                if '%' in text_template:
+                    self.text = text_template % object_name
+                else:
+                    self.text = text_template
+            elif object_name is not None:
+                self.text = 'Can\'t reach %s' % object_name
+            else:
                 self.text = 'stuck'
             super().start(event)
 

@@ -20,7 +20,7 @@ class PilotCheckStart(StateNode):
             self.robot.world.rrt.plan_path(start_node,start_node)
         except StartCollides as e:
             print('PilotCheckStart: Start collides!',e)
-            self.post_event(PilotEvent(StartCollides, e.args))
+            self.post_event(PilotEvent(StartCollides, args=e.args))
             self.post_failure()
             return
         except Exception as e:

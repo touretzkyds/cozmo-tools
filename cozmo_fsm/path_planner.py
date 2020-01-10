@@ -230,8 +230,8 @@ class PathPlanner():
 
     @staticmethod
     def from_path(path, doorways):
-        # Consider each segment (consecutive pair of points) of path
-        # and see if it crosses a doorway.
+        # Consider each path segment (defined by start and end
+        # RRTNodes) and see if it crosses a doorway.
         door = None
         i = 0  # in case len(path) is 1 and we skip the for loop
         pt1 = path[i]
@@ -241,7 +241,8 @@ class PathPlanner():
             if door:
                 i -= 1
                 break
-            pt1 = pt2
+            else:
+                pt1 = pt2
 
         # If no doorway, we're good to go
         if door is None:
@@ -251,9 +252,10 @@ class PathPlanner():
 
         # Truncate the path at the doorway, and ajust to make sure
         # we're outside the approach gate.
-        (dx,dy) = (door.x, door.y)
+        start_point = (pt1.x, pt1.y)
         DELTA = 15 # mm
-        gate = DoorPass.calculate_gate((dx,dy), door, DoorPass.OUTER_GATE_DISTANCE + DELTA)
+        gate = DoorPass.calculate_gate(start_point, door, DoorPass.OUTER_GATE_DISTANCE + DELTA)
+        (dx,dy) = (door.x, door.y)
         (gx,gy) = (gate[0],gate[1])
         gate_node = RRTNode(x=gx, y=gy)
         print('door=', door, 'gate_node=', gate_node)
