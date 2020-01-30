@@ -222,8 +222,9 @@ def get_orientation_state(quaternion, isPlanar=False):
             if round(y, 1) == 0:
                 z = z-pi/2 if x>0 else z+pi/2
             else:
-                w, x, y, z = quaternion
-                x, y, z = quaternion_to_euler_angle([w, y, x, z])
+                #w, x, y, z = quaternion
+                #x, y, z = quaternion_to_euler_angle([w, y, x, z])
+                x, y, _ = quaternion_to_euler_angle([q0, q2, q1, q3])
                 z = -y if x>0 else y+pi
     else:
         orientation = ORIENTATION_TILTED
