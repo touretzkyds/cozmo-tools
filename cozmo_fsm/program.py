@@ -151,7 +151,9 @@ class StateMachineProgram(StateNode):
               robot.is_picked_up
               or (not robot.is_moving
                   and (robot.accelerometer.z < 5000
-                       or robot.accelerometer.z > 10300))))(self.robot)
+                       or robot.accelerometer.z > 13000))))(self.robot)
+#                  and (robot.accelerometer.z < 5000
+#                       or robot.accelerometer.z > 10300))))(self.robot)
 
         # World map and path planner
         self.robot.enable_facial_expression_estimation(True)
