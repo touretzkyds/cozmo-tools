@@ -9,6 +9,8 @@ try:
 except:
     pass
 
+import time
+
 from threading import Thread  # for backgrounding window
 
 INIT_DONE = False
@@ -29,6 +31,7 @@ def init():
 
         # Killing window should not directly kill main program
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
+        time.sleep(2)
         launch_event_loop()
 
 def create_window(name,size=(500,500)):
@@ -51,6 +54,7 @@ def event_loop():
         CREATION_QUEUE = []
         for req in queue:
             req()  # invoke the window creator
+        time.sleep(0.1)
 
 def launch_event_loop():
     global MAIN_LOOP_LAUNCHED

@@ -131,7 +131,7 @@ class StateMachineProgram(StateNode):
         # Create a particle filter
         if not isinstance(self.particle_filter,ParticleFilter):
             self.particle_filter = SLAMParticleFilter(self.robot, landmark_test=self.landmark_test)
-        else:
+        elif isinstance(self.particle_filter,SLAMParticleFilter):
             self.particle_filter.clear_landmarks()
         pf = self.particle_filter
         self.robot.world.particle_filter = pf
@@ -190,6 +190,7 @@ class StateMachineProgram(StateNode):
             if self.particle_viewer is True:
                 self.particle_viewer = \
                     ParticleViewer(self.robot, scale=self.particle_viewer_scale)
+                print('set particle viewer =', self.particle_viewer)
             self.particle_viewer.start()
         self.robot.world.particle_viewer = self.particle_viewer
 

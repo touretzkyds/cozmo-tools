@@ -104,6 +104,7 @@ class ParticleViewer():
             opengl.CREATION_QUEUE.append(self.window_creator)
             while not WINDOW:
                 time.sleep(0.1)
+                time.sleep(1)
         if platform.system() == 'Darwin':
             print("Type 'option' + 'h' in the particle viewer window for help.")
         else:

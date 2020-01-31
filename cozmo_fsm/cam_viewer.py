@@ -29,8 +29,6 @@ path = 'snap/'
 WINDOW = None
 
 class CamViewer():
-    prog_start = False
-
     def __init__(self, robot, width=640, height=480,
                  windowName="Cozmo's World",
                  bgcolor=(0, 0, 0)):
@@ -90,7 +88,7 @@ class CamViewer():
     # ================ Window Setup ================
     def window_creator(self):
         global WINDOW
-        glutInit(sys.argv)
+        #glutInit(sys.argv)
         WINDOW = opengl.create_window(
             bytes(self.windowName, 'utf-8'), (self.width, self.height))
         glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
@@ -107,7 +105,6 @@ class CamViewer():
         if not WINDOW:
             opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
-            CamViewer.prog_start = True
             while not WINDOW:
                 time.sleep(0.1)
 
