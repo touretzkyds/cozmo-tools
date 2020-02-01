@@ -263,10 +263,9 @@ class ParticleViewer():
         glColor4f(0., 0., 0., 1.)
         glTranslatef(*coords,0)
         glRotatef(angle + angle_adjust, 0., 0., 1.)
-        label_str = ascii(label)
-        glTranslatef(3.-7*len(label_str), -5., 0.)
+        glTranslatef(3.-7*len(label), -5., 0.)
         glScalef(0.1,0.1,0.1)
-        for char in label_str:
+        for char in label:
             glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, ord(char))
         glPopMatrix()
 
