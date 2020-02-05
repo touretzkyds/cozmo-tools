@@ -6,7 +6,12 @@ import time
 
 import numpy
 import numpy as np
-import cv2
+
+try:
+    import cv2
+    ARUCO_DICT_4x4_100 = cv2.aruco.DICT_4X4_100
+except:
+    ARUCO_DICT_4x4_100 = None
 
 import cozmo
 from cozmo.util import degrees, distance_mm, speed_mmps
@@ -46,7 +51,7 @@ class StateMachineProgram(StateNode):
                  particle_viewer_scale = 1.0,
 
                  aruco = True,
-                 arucolibname = cv2.aruco.DICT_4X4_100,
+                 arucolibname = ARUCO_DICT_4x4_100,
                  aruco_disabled_ids = (17, 37),
                  aruco_marker_size = ARUCO_MARKER_SIZE,
 

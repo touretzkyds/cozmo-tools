@@ -1,10 +1,12 @@
-import cv2
-import cv2.aruco as aruco
 from numpy import matrix, array, ndarray, sqrt, arctan2, pi
 import threading
 from time import sleep
 from .geometry import wrap_angle
 
+try:
+    import cv2
+    import cv2.aruco as aruco
+except: pass
 
 # Known camera parameters
 

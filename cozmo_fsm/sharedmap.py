@@ -1,4 +1,3 @@
-import cv2
 import socket
 import pickle
 import threading

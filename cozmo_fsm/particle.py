@@ -5,7 +5,9 @@ Particle filter localization.
 import math, array, random
 from math import pi, sqrt, sin, cos, atan2, exp
 import numpy as np
-import cv2
+
+try: import cv2
+except: pass
 
 import cozmo
 from cozmo.util import Pose

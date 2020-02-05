@@ -1,4 +1,7 @@
-import cv2, math
+try: import cv2
+except: pass
+
+import math
 from numpy import sqrt, arctan2, array, multiply
 
 ARUCO_MARKER_SIZE = 44
@@ -50,8 +53,9 @@ class ArucoMarker(object):
 class Aruco(object):
     def __init__(self, robot, arucolibname, marker_size=ARUCO_MARKER_SIZE, disabled_ids=[]):
         self.arucolibname = arucolibname
-        self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
-        self.aruco_params = cv2.aruco.DetectorParameters_create()
+        if arucolibname is not None:
+            self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
+            self.aruco_params = cv2.aruco.DetectorParameters_create()
         self.seen_marker_ids = []
         self.seen_marker_objects = dict()
         self.disabled_ids = disabled_ids  # disable markers with high false detection rates

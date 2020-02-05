@@ -6,12 +6,12 @@ import numpy as np
 import math
 import random
 import time
-from PIL import Image
-import cv2
 import cozmo
 from cozmo.util import degrees, distance_mm, speed_mmps
 
 try:
+    import cv2
+    from PIL import Image
     from OpenGL.GLUT import *
     from OpenGL.GL import *
     from OpenGL.GLU import *

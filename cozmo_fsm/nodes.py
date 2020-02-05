@@ -4,7 +4,9 @@ import inspect
 import types
 import random
 import numpy as np
-import cv2
+
+try: import cv2
+except: pass
 
 from math import pi, sqrt, atan2, inf, nan
 from multiprocessing import Process, Queue

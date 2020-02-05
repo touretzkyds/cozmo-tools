@@ -1,6 +1,8 @@
 from cozmo.util import Pose
-from cv2 import Rodrigues
 from numpy import matrix, tan, arctan2
+
+try: from cv2 import Rodrigues
+except: pass
 
 from .nodes import *
 from .transitions import *

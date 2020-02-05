@@ -5,10 +5,15 @@ classes without having to connect to a real robot.
 
 import asyncio
 
-import cozmo
-import cv2
+try:
+    import cv2
+    ARUCO_DICT_4x4_100 = cv2.aruco.DICT_4X4_100
+except:
+    ARUCO_DICT_4x4_100 = None
 
+import cozmo
 from cozmo.util import Distance, Angle, Pose
+
 from .cozmo_kin import CozmoKinematics
 from .evbase import EventRouter
 from .aruco import Aruco
@@ -43,7 +48,7 @@ class SimRobot():
         robot.carrying = None
 
         robot.world = SimWorld()
-        robot.world.aruco = Aruco(robot, cv2.aruco.DICT_4X4_100)
+        robot.world.aruco = Aruco(robot, ARUCO_DICT_4x4_100)
         robot.world.light_cubes = dict()
         robot.world._faces = dict()
         robot.world.charger = None
