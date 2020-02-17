@@ -4,12 +4,15 @@ from cozmo_fsm import *
 
 class CV_Contour(StateMachineProgram):
     def __init__(self):
-        super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
+        super().__init__(aruco=False, particle_filter=False, cam_viewer=False,
                          annotate_sdk=False)
 
     def start(self):
-        cv2.namedWindow('contour')
+        super().start()
+
+        self.force_annotation = True
         dummy = numpy.array([[0]*320])
+        cv2.namedWindow('contour')
         cv2.imshow('contour',dummy)
 
         cv2.createTrackbar('thresh1','contour',0,255,lambda self: None)
@@ -24,13 +27,11 @@ class CV_Contour(StateMachineProgram):
                        (128,128,0), (0,128,128), (128,0,128),
                        (255,255,255)]
 
-        super().start()
-
 
     def user_image(self,image,gray):
         thresh1 = cv2.getTrackbarPos('thresh1','contour')
         ret, thresholded = cv2.threshold(gray, thresh1, 255, 0)
-        cv2.imshow('contour',thresholded)
+        #cv2.imshow('contour',thresholded)
         if cv2.__version__[0] >= '4':
             contours, hierarchy = \
                 cv2.findContours(thresholded, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -57,4 +58,6 @@ class CV_Contour(StateMachineProgram):
                 temp = self.hierarchy[0,temp,3]
             contour = scale * self.contours[index]
             cv2.drawContours(annotated_image, [contour], 0, self.colors[depth], 1)
+        cv2.imshow('contour',annotated_image)
+        cv2.waitKey(1)
         return annotated_image
