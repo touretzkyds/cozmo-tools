@@ -42,7 +42,7 @@ class RandomTurn(Turn):
         super().start(event)
 
 class Randomness(StateMachineProgram):
-    $setup {
+    $setup{
         startnode: StateNode() =RND=> {fwd, fwd, turn, turn, joke}
 
         fwd: Say(["Forward", "Straight", "Full steam ahead"])

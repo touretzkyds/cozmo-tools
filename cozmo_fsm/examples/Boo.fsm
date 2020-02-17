@@ -7,10 +7,7 @@
   terminate a second source (MoveHead) that doesn't complete.
 """
 
-try:
-    from cozmo_fsm import *
-except:
-    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+from cozmo_fsm import *
 
 class WaitForPlayer(StateMachineProgram):
     """Wait for player's face to appear and remain visible for a little while."""

@@ -14,8 +14,8 @@ from cozmo_fsm import *
 
 class CV_Hough(StateMachineProgram):
     def __init__(self):
-        super().__init__(aruco=False, particle_filter = False, cam_viewer=True,
-                         annotate_sdk = False)
+        super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
+                         annotate_sdk=False)
 
     def start(self):
         cv2.namedWindow('edges')
