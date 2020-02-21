@@ -14,14 +14,16 @@ from cozmo_fsm import *
 
 class CV_Hough(StateMachineProgram):
     def __init__(self):
-        super().__init__(aruco=False, particle_filter=False, cam_viewer=True,
-                         annotate_sdk=False)
+        super().__init__(aruco=False, particle_filter=False, cam_viewer=False,
+                         force_annotation=True, annotate_sdk=False)
 
     def start(self):
+        cv2.namedWindow('gray')
         cv2.namedWindow('edges')
         cv2.namedWindow('Hough')
         cv2.namedWindow('HoughP')
         dummy = numpy.array([[0]])
+        cv2.imshow('gray',dummy)
         cv2.imshow('edges',dummy)
         cv2.imshow('Hough',dummy)
         cv2.imshow('HoughP',dummy)
@@ -54,6 +56,8 @@ class CV_Hough(StateMachineProgram):
         super().start()
 
     def user_image(self,image,gray):
+        self.gray = gray
+
         # Canny edge detector
         self.thresh1 = cv2.getTrackbarPos('thresh1','edges')
         self.thresh2 = cv2.getTrackbarPos('thresh2','edges')
@@ -75,6 +79,7 @@ class CV_Hough(StateMachineProgram):
                                        self.minLineLength, self.maxLineGap)
 
     def user_annotate(self,image):
+        cv2.imshow('gray',self.gray)
         cv2.imshow('edges',self.edges)
         if self.h_lines is not None:
             hough_image = cv2.cvtColor(self.edges,cv2.COLOR_GRAY2BGR)
@@ -102,4 +107,5 @@ class CV_Hough(StateMachineProgram):
                 if p_main:
                     cv2.line(image,(2*x1,2*y1),(2*x2,2*y2),(255,0,0),2)
             cv2.imshow('HoughP',houghp_image)
+        cv2.waitKey(1)
         return image
