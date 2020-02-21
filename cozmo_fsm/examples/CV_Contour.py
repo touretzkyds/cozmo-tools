@@ -14,7 +14,7 @@ class CV_Contour(StateMachineProgram):
 
     def start(self):
         super().start()
-        dummy = numpy.array([[0]*320], dtype='int')
+        dummy = numpy.array([[0]*320], dtype='uint8')
         cv2.namedWindow('contour')
         cv2.imshow('contour',dummy)
 
