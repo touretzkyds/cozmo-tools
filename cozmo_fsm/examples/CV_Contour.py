@@ -4,8 +4,13 @@ from cozmo_fsm import *
 
 class CV_Contour(StateMachineProgram):
     def __init__(self):
+        self.colors = [(0,0,255), (0,255,0), (255,0,0),
+                       (255,255,0), (255,0,255), (0,255,255),
+                       (0,0,128), (0,128,0), (128,0,0),
+                       (128,128,0), (0,128,128), (128,0,128),
+                       (255,255,255)]
         super().__init__(aruco=False, particle_filter=False, cam_viewer=False,
-                         annotate_sdk=False)
+                         force_annotation=True, annotate_sdk=False)
 
     def start(self):
         super().start()
@@ -20,13 +25,6 @@ class CV_Contour(StateMachineProgram):
 
         cv2.createTrackbar('minArea','contour',1,1000,lambda self: None)
         cv2.setTrackbarPos('minArea','contour',50)
-
-        self.colors = [(0,0,255), (0,255,0), (255,0,0),
-                       (255,255,0), (255,0,255), (0,255,255),
-                       (0,0,128), (0,128,0), (128,0,0),
-                       (128,128,0), (0,128,128), (128,0,128),
-                       (255,255,255)]
-
 
     def user_image(self,image,gray):
         thresh1 = cv2.getTrackbarPos('thresh1','contour')
