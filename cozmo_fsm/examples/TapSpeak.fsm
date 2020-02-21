@@ -11,10 +11,7 @@
   listening for more tap events.
 """
 
-try:
-    from cozmo_fsm import *
-except:
-    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+from cozmo_fsm import *
 
 from cozmo_fsm import *
 
@@ -28,7 +25,7 @@ class SayCube(Say):
         super().start(event)
 
 class TapSpeak(StateMachineProgram):
-    $setup {
+    $setup{
         intro: Say('Tap a cube.') =C=> wait
 
         wait: StateNode() =Tap()=> speak

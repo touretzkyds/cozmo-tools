@@ -175,7 +175,10 @@ class DataTrans(Transition):
         if self.running: return
         super().start()
         for source in self.sources:
-            self.robot.erouter.add_listener(self, DataEvent, source)
+            if self.data is None or isinstance(self.data, type):
+                self.robot.erouter.add_wildcard_listener(self, DataEvent, source)
+            else:
+                self.robot.erouter.add_listener(self, DataEvent, source)
 
     def handle_event(self,event):
         if not self.running: return

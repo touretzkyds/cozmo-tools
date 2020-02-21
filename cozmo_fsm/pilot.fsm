@@ -65,6 +65,10 @@ class PilotBase(StateNode):
             if not isinstance(event, DataEvent):
                 raise ValueError(event)
             (navplan, grid_display) = event.data
+            if grid_display is not None:
+                if self.parent.robot.world.path_viewer:
+                    self.parent.robot.world.path_viewer.clear_trees()
+
             self.robot.world.rrt.draw_path = navplan.extract_path()
             print('ReceivePlan: draw_path=', self.robot.world.rrt.draw_path)
             self.robot.world.rrt.grid_display = grid_display
@@ -140,7 +144,8 @@ class PilotBase(StateNode):
             next =C=> ParentCompletes()
         }
 
-    # End of PilotExecutePlan
+        # End of PilotExecutePlan
+    # End of PilotBase
 
 
 #---------------- PilotToObject ----------------
@@ -308,8 +313,9 @@ class PilotToPose(PilotBase):
 
             # If no doorpass, we're good to go
             last_step = navplan.steps[-1]
+            grid_display = None
             if last_step.type != NavStep.DOORPASS:
-                self.post_data(navplan)
+                self.post_data((navplan,grid_display))
                 return
 
             # We planned for a doorpass; replan to the outer gate
@@ -324,7 +330,7 @@ class PilotToPose(PilotBase):
             cpath = [(node.x,node.y) for node in path]
             navplan = PathPlanner.from_path(cpath, [])
             navplan.steps.append(last_step)  # Add the doorpass step
-            self.post_data(navplan)
+            self.post_data((navplan,grid_display))
 
         # ----- End of PilotRRTPlanner -----
 
@@ -343,7 +349,12 @@ class PilotToPose(PilotBase):
 
 
     $setup{
-        planner: self.PilotRRTPlanner() =D=> exec
+        # PilotToPose machine
+
+        planner: self.PilotRRTPlanner() =D=> recv
+        planner =PILOT=> ParentPilotEvent() =N=> Print('Path planner failed')
+
+        recv: self.ReceivePlan() =D=> exec
 
         exec: self.PilotExecutePlan()
         exec =C=> check

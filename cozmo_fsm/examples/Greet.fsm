@@ -6,14 +6,11 @@
   speech has completed, he waits 5 seconds, then says 'Bye-bye now'.
 """
 
-try:
-    from cozmo_fsm import *
-except:
-    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+from cozmo_fsm import *
 
 class Greet(StateMachineProgram):
-    $setup """
+    $setup {
         say: Say('Greetings, human!') =C=>
           wait: StateNode() =T(5)=>
             say2: Say('Bye-bye now.')
-    """
+    }

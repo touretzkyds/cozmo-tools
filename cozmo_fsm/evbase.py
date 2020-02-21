@@ -130,19 +130,19 @@ class EventRouter:
         source_dict = self.dispatch_table.get(type(event), None)
         if source_dict is None:  # no listeners for this event type
             return []
-        matches = source_dict.get(event.source, [])
-        if event.source is None:
-            none_matches = matches
-            matches = []
-        else:
-            none_matches = source_dict.get(None, [])
+        source_matches = source_dict.get(event.source, [])
         wildcards = []
-        for handler in none_matches:
+        matches = []
+        for handler in source_matches:
             if self.wildcard_registry.get(handler,False) is True:
                 wildcards.append(handler)
             else:
                 matches.append(handler)
         # wildcard handlers must come last in the list
+        if type(event).__name__ == 'PilotEvent':
+            print('event=',event,'   event.source=', repr(event.source))
+            print('wildcard_registry is',self.wildcard_registry)
+            print('matches=',matches,'   wildcards=',wildcards)
         return matches + wildcards
 
     def post(self,event):
@@ -153,7 +153,7 @@ class EventRouter:
         for listener in listeners:
             cnt += 1
             if TRACE.trace_level >= TRACE.listener_invocation:
-                print('TRACE%d:' % TRACE.listener_invocation, listener.__class__, 'receiving', event)
+                print('TRACE%d:' % TRACE.listener_invocation, listener.__self__, 'receiving', event)
             self.robot.loop.call_soon(listener,event)
     
     def add_process_node(self, node):

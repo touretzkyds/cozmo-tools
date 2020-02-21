@@ -90,7 +90,7 @@ class SpeechListener():
                         warned_no_mic = False
                     while True:
                         if self.debug: print('--> Listening...')
-                        audio = self.rec.listen(source, timeout=8, phrase_time_limit=5)
+                        audio = self.rec.listen(source, timeout=8, phrase_time_limit=8)
                         audio_len = len(audio.frame_data)
                         if self.debug:
                             print('--> Got audio data: length = {:,d} bytes.'. \
@@ -108,7 +108,7 @@ class SpeechListener():
                             evt = SpeechEvent(string,words)
                             self.robot.erouter.post(evt)
                         except sr.RequestError as e:
-                            print("Could not request results form google speech recognition service; {0}".format(e)) 
+                            print("Could not request results from google speech recognition service; {0}".format(e)) 
                         except sr.UnknownValueError:
                             if self.debug:
                                 print('--> Recognizer found no words.')

@@ -9,10 +9,7 @@
   action. When he's done backing up, he stops beeping and says 'Safety first'.
 """
 
-try:
-    from cozmo_fsm import *
-except ImportError:
-    raise ImportError("Can't find the cozmo_fsm package. Check your search path.")
+from cozmo_fsm import *
 
 class BackItUp(StateMachineProgram):
     $setup {

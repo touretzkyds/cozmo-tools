@@ -298,6 +298,12 @@ class PathViewer():
         global the_items
         the_items.append((tree,color))
 
+    def clear_trees(self):
+        global the_items
+        the_items = []
+        self.robot.world.rrt.treeA = []
+        self.robot.world.rrt.treeB = []
+
     def display(self):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
