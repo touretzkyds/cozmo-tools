@@ -195,7 +195,6 @@ class StateMachineProgram(StateNode):
             if self.particle_viewer is True:
                 self.particle_viewer = \
                     ParticleViewer(self.robot, scale=self.particle_viewer_scale)
-                print('set particle viewer =', self.particle_viewer)
             self.particle_viewer.start()
         self.robot.world.particle_viewer = self.particle_viewer
 

@@ -23,7 +23,7 @@ WINDOW_REGISTRY = []
 CREATION_QUEUE = []
 
 def init():
-    global INIT_DONE
+    global INIT_DONE, robot
     if not INIT_DONE:
         INIT_DONE = True
         glutInit()
@@ -31,7 +31,6 @@ def init():
 
         # Killing window should not directly kill main program
         glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION)
-        time.sleep(2)
         launch_event_loop()
 
 def create_window(name,size=(500,500)):
@@ -43,18 +42,22 @@ def create_window(name,size=(500,500)):
     return w
 
 def event_loop():
-    global CREATION_QUEUE
     while True:
         for window in WINDOW_REGISTRY:
             glutSetWindow(window)
             glutPostRedisplay()
         glutMainLoopEvent()
-        # Process any requests for new windows
-        queue = CREATION_QUEUE
-        CREATION_QUEUE = []
-        for req in queue:
-            req()  # invoke the window creator
+        process_requests()
         time.sleep(0.1)
+
+def process_requests():
+    global CREATION_QUEUE
+    # Process any requests for new windows
+    queue = CREATION_QUEUE
+    CREATION_QUEUE = []
+    for req in queue:
+        req()  # invoke the window creator
+
 
 def launch_event_loop():
     global MAIN_LOOP_LAUNCHED

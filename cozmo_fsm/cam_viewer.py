@@ -105,8 +105,6 @@ class CamViewer():
         if not WINDOW:
             opengl.init()
             opengl.CREATION_QUEUE.append(self.window_creator)
-            while not WINDOW:
-                time.sleep(0.1)
 
     def display(self):
         self.process_image()
