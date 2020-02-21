@@ -22,7 +22,7 @@ class CV_Hough(StateMachineProgram):
         cv2.namedWindow('edges')
         cv2.namedWindow('Hough')
         cv2.namedWindow('HoughP')
-        dummy = numpy.array([[0]])
+        dummy = numpy.array([[0]], dtype='uint8')
         cv2.imshow('gray',dummy)
         cv2.imshow('edges',dummy)
         cv2.imshow('Hough',dummy)
