@@ -27,7 +27,6 @@ class PilotCheckStart(StateNode):
             print('PilotCheckStart: Unexpected planner exception',e)
             self.post_failure()
             return
-        self.post_event(PilotEvent(True))
         self.post_success()
 
 #---------------- Navigation Plan ----------------
