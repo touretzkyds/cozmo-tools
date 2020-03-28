@@ -17,5 +17,5 @@ Run it by typing: `python3 simple_cli`
 * __genfsm__ is a preprocessor that converts .fsm files written in
 the cozmo_fsm notation to .py files that are ready to run.
 
-__Note__: you can install most of the Python dependencies by running `pip3 install -r requirements.txt`,
+__Note__: you can install most of the Python dependencies by simply running `pip3 install -r requirements.txt`,
 but see the INSTALL.txt file for some exceptions.
