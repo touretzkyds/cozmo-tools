@@ -1,18 +1,35 @@
 Ubuntu Linux:
-You can install all required packages by doing:
+You can install all required Python packages by doing:
   pip3 install -r requirements.txt
+For OpenGL you will also need to do:
+  apt-get install freeglut3
+You will also need to install adb:
+  apt-get install android-tools-adb
 
 
 Windows:
-  The requirements.txt file will for for everything but OpenGL.
+  The requirements.txt file will work for for everything but OpenGL.
   As of 2018 the PyOpenGL and PyOpenGL_accelerate packages in PyPI were not good.
   Instead, download the whl files for both of these for your Python version from
      https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
   and use pip to install them.
-
+  If you are using an Android device or a Kindle Fire to run the Cozmo appp, you
+  will also need to install adb. Follow the instructions on this page:
+      http://cozmosdk.anki.com/docs/adb.html
+  If you are using an iOS device to run the Cozmo app you must install iTunes on
+  your Windows computer so that you get the proper device drivers. Make sure
+  that iTunes can talk to your iOS device before proceeding.
 
 MacOS (should be 10.13 or higher):
-  The requirements.txt file will for for everything but PyAudio.
+  The requirements.txt file will work for for everything but PyAudio.
   The version of PyAudio in PyPI does not compile unless you have
-  certain tools installed.  Visit this page to learn how to install
-  PyAudio: http://people.csail.mit.edu/hubert/pyaudio/
+  certain tools installed.  Visit this page to learn how to install PyAudio:
+    http://people.csail.mit.edu/hubert/pyaudio/
+  To use OpenGL you need to install freeglut, which can be done with the
+  command 'brew install freeglut'. If your system doesn't have the "brew"
+  command, visit this page: https://brew.sh/
+  If you are using an Android device to run the Cozmo app, you will need to
+  install adb. Follow the instructions on this page:
+    http://cozmosdk.anki.com/docs/adb.html
+  If you are using an iOS device to run the Cozmo app you don't need to
+  install anything extra on your MacOS system.
