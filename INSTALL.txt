@@ -20,6 +20,7 @@ Windows:
   your Windows computer so that you get the proper device drivers. Make sure
   that iTunes can talk to your iOS device before proceeding.
 
+
 MacOS (should be 10.13 or higher):
   The requirements.txt file will work for for everything but PyAudio.
   The version of PyAudio in PyPI does not compile unless you have
