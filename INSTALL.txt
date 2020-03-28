@@ -9,9 +9,9 @@ Ubuntu Linux:
 
 
 Windows:
-1. The requirements.txt file will work for for everything but OpenGL.
-   As of 2018 the PyOpenGL and PyOpenGL_accelerate packages in PyPI were not good.
-   Instead, download the whl files for both of these for your Python version from
+1. The requirements.txt file lists all the packages you can install with pip, except
+   for PyOpenGL. As of 2018 the PyOpenGL and PyOpenGL_accelerate packages in PyPI
+   were not good. Instead, download their whl files for your Python version from
      https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
    and use pip to install them.
 2. If you are using an Android device or a Kindle Fire to run the Cozmo app, you
