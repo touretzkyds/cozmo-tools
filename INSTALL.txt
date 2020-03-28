@@ -5,6 +5,7 @@ Ubuntu Linux:
      pip3 install -r requirements.txt
 3. You will also need to install adb:
      apt-get install android-tools-adb
+4. To get simple_cli to work, add the cozmo-tools directory to your PATH.
 
 
 Windows:
@@ -34,3 +35,5 @@ MacOS (should be 10.13 or higher):
      http://cozmosdk.anki.com/docs/adb.html
 4. If you are using an iOS device to run the Cozmo app you don't need to
    install anything extra on your MacOS system.
+5. To get simple_cli to work, add cozmo-tools to your PATH, and change the first
+   line of simple_cli to include the correct path to your Python.
