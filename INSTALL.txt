@@ -1,8 +1,8 @@
 Ubuntu Linux:
-You can install all required Python packages by doing:
-  pip3 install -r requirements.txt
-For OpenGL you will also need to do:
+For OpenGL you will need to do:
   apt-get install freeglut3
+You can then install all required Python packages by doing:
+  pip3 install -r requirements.txt
 You will also need to install adb:
   apt-get install android-tools-adb
 
@@ -13,7 +13,7 @@ Windows:
   Instead, download the whl files for both of these for your Python version from
      https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
   and use pip to install them.
-  If you are using an Android device or a Kindle Fire to run the Cozmo appp, you
+  If you are using an Android device or a Kindle Fire to run the Cozmo app, you
   will also need to install adb. Follow the instructions on this page:
       http://cozmosdk.anki.com/docs/adb.html
   If you are using an iOS device to run the Cozmo app you must install iTunes on
