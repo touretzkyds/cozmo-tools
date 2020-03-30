@@ -10,7 +10,7 @@ Ubuntu Linux:
 
 Windows:
 1. The requirements.txt file lists all the packages you can install with pip, except
-   for PyOpenGL. As of 2018 the PyOpenGL and PyOpenGL_accelerate packages in PyPI
+   for PyOpenGL. As of 2020 the PyOpenGL and PyOpenGL_accelerate packages in PyPI
    were not good. Instead, download their whl files for your Python version from
      https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
    and use pip to install them.

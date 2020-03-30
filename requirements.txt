@@ -1,5 +1,6 @@
 cozmo
 numpy
+Pillow
 opencv-python
 opencv-contrib-python
 termcolor
