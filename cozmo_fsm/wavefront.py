@@ -25,15 +25,15 @@ class WaveFront():
     def initialize_grid(self,bbox=None):
         if bbox:
             self.bbox = bbox
-            self.grid_shape = (ceil((bbox[1][0] - bbox[0][0] + 2*self.inflate_size)/self.square_size),
-                              ceil((bbox[1][1] - bbox[0][1] + 2*self.inflate_size)/self.square_size))
+            self.grid_shape = (ceil((bbox[1][0] - bbox[0][0] + 4*self.inflate_size)/self.square_size),
+                              ceil((bbox[1][1] - bbox[0][1] + 4*self.inflate_size)/self.square_size))
         self.grid = np.zeros(self.grid_shape, dtype=np.int32)
         self.maxdist = 1
 
     def coords_to_grid(self,xcoord,ycoord):
         "Convert world map coordinates to grid subscripts."
-        x = int(round((xcoord-self.bbox[0][0]+self.inflate_size)/self.square_size))
-        y = int(round((ycoord-self.bbox[0][1]+self.inflate_size)/self.square_size))
+        x = int(round((xcoord-self.bbox[0][0]+2*self.inflate_size)/self.square_size))
+        y = int(round((ycoord-self.bbox[0][1]+2*self.inflate_size)/self.square_size))
         if x >= 0 and x < self.grid_shape[0] and \
            y >= 0 and y < self.grid_shape[1]:
             return (x,y)
@@ -43,8 +43,8 @@ class WaveFront():
     def grid_to_coords(self,gridx,gridy):
         xmin = self.bbox[0][0]
         ymin = self.bbox[0][1]
-        x = gridx*self.square_size + xmin - self.inflate_size
-        y = gridy*self.square_size + ymin - self.inflate_size
+        x = gridx*self.square_size + xmin - 2*self.inflate_size
+        y = gridy*self.square_size + ymin - 2*self.inflate_size
         return (x,y)
 
     def set_obstacle_cell(self, xcoord, ycoord, obstacle_id):
