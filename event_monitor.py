@@ -100,7 +100,7 @@ def monitor_EvtObjectMovingStopped(evt, *, obj, move_duration, **kwargs):
 
 def monitor_face(evt, face, **kwargs):
     print_prefix(evt)
-    name = face.name if face.name is not '' else '[unknown face]'
+    name = face.name if face.name != '' else '[unknown face]'
     expr = face.expression if face.expression is not None else 'expressionless'
     kw = set(kwargs.keys()) if len(kwargs) > 0 else '{}'
     print(name, ' (%s) ' % expr, ' face_id=', face.face_id, '  ', kw, sep='')
