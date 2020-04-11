@@ -29,8 +29,8 @@ help_text = """
 Particle viewer commands:
   w/a/s/d    Drive robot +/- 10 mm or turn +/- 22.5 degrees
   W/A/S/D    Drive robot +/- 40 mm or turn +/- 90 degrees
-  i/k        Head up/down 5 degrees
-  I/K        Head up/down 20 degrees
+  i/k/I/K    Head up/down 5 or 20 degrees
+  u/j/U/J    Lift up/down 5 or max degrees
   e          Evaluate particles using current sensor info
   r          Resample particles (evaluates first)
   z          Reset particle positions (randomize, or all 0 for SLAM)
@@ -408,6 +408,18 @@ class ParticleViewer():
         self.robot.loop.call_later(0.1, pf.look_for_new_landmarks)
         self.report_pose()
 
+    async def lift_to(self,angle):
+        min_theta = cozmo.robot.MIN_LIFT_ANGLE.degrees
+        max_theta = cozmo.robot.MAX_LIFT_ANGLE.degrees
+        angle_range = max_theta - min_theta
+        raw_height = (angle - min_theta) / angle_range
+        height = min(1.0, max(0.0, raw_height))
+        handle = self.robot.set_lift_height(height, in_parallel=True)
+        await handle.wait_for_completed()
+        pf = self.robot.world.particle_filter
+        self.robot.loop.call_later(0.1, pf.look_for_new_landmarks)
+        self.report_pose()
+
     def keyPressed(self,key,mouseX,mouseY):
         pf = self.robot.world.particle_filter
         translate_wasd = 10 # millimeters
@@ -450,6 +462,18 @@ class ParticleViewer():
         elif key == b'K':     # head down
             ang = self.robot.head_angle.degrees - 20
             self.robot.loop.create_task(self.look(ang))
+        elif key == b'u':     # lift up
+            ang = self.robot.lift_angle.degrees + 5
+            self.robot.loop.create_task(self.lift_to(ang))
+        elif key == b'j':     # lift down
+            ang = self.robot.lift_angle.degrees - 5
+            self.robot.loop.create_task(self.lift_to(ang))
+        elif key == b'U':     # lift up
+            ang = self.robot.lift_angle.degrees + 60
+            self.robot.loop.create_task(self.lift_to(ang))
+        elif key == b'J':     # lift down
+            ang = self.robot.lift_angle.degrees - 60
+            self.robot.loop.create_task(self.lift_to(ang))
         elif key == b'z':     # delocalize
             pf.delocalize()
             #pf.initializer.initialize(self.robot)
