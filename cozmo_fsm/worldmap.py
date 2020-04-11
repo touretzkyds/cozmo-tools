@@ -110,19 +110,32 @@ class ChargerObj(WorldObject):
 class CustomMarkerObj(WorldObject):
     custom_marker_size = (4,44,44)
 
-    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0):
+    def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, rotation=0):
+        # 'theta' is orientation relative to North in particle filter reference frame
+        # 'rotation' is orientation relative to "up" in the camera image
         if id is None:
             custom_type = sdk_obj.object_type.name[-2:]
             id = 'CustomMarkerObj-' + str(custom_type)
         super().__init__(id,x,y,z)
+        self.theta = wrap_angle(theta)
         self.sdk_obj = sdk_obj
         self.marker_number = int(id[-2:])
         self.size = self.custom_marker_size
         if self.sdk_obj:
-            self.orientation, self.theta, _, _ = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
+            self.orientation, self.rotation, _, _ = \
+              get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3, True)
         else:
-            self.theta = theta
-            self.orientation = geometry.ORIENTATION_UPRIGHT
+            self.rotation = wrap_angle(rotation)
+            if abs(self.rotation) < 0.1:
+                self.orientation = geometry.ORIENTATION_UPRIGHT
+            elif  abs(self.rotation-pi/2) < 0.1:
+                self.orientation = geometry.ORIENTATION_LEFT
+            elif  abs(self.rotation+pi/2) < 0.1:
+                self.orientation = geometry.ORIENTATION_RIGHT
+            elif  abs(wrap_angle(self.rotation+pi)) < 0.1:
+                self.orientation = geometry.ORIENTATION_INVERTED
+            else:
+                self.orientation = geometry.ORIENTATION_TILTED
 
     @property
     def is_visible(self):
@@ -147,15 +160,16 @@ class CustomMarkerObj(WorldObject):
     def __repr__(self):
         if self.sdk_obj:
             vis = ' visible' if self.is_visible else ''
-            return '<CustomMarkerObj-%s %d: (%.1f,%.1f)%s %s>' % \
+            return '<CustomMarkerObj-%s %d: (%.1f,%.1f) @ %d deg.%s %s>' % \
                 (self.sdk_obj.object_type.name[-2:], self.sdk_obj.object_id,
-                 self.x, self.y, vis, self.orientation)
+                 self.x, self.y, self.theta*180/pi, vis, self.orientation)
         else:
             return '<CustomMarkerObj %s (%.1f,%.1f) %s>' % \
                 (self.id, self.x, self.y, self.orientation)
 
 
 class CustomCubeObj(WorldObject):
+    # *** TODO: add self.rotation and self.orientation similar to CustomMarkerObj
     def __init__(self, sdk_obj, id=None, x=0, y=0, z=0, theta=0, size=None):
         custom_type = sdk_obj.object_type.name[-2:]
         if id is None:
@@ -760,9 +774,11 @@ class WorldMap():
         wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
         if isinstance(wmobject, CustomMarkerObj):
-            wmobject.orientation, wmobject.theta, _, _ = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3, True)
+            wmobject.orientation, wmobject.rotation, _, _ = \
+              get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3, isPlanar=True)
         elif isinstance(wmobject, CustomCubeObj):
-            wmobject.orientation, _, _, wmobject.theta = get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3)
+            wmobject.orientation, _, _, wmobject.rotation = \
+              get_orientation_state(sdk_obj.pose.rotation.q0_q1_q2_q3, isPlanar=False)
 
     def update_carried_object(self, wmobject):
         #print('Updating carried object ',wmobject)
