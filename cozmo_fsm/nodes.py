@@ -935,11 +935,15 @@ class Say(ActionNode):
         if not isinstance(utterance, str):
             utterance = repr(utterance)
         self.utterance = utterance
-        super().start(event)
         print("Speaking: '",utterance,"'",sep='')
+        super().start(event)
 
     def action_launcher(self):
-        return self.robot.say_text(self.utterance, **self.action_kwargs)
+        if self.utterance == '':
+            self.post_completion()
+            return None
+        else:
+            return self.robot.say_text(self.utterance, **self.action_kwargs)
 
 
 class Forward(ActionNode):
