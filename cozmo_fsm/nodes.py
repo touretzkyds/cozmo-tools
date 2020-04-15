@@ -939,7 +939,8 @@ class Say(ActionNode):
         super().start(event)
 
     def action_launcher(self):
-        if self.utterance == '':
+        if self.utterance.rstrip() == '':
+            # robot.say_text() action would fail on empty string
             self.post_completion()
             return None
         else:
