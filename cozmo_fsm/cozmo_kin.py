@@ -1,10 +1,10 @@
-from math import pi
+from math import pi, tan
 
 import cozmo
 
 from .kine import *
 from cozmo_fsm import geometry
-from .geometry import tprint
+from .geometry import tprint, point, translation_part, rotation_part
 from .rrt_shapes import *
 
 # ================ Constants ================
@@ -94,3 +94,34 @@ class CozmoKinematics(Kinematics):
 
     def get_world(self):
         return self.robot.world.particle_filter.pose_estimate()
+
+    def project_to_ground(self,cx,cy):
+        "Converts camera coordinates to a ground point in the base frame."
+        # Formula taken from Tekkotsu's projectToGround method
+        camera_res = (320, 240)
+        half_camera_max = max(*camera_res) / 2
+        config = self.robot.camera.config
+        # Convert to generalized coordinates in range [-1, 1]
+        gx = (cx-config.center.x) / half_camera_max
+        gy = (cy-config.center.y) / half_camera_max
+        #tekkotsu_focal_length_x = camera_res[0]/camera_max / tan(config.fov_x.radians/2)
+        #tekkotsu_focal_length_y = camera_res[1]/camera_max / tan(config.fov_y.radians/2)
+        # Generate a ray in the camera frame
+        rx = gx / (config.focal_length.x / half_camera_max)
+        ry = gy / (config.focal_length.y / half_camera_max)
+        ray = point(rx,ry,1)
+
+        cam_to_base = self.robot.kine.joint_to_base('camera')
+        offset = translation_part(cam_to_base)
+        rot_ray = rotation_part(cam_to_base).dot(ray)
+        dist = - offset[2,0]
+        align = rot_ray[2,0]
+
+        if abs(align) > 1e-5:
+            s = dist / align
+            hit = point(rot_ray[0,0]*s, rot_ray[1,0]*s, rot_ray[2,0]*s) + offset
+        elif align * dist < 0:
+            hit = point(-rot_ray[0,0], -rot_ray[1,0], -rot_ray[2,0], abs(align))
+        else:
+            hit = point(rot_ray[0,0], rot_ray[1,0], rot_ray[2,0], abs(align))
+        return hit

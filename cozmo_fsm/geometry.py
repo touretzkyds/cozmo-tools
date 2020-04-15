@@ -67,8 +67,13 @@ def dh_matrix(d,theta,r,alpha):
     """Denavit-Hartenberg transformation from joint i to joint i+1."""
     return aboutX(alpha).dot(translate(r,0,d).dot(aboutZ(theta)))
 
-def translation(t):
-    return np.array([ [t[0,3]], [t[1,3]], [t[2,3]], [t[3,3]] ])
+def translation_part(t):
+    return np.array([ [t[0,3]], [t[1,3]], [t[2,3]], [0] ]) / t[3,3]
+
+def rotation_part(t):
+    r = t.copy()
+    r[0:3,3] = 0
+    return r
 
 def wrap_angle(angle_rads):
     """Keep angle between -pi and pi."""
