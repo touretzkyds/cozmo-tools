@@ -39,7 +39,7 @@ class LightCubeObj(WorldObject):
             id = 'Cube-' + str(sdk_obj.cube_id)
         super().__init__(id,x,y,z)
         self.sdk_obj = sdk_obj
-        if sdk_obj:
+        if sdk_obj and sdk_obj.pose:
             self.sdk_obj.wm_obj = self
             self.update_from_sdk = True
             self.orientation, _, _, self.theta = get_orientation_state(self.sdk_obj.pose.rotation.q0_q1_q2_q3)
