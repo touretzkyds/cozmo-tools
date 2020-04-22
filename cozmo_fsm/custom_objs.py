@@ -2,6 +2,7 @@ import cozmo
 from cozmo.objects import CustomObject, CustomObjectMarkers, CustomObjectTypes
 
 custom_marker_types = []
+custom_container_types = []
 custom_cube_types = []
 
 async def declare_objects(robot):
@@ -48,7 +49,23 @@ async def declare_objects(robot):
                       40, 40, 40, 40, True)
 
 
+# Markers for containers
+    custom_container_types = [
+      CustomObjectTypes.CustomType04,
+      CustomObjectTypes.CustomType05
+      ]
 
+    await decl_marker(CustomObjectTypes.CustomType04,
+                      CustomObjectMarkers.Circles3,
+                      40, 40, 40, 40, False)
+
+    await decl_marker(CustomObjectTypes.CustomType05,
+                      CustomObjectMarkers.Triangles3,
+                      40, 40, 40, 40, False)
+
+
+
+# Markers for cubes
 
     decl_cube = robot.world.define_custom_cube
 

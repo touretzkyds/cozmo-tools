@@ -761,6 +761,8 @@ class WorldMap():
             print('Should never get here:',sdk_obj.pose,self.robot.pose)
             return
         id = 'CustomMarkerObj-' + str(sdk_obj.object_type.name[-2:])
+        if not sdk_obj.is_unique:
+          id += '-' + str(sdk_obj.object_id)
         if id in self.objects:
             wmobject = self.objects[id]
             wmobject.sdk_obj = sdk_obj  # In case created marker before seeing it
@@ -770,6 +772,8 @@ class WorldMap():
                 wmobject = CustomMarkerObj(sdk_obj,id)
             elif type in custom_objs.custom_cube_types:
                 wmobject = CustomCubeObj(sdk_obj,id)
+            else:  # if we don't know what else to do with it, treat as a custom marker
+                wmobject = CustomMarkerObj(sdk_obj,id)
             self.objects[id] = wmobject
         wmobject.pose_confidence = +1
         self.update_coords_from_sdk(wmobject, sdk_obj)
