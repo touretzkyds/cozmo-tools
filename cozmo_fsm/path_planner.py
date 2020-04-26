@@ -136,7 +136,15 @@ class PathPlanner():
         if not collider:
             collider = wf.check_start_collides(start_node.x, start_node.y)
 
-        if collider and collider.obstacle_id is not goal_shape.obstacle_id:
+        if collider:
+          if collider.obstacle_id is goal_shape.obstacle_id:  # We're already at the goal
+            step = NavStep(NavStep.DRIVE, [RRTNode(x=start_node.x, y=start_node.y)])
+            navplan = NavPlan([step])
+            grid_display = None if not need_grid_display else wf.grid
+            result = (navplan, grid_display)
+            return DataEvent(result)
+          else:
+            # Find an escape move from this collision condition
             q = start_node.q
             for (phi, escape_distance) in escape_options:
                 if phi != pi:
@@ -149,7 +157,7 @@ class PathPlanner():
                                     y=start_node.y + escape_distance*sin(q+phi),
                                     q=new_q)
                 collider2 = rrt_instance.collides(new_start)
-                # print('trying escape', new_start, 'collision:', collider2)
+                #print('trying escape', new_start, 'collision:', collider2)
                 if not collider2  and \
                    not wf.check_start_collides(new_start.x,new_start.y):
                     start_escape_move = (escape_type, phi, start_node, new_start)
