@@ -162,7 +162,7 @@ class PathPlanner():
                    not wf.check_start_collides(new_start.x,new_start.y):
                     start_escape_move = (escape_type, phi, start_node, new_start)
                     start_node = new_start
-                    print('Path planner found escape move', start_escape_move)
+                    print('Path planner found escape move from', collider, 'using:', start_escape_move)
                     break
             if start_escape_move is None:
                 print('PathPlanner: Start collides!', collider)
@@ -197,6 +197,14 @@ class PathPlanner():
         rrt_instance.obstacles = skinny_obstacles
         #rrt_instance.obstacles = fat_obstacles
         rrt_instance.smooth_path()
+
+        # If the path ends in a collision according to the RRT, back off
+        while len(rrt_instance.path) > 2:
+          last_node = rrt_instance.path[-1]
+          if rrt_instance.collides(last_node):
+            rrt_instance.path = rrt_instance.path[:-1]
+          else:
+            break
 
         # Construct the navigation plan
         navplan = PathPlanner.from_path(rrt_instance.path, doorway_list)
