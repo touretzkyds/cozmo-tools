@@ -1,11 +1,13 @@
 Ubuntu Linux:
 1. For OpenGL you will need to do:
      apt-get install freeglut3
-2. You can then install all required Python packages by doing:
+2. Tp get speech recognition to work:
+     apt-get install python3-pyaudio
+3. You can then install all required Python packages by doing:
      pip3 install -r requirements.txt
-3. You will also need to install adb:
+4. You will also need to install adb:
      apt-get install android-tools-adb
-4. To get simple_cli to work, add the cozmo-tools directory to your PATH.
+5. To get simple_cli to work, add the cozmo-tools directory to your PATH.
 
 
 Windows:
