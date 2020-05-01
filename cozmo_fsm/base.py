@@ -94,13 +94,15 @@ class StateNode(EventListener):
             parent.start_node = self
         return self
 
-    def post_event(self,event):
+    def post_event(self, event, suppress_trace=False):
         if not isinstance(event,Event):
             raise ValuError('post_event given a non-Event argument:',event)
         if event.source is None:
             event.source = self
-        if TRACE.trace_level >= TRACE.event_posted:
+        if (not suppress_trace) and (TRACE.trace_level >= TRACE.event_posted):
             print('TRACE%d:' % TRACE.event_posted, self, 'posting event',event)
+        if not self.running:
+          print("*** ERROR: Node", self, "posted event", event,"before calling super().start(). ***")
         self.robot.erouter.post(event)
 
     def post_completion(self):
@@ -108,7 +110,7 @@ class StateNode(EventListener):
             print('TRACE%d:' % TRACE.statenode_startstop, self, 'posting completion')
         event = CompletionEvent()
         event.source = self
-        self.robot.erouter.post(event)
+        self.post_event(event, suppress_trace=True)
 
     def post_success(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
@@ -116,7 +118,7 @@ class StateNode(EventListener):
                   self, 'posting success, details=%s' % details)
         event = SuccessEvent(details)
         event.source = self
-        self.robot.erouter.post(event)
+        self.post_event(event, suppress_trace=True)
 
     def post_failure(self,details=None):
         if TRACE.trace_level > TRACE.statenode_startstop:
@@ -124,7 +126,7 @@ class StateNode(EventListener):
                   self, 'posting failure, details=%s' % details)
         event = FailureEvent(details)
         event.source = self
-        self.robot.erouter.post(event)
+        self.post_event(event, suppress_trace=True)
 
     def post_data(self,value):
         if TRACE.trace_level > TRACE.statenode_startstop:
@@ -132,7 +134,7 @@ class StateNode(EventListener):
                   self, 'posting data', value)
         event = DataEvent(value)
         event.source = self
-        self.robot.erouter.post(event)
+        self.post_event(event, suppress_trace=True)
 
     def now(self):
         """Use now() to execute this node from the command line instead of as part of a state machine."""
