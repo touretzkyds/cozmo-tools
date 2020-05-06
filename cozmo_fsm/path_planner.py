@@ -189,7 +189,7 @@ class PathPlanner():
         grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
             print('PathPlanner wavefront: goal unreachable!')
-            return PilotEvent(GoalUnreachable, grid_display=grid_display)
+            return PilotEvent(GoalUnreachable, grid_display=grid_display, text='Goal unreachable')
 
         # Extract and smooth the path
         coords_pairs = wf.extract(goal_found, wf_start)
@@ -281,7 +281,7 @@ class PathPlanner():
             if ((px-dx)**2 + (py-dy)**2) >  (DoorPass.OUTER_GATE_DISTANCE + DELTA)**2:
                 break
             i -= 1
-        
+
         # For now, just truncate the path and insert an approach gate node.
         new_path = path[0:i+1]
         new_path.append(gate_node)
@@ -319,7 +319,7 @@ class PathPlannerProcess(LaunchProcess):
 
     @staticmethod
     def process_workhorse(reply_token, start_node, goal_shape, robot_parts, bbox,
-                          fat_obstacles, skinny_obstacles, doorway_list, need_grid_display): 
+                          fat_obstacles, skinny_obstacles, doorway_list, need_grid_display):
         rrt_instance = RRT(robot_parts=robot_parts, bbox=bbox)
         result = \
             PathPlanner.do_planning(rrt_instance, start_node, goal_shape,

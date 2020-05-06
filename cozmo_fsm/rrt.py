@@ -69,7 +69,7 @@ class RRT():
         self.arc_radius = arc_radius
         self.xy_tolsq = xy_tolsq
         self.q_tol = q_tol
-        self.robot_parts = robot_parts if robot_parts is not None else self.make_robot_parts(robot) 
+        self.robot_parts = robot_parts if robot_parts is not None else self.make_robot_parts(robot)
         self.bounds = bounds
         self.obstacles = obstacles
         self.auto_obstacles = auto_obstacles
@@ -81,6 +81,7 @@ class RRT():
         self.path = []
         self.draw_path = []
         self.grid_display = None  # *** HACK to display wavefront grid
+        self.text = None    # *** HACK to display unreachable text
 
     REACHED = 'reached'
     COLLISION = 'collision'
@@ -522,7 +523,7 @@ class RRT():
     def generate_wall_obstacles(wall, wall_inflation, doorway_adjustment):
         wall_spec = wall_marker_dict[wall.spec_id]
         wall_half_length = wall.length / 2
-        widths = [] 
+        widths = []
         edges = [ [0, -wall_half_length - wall_inflation, 0., 1.] ]
         last_x = -wall_half_length - wall_inflation
         for (door_center, door_width) in wall_spec.doorways:

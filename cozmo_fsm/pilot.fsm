@@ -54,7 +54,7 @@ class PilotBase(StateNode):
           super().start()
           object = self.parent.object
           if object.pose_confidence < 0:
-              self.parent.post_event(PilotEvent(NotLocalized,object=object))
+              self.parent.post_event(PilotEvent(NotLocalized,object=object,text='not localized'))
               self.parent.post_failure()
               return
           self.post_event(DataEvent(self.parent.object))
@@ -121,7 +121,7 @@ class PilotBase(StateNode):
 
         $setup{
             # PilotExecutePlan machine
-            
+
             dispatch: self.DispatchStep()
             dispatch =D(NavStep.DRIVE)=> drive
             dispatch =D(NavStep.DOORPASS)=> doorpass
@@ -401,6 +401,7 @@ class PilotFrustration(StateNode):
                 self.text = 'Can\'t reach %s' % object_name
             else:
                 self.text = 'stuck'
+            self.robot.world.rrt.text = self.text
             super().start(event)
 
 
