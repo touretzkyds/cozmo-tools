@@ -189,7 +189,7 @@ class PathPlanner():
         grid_display = None if not need_grid_display else wf.grid
         if goal_found is None:
             print('PathPlanner wavefront: goal unreachable!')
-            return PilotEvent(GoalUnreachable, grid_display=grid_display, text='Goal unreachable')
+            return PilotEvent(GoalUnreachable, grid_display=grid_display, text='unreachable')
 
         # Extract and smooth the path
         coords_pairs = wf.extract(goal_found, wf_start)

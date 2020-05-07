@@ -54,7 +54,7 @@ class PilotBase(StateNode):
           super().start()
           object = self.parent.object
           if object.pose_confidence < 0:
-              self.parent.post_event(PilotEvent(NotLocalized,object=object,text='not localized'))
+              self.parent.post_event(PilotEvent(NotLocalized,object=object))
               self.parent.post_failure()
               return
           self.post_event(DataEvent(self.parent.object))
