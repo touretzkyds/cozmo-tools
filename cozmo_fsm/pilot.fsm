@@ -121,7 +121,7 @@ class PilotBase(StateNode):
 
         $setup{
             # PilotExecutePlan machine
-            
+
             dispatch: self.DispatchStep()
             dispatch =D(NavStep.DRIVE)=> drive
             dispatch =D(NavStep.DOORPASS)=> doorpass
@@ -406,6 +406,7 @@ class PilotFrustration(StateNode):
                 self.text = 'Can\'t reach %s' % object_name
             else:
                 self.text = 'stuck'
+            self.robot.world.rrt.text = self.text
             super().start(event)
 
 
