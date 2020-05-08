@@ -11,7 +11,7 @@ from .events import PilotEvent
 #from .transitions import CompletionTrans, FailureTrans, SuccessTrans, DataTrans, NullTrans
 from .transitions import *
 from .cozmo_kin import wheelbase, center_of_rotation_offset
-from .worldmap import DoorwayObj
+from .worldmap import WorldObject, DoorwayObj
 from .path_planner import PathPlannerProcess, PathPlanner
 from .geometry import segment_intersect_test
 from .doorpass import DoorPass
@@ -158,7 +158,7 @@ class PilotToObject(PilotBase):
 
     def start(self, event=None):
         if isinstance(event,DataEvent):
-            if isinstance(event.data,WorldObj):
+            if isinstance(event.data, WorldObject):
                 self.object = event.data
             else:
                 raise ValueError('DataEvent to PilotToObject must be a WorldObject', event.data)
@@ -323,9 +323,10 @@ class PilotToPose(PilotBase):
                 self.post_data((navplan,grid_display))
                 return
 
-            # We planned for a doorpass; replan to the outer gate
+            # We planned for a doorpass as the last step; replan to the outer gate.
             door = last_step.param
-            gate = DoorPass.calculate_gate(self.robot, door, DoorPass.OUTER_GATE_DISTANCE)
+            last_node = navplan.steps[-2].param[-1]
+            gate = DoorPass.calculate_gate(last_node, door, DoorPass.OUTER_GATE_DISTANCE)
             goal_node = RRTNode(x=gate[0], y=gate[1], q=gate[2])
             print('new goal is', goal_node)
             try:

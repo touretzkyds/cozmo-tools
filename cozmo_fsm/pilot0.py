@@ -39,7 +39,8 @@ class NavStep():
     def __init__(self, type, param):
         """For DRIVE and BACKUP types, param is a list of RRTNode instances.  The
         reason we group these into a list instead of having one node per step is that
-        the DriveContinuous function is going to be interpolating over the entire sequence."""
+        the DriveContinuous function is going to be interpolating over the entire sequence.
+        For a DOORPASS step the param is the door object."""
         self.type = type
         self.param = param
 
