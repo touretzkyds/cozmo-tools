@@ -329,7 +329,7 @@ class PilotToPose(PilotBase):
             # We planned for a doorpass as the last step; replan to the outer gate.
             door = last_step.param
             last_node = navplan.steps[-2].param[-1]
-            gate = DoorPass.calculate_gate(last_node, door, DoorPass.OUTER_GATE_DISTANCE)
+            gate = DoorPass.calculate_gate((last_node.x, last_node.y), door, DoorPass.OUTER_GATE_DISTANCE)
             goal_node = RRTNode(x=gate[0], y=gate[1], q=gate[2])
             print('new goal is', goal_node)
             try:
