@@ -139,10 +139,6 @@ class EventRouter:
             else:
                 matches.append(handler)
         # wildcard handlers must come last in the list
-        if type(event).__name__ == 'PilotEvent':
-            print('event=',event,'   event.source=', repr(event.source))
-            print('wildcard_registry is',self.wildcard_registry)
-            print('matches=',matches,'   wildcards=',wildcards)
         return matches + wildcards
 
     def post(self,event):

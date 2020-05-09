@@ -50,7 +50,7 @@ class NavStep():
         elif self.type == NavStep.DRIVE:
             psteps = [(round(node.x,1),round(node.y,1)) for node in self.param]
             pstring = repr(psteps)
-        else:
+        else:   # NavStep.BACKUP and anything else
             pstring = repr(self.param)
             if len(pstring) > 40:
                 pstring = pstring[0:20] + ' ...' + pstring[-20:]

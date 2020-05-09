@@ -70,7 +70,7 @@ class PilotBase(StateNode):
                     self.parent.robot.world.path_viewer.clear_trees()
 
             self.robot.world.rrt.draw_path = navplan.extract_path()
-            print('ReceivePlan: draw_path=', self.robot.world.rrt.draw_path)
+            #print('ReceivePlan: draw_path=', self.robot.world.rrt.draw_path)
             self.robot.world.rrt.grid_display = grid_display
             self.post_event(DataEvent(navplan))
 
@@ -245,11 +245,14 @@ class PilotToPose(PilotBase):
                 for phi in escape_headings:
                     if phi != pi:
                         new_q = wrap_angle(start_node.q + phi)
+                        d = escape_distance
                     else:
                         new_q = start_node.q
-                    new_start = RRTNode(x=start_node.x + escape_distance*cos(new_q),
-                                        y=start_node.y + escape_distance*sin(new_q),
+                        d = -escape_distance
+                    new_start = RRTNode(x=start_node.x + d*cos(new_q),
+                                        y=start_node.y + d*sin(new_q),
                                         q=new_q)
+                    # print('trying start escape', new_start)
                     if not self.robot.world.rrt.collides(new_start):
                         start_escape_move = (phi, start_node, new_start)
                         start_node = new_start
@@ -259,7 +262,6 @@ class PilotToPose(PilotBase):
                     self.parent.post_event(PilotEvent(StartCollides, args=e.args))
                     self.parent.post_failure()
                     return
-                print('escape=', start_escape_move)
                 try:
                     (treeA, treeB, path) = self.planner(start_node, goal_node)
                 except GoalCollides as e:
@@ -305,13 +307,14 @@ class PilotToPose(PilotBase):
             if start_escape_move:
                 phi, start, new_start = start_escape_move
                 if phi == pi:
-                    escape_step = NavStep(NavStep.BACKUP, (new_start.x, new_start.y))
+                    escape_step = NavStep(NavStep.BACKUP, [new_start])
                     navplan.steps.insert(0, escape_step)
                 elif navplan.steps[0].type == NavStep.DRIVE:
-                    navplan.steps[0].param.insert(0, (start.x, start.y))
+                    # Insert at the beginning the original start node we replaced with new_start
+                    navplan.steps[0].param.insert(0, start_node)
                 else:
                     # Shouldn't get here, but just in case
-                    escape_step = NavStep(NavStep.DRIVE, ((start.x,start.y), (new_start.x,new_start.y)))
+                    escape_step = NavStep(NavStep.DRIVE, (RRTNode(start.x,start.y), RRTNode(new_start.x,new_start.y)))
                     navplan.steps.insert(0, escape_step)
 
             #print('finalnavplan steps:', navplan.steps)
