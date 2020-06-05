@@ -19,10 +19,10 @@ from cozmo.util import degrees, Pose
 class PF_Aruco(StateMachineProgram):
     def __init__(self):
         landmarks = {
-            0 : Pose(-55, 160, 0, angle_z=degrees(90)),
-            1 : Pose( 55, 160, 0, angle_z=degrees(90)),
-            2 : Pose(160,  55, 0, angle_z=degrees( 0)),
-            3 : Pose(160, -55, 0, angle_z=degrees( 0))
+            'Aruco-0' : Pose(-55, 160, 0, angle_z=degrees(90)),
+            'Aruco-1' : Pose( 55, 160, 0, angle_z=degrees(90)),
+            'Aruco-2' : Pose(160,  55, 0, angle_z=degrees( 0)),
+            'Aurco-3' : Pose(160, -55, 0, angle_z=degrees( 0))
         }
         pf = ParticleFilter(robot,
                             landmarks = landmarks,
