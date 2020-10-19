@@ -9,7 +9,7 @@ from .geometry import wrap_angle
 
 from .rrt_shapes import *
 from .cozmo_kin import center_of_rotation_offset
-from .worldmap import WallObj, wall_marker_dict, RoomObj, LightCubeObj
+from .worldmap import WallObj, wall_marker_dict, RoomObj, LightCubeObj, MapFaceObj
 from .worldmap import CustomCubeObj, ChargerObj, CustomMarkerObj, ChipObj, RobotForeignObj
 
 # *** TODO: Collision checking needs to use opposite headings
@@ -590,6 +590,13 @@ class RRT():
         return r
 
     @staticmethod
+    def generate_mapFace_obstacle(obj, obstacle_inflation=0):
+        r = Rectangle(center=geometry.point(obj.x,obj.y),
+                      dimensions=[obj.size[0]+2*obstacle_inflation, obj.size[1]+2*obstacle_inflation])
+        r.obstacle_id = obj.id
+        return r
+
+    @staticmethod
     def make_robot_parts(robot):
         result = []
         for joint in robot.kine.joints.values():
@@ -608,7 +615,8 @@ class RRT():
         # Rooms aren't obstacles, so include them separately.
         rooms = [obj for obj in objs if isinstance(obj,RoomObj)]
         # Cubes and markers may not be obstacles if they are goal locations, so include them again.
-        goals = [obj for obj in objs if isinstance(obj,(LightCubeObj,CustomMarkerObj)) and obj.pose_confidence >= 0]
+        goals = [obj for obj in objs if isinstance(obj,(LightCubeObj,CustomMarkerObj)) and obj.pose_confidence >= 0 or isinstance(obj,MapFaceObj)]
+
         for obj in self.obstacles + rooms + goals:
             ((x0,y0),(x1,y1)) = obj.get_bounding_box()
             xmin = min(xmin, x0)
