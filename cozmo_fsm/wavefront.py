@@ -9,7 +9,7 @@ from math import floor, ceil, cos, sin
 from .geometry import wrap_angle, rotate_point, polygon_fill, check_concave
 from .rrt import StartCollides
 from .rrt_shapes import *
-from .worldmap import LightCubeObj, ChargerObj, CustomMarkerObj
+from .worldmap import LightCubeObj, ChargerObj, CustomMarkerObj, MapFaceObj
 
 class WaveFront():
     goal_marker = 2**31 - 1
@@ -96,7 +96,7 @@ class WaveFront():
         goal_points = []
         if shape.obstacle_id.startswith('Room'):
             empty_points, goal_points = self.generate_room_goal_points(shape, default_offset)
-        else:   # cubes, charger, markers
+        else:   # cubes, charger, markers, mapFace
             empty_points, goal_points = self.generate_cube_goal_points(shape, obstacle_inflation)
         for point in empty_points:
             self.set_empty_cell(*rotate_point(point, shape.center[0:2,0], shape.orient))
@@ -118,13 +118,15 @@ class WaveFront():
         return (empty_points, goal_points)
 
     def generate_cube_goal_points(self,shape,obstacle_inflation):
-        # for cubes, charger, markers
+        # for cubes, charger, markers, mapFace
         if shape.obstacle_id.startswith('Cube'):
             (xsize,ysize,_) = LightCubeObj.light_cube_size
         elif shape.obstacle_id.startswith('Charger'):
             (xsize,ysize,_) = ChargerObj.charger_size
         elif shape.obstacle_id.startswith('CustomMarkerObj'):
             (xsize,ysize,_) = CustomMarkerObj.custom_marker_size
+        elif shape.obstacle_id == 'MapFace':
+            (xsize,ysize) = MapFaceObj.mapFace_size
         else:
             raise ValueError('Unrecognized goal shape', shape)
         ((xmin,ymin), (xmax,ymax)) = shape.get_bounding_box()

@@ -8,7 +8,7 @@ from multiprocessing import Process
 from .nodes import LaunchProcess
 from .events import DataEvent, PilotEvent
 from .pilot0 import NavPlan, NavStep
-from .worldmap import WorldObject, LightCubeObj, ChargerObj, CustomMarkerObj, RoomObj, DoorwayObj
+from .worldmap import WorldObject, LightCubeObj, ChargerObj, CustomMarkerObj, RoomObj, DoorwayObj, MapFaceObj
 from .rrt import RRT, RRTNode, StartCollides, GoalCollides, GoalUnreachable
 from .wavefront import WaveFront
 from .geometry import wrap_angle, segment_intersect_test
@@ -91,6 +91,8 @@ class PathPlanner():
             goal_shape = RRT.generate_marker_obstacle(goal_object)
         elif isinstance(goal_object, RoomObj):
             goal_shape = RRT.generate_room_obstacle(goal_object)
+        elif isinstance(goal_object, MapFaceObj):
+            goal_shape = RRT.generate_mapFace_obstacle(goal_object)
         else:
             raise ValueError("Can't convert path planner goal %s to shape." % goal_object)
 

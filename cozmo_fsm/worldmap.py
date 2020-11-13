@@ -472,6 +472,22 @@ class LightCubeForeignObj(WorldObject):
         self.z = z
         self.theta = theta
 
+class MapFaceObj(WorldObject):
+    mapFace_size = (104., 98.)
+    def __init__(self, id=None, x=0, y=0, is_visible=False, expression='unknown'):
+        super().__init__(id,x,y,0)
+        self.theta = 0
+        self.is_visible = is_visible
+        self.expression = expression
+        self.size = self.mapFace_size
+
+    def __repr__(self):
+        return "<MapFaceObj: expression:%s (%.1f, %.1f, %.1f) vis:%s>" % \
+               (self.expression, self.x, self.y, self.z, self.is_visible)
+
+    def get_bounding_box(self):
+        # ((xmin,ymin), (xmax,ymax))
+        return ((self.x-self.size[0]/2, self.y-self.size[1]/2), (self.x+self.size[0]/2, self.y+self.size[1]/2))
 
 #================ WorldMap ================
 
@@ -498,6 +514,9 @@ class WorldMap():
             wall.make_arucos(self)
         else:
             self.robot.world.particle_filter.add_fixed_landmark(landmark)
+
+    def add_mapFace(self, mapFace):
+        self.objects[mapFace.id] = mapFace
 
     def delete_wall(self,wall_id):
         "Delete a wall, its markers, and its doorways, so we can predefine a new one."
