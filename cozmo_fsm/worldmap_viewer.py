@@ -242,7 +242,7 @@ class WorldMapViewer():
         glPushMatrix()
         glTranslatef(*pos)
         s = light_cube_size_mm
-        glTranslatef(0,0,s/2)
+        glTranslatef(0,0,4)  # keep cube from projecting through the floor
         if valid_pose:
             t = geometry.quat2rot(*lcube.pose.rotation.q0_q1_q2_q3)
         else:
