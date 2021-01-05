@@ -506,6 +506,7 @@ class RRT():
             if not obj.is_obstacle: continue
             if self.robot.carrying is obj: continue
             if obj.pose_confidence < 0: continue
+            if 'unseen' in obj.__dict__ and obj.unseen: continue
             if isinstance(obj, WallObj):
                 obstacles = obstacles + \
                             self.generate_wall_obstacles(obj, wall_inflation, doorway_adjustment)
@@ -516,7 +517,7 @@ class RRT():
             elif isinstance(obj, ChipObj):
                 obstacles.append(self.generate_chip_obstacle(obj,obstacle_inflation))
             elif isinstance(obj, RobotForeignObj):
-               obstacles.append(self.generate_foreign_obstacle(obj))
+                obstacles.append(self.generate_foreign_obstacle(obj))
         self.obstacles = obstacles
 
     @staticmethod
