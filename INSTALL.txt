@@ -1,7 +1,7 @@
 Ubuntu Linux:
 1. For OpenGL you will need to do:
      apt-get install freeglut3
-2. Tp get speech recognition to work:
+2. To get speech recognition to work:
      apt-get install python3-pyaudio
 3. You can then install all required Python packages by doing:
      pip3 install -r requirements.txt
