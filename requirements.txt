@@ -3,6 +3,7 @@ numpy
 Pillow
 opencv-python
 opencv-contrib-python
+colorama
 termcolor
 PyOpenGL
 PyOpenGL_accelerate

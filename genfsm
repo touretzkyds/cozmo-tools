@@ -32,6 +32,11 @@ Author: David S. Touretzky, Carnegie Mellon University
 import sys, time, re
 
 try:
+    import colorama
+    colorama.init()
+except: pass
+
+try:
     from termcolor import cprint
 except:
     def cprint(string, color=None, file=None):
