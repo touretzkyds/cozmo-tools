@@ -129,9 +129,13 @@ class TapTrans(Transition):
     def start(self):
         if self.running: return
         super().start()
-        self.robot.erouter.add_listener(self,TapEvent,self.cube)
+        if self.cube:
+            self.robot.erouter.add_listener(self,TapEvent,self.cube)
+        else:
+            self.robot.erouter.add_wildcard_listener(self,TapEvent,None)
 
     def handle_event(self,event):
+        if not self.running: return
         if self.cube:
             self.fire(event)
         else:

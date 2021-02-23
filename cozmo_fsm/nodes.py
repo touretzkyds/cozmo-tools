@@ -1012,8 +1012,10 @@ class Turn(ActionNode):
     def action_launcher(self):
         if self.angle is None:
             return None
-        else:
-            return self.robot.turn_in_place(self.angle, **self.action_kwargs)
+        elif not isinstance(self.angle, cozmo.util.Angle):
+            print("*** WARNING: node", self.name, "self.angle =", self.angle, "is not an instance of cozmo.util.Angle")
+            self.angle = degrees(self.angle) if isinstance(self.angle, (int,float)) else degrees(0)
+        return self.robot.turn_in_place(self.angle, **self.action_kwargs)
 
 class GoToPose(ActionNode):
     "Uses SDK's go_to_pose method."
