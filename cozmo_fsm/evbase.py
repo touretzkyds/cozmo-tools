@@ -132,6 +132,7 @@ class EventRouter:
             return []
         source_matches = source_dict.get(event.source, [])
         match_handlers = []
+        # TapEvent can be wildcarded even though the source is never None
         wildcard_matches = source_dict.get(None, []) if event.source is not None else []
         wildcard_handlers = []
         for handler in source_matches + wildcard_matches:
