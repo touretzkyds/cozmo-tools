@@ -90,8 +90,11 @@ class SpeechListener():
                         warned_no_mic = False
                     while True:
                         if self.debug: print('--> Listening...')
-                        audio = self.rec.listen(source, timeout=8, phrase_time_limit=8)
-                        audio_len = len(audio.frame_data)
+                        try:
+                            audio = self.rec.listen(source, timeout=8, phrase_time_limit=8)
+                            audio_len = len(audio.frame_data)
+                        except:
+                            continue
                         if self.debug:
                             print('--> Got audio data: length = {:,d} bytes.'. \
                                   format(audio_len))
