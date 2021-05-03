@@ -208,6 +208,8 @@ class PilotToPose(PilotBase):
         self.max_iter = max_iter
 
     def start(self, event=None):
+        if isinstance(event, DataEvent) and isinstance(event.data, Pose):
+            self.target_pose = event.data
         self.robot.world.rrt.max_iter = self.max_iter
         super().start(self)
 

@@ -919,7 +919,8 @@ class SLAMSensorModel(SensorModel):
             # Must see at least two markers to create a wall, but once it's
             # in the world map we only require one marker to recognize it.
             # Necessary to avoid spurious wall creation.
-            if len(markers) >= 2 or wall_id in self.robot.world.world_map.objects:
+            # NOTE: switched to only requiring 1 marker for wall creation.
+            if len(markers) >= 1 or wall_id in self.robot.world.world_map.objects:
                 walls.append(self.infer_wall_from_corners_lists(wall_id,markers))
         return walls
 
