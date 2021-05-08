@@ -29,6 +29,27 @@ class PilotCheckStart(StateNode):
             return
         self.post_success()
 
+
+class PilotCheckStartDetail(StateNode):
+    "Fails if rrt planner indicates start_collides"
+
+    def start(self, event=None):
+        super().start(event)
+        (pose_x, pose_y, pose_theta) = self.robot.world.particle_filter.pose
+        start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
+        try:
+            self.robot.world.rrt.plan_path(start_node,start_node)
+        except StartCollides as e:
+            print('PilotCheckStartDetail: Start collides!',e)
+            self.post_event(PilotEvent(StartCollides, args=e.args))
+            self.post_data(e.args)
+            return
+        except Exception as e:
+            print('PilotCheckStartDetail: Unexpected planner exception',e)
+            self.post_failure()
+            return
+        self.post_success()
+
 #---------------- Navigation Plan ----------------
 
 class NavStep():
