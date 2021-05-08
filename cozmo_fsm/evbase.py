@@ -131,15 +131,17 @@ class EventRouter:
         if source_dict is None:  # no listeners for this event type
             return []
         source_matches = source_dict.get(event.source, [])
-        wildcards = []
-        matches = []
-        for handler in source_matches:
+        match_handlers = []
+        # TapEvent can be wildcarded even though the source is never None
+        wildcard_matches = source_dict.get(None, []) if event.source is not None else []
+        wildcard_handlers = []
+        for handler in source_matches + wildcard_matches:
             if self.wildcard_registry.get(handler,False) is True:
-                wildcards.append(handler)
+                wildcard_handlers.append(handler)
             else:
-                matches.append(handler)
+                match_handlers.append(handler)
         # wildcard handlers must come last in the list
-        return matches + wildcards
+        return match_handlers + wildcard_handlers
 
     def post(self,event):
         if not isinstance(event,Event):
