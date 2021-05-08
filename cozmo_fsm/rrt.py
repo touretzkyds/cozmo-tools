@@ -177,7 +177,7 @@ class RRT():
         self.arc_radius = arc_radius
         if self.auto_obstacles:
             obstacle_inflation = 5
-            doorway_adjustment = +77  # widen doorways for RRT
+            doorway_adjustment = 20  # widen doorways for RRT
             self.generate_obstacles(obstacle_inflation, doorway_adjustment)
         self.start = start
         self.goal = goal

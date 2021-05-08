@@ -67,6 +67,28 @@ class DoorPass(StateNode):
             super().start(event)
 
 
+    class AwayFromCollide(Forward):
+        def start(self, event=None):
+            # super().start(event)
+            if isinstance(event,DataEvent):
+                startNode = event.data[0]
+                collideObj = event.data[1]
+                (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
+                cx, cy = collideObj.center[0,0],collideObj.center[1,0]
+                ctheta = atan2(cy-ry, cx-rx)
+                delta_angle = wrap_angle(ctheta - rtheta)
+                delta_angle = delta_angle/pi*180
+                if -90 < delta_angle and delta_angle < 90:
+                    self.distance = distance_mm(-40)
+                else:
+                    self.distance = distance_mm(40)
+                self.speed = speed_mmps(50)
+                super().start(event)
+            else:
+                raise ValueError('DataEvent to AwayFromCollide must be a StartCollides.args', event.data)
+                self.post_failure()
+
+
     class TurnToGate(Turn):
         """Turn to the approach gate, or post success if we're already there."""
         def __init__(self,offset):
@@ -161,71 +183,87 @@ class DoorPass(StateNode):
             super().start(event)
 
     def setup(self):
-        """
-            droplift: self.AdjustLiftHeight() =N=>
-                SetHeadAngle(0) =T(0.2)=> check_start  # Time for vision to process
-    
-            check_start: PilotCheckStart()
-            check_start =S=> turn_to_gate1
-            check_start =F=> Forward(-80) =C=> check_start2
-    
-            check_start2: PilotCheckStart()
-            check_start2 =S=> turn_to_gate1
-            check_start2 =F=> ParentFails()
-    
-            turn_to_gate1: self.TurnToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
-                StateNode() =T(0.2)=> forward_to_gate1
-    
-            forward_to_gate1: self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
-                StateNode() =T(0.2)=> {look_up, turn_to_gate2}
-    
-            # If we're carrying a cube, we lower the lift so we can see
-            look_up: SetHeadAngle(35)
-    
-            turn_to_gate2: self.TurnToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
-                StateNode() =T(0.2)=> self.CheckCarrying() =C=> turn_to_marker1
-    
-            turn_to_marker1: self.TurnToMarker()
-            turn_to_marker1 =C=> marker_forward1
-            turn_to_marker1 =F=> marker_forward1
-    
-            marker_forward1: self.ForwardToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
-                SetHeadAngle(40) =C=> StateNode() =T(0.2)=> turn_to_marker2
-    
-            turn_to_marker2: self.TurnToMarker()
-            turn_to_marker2 =C=> marker_forward2
-            turn_to_marker2 =F=> marker_forward2
-    
-            marker_forward2: StateNode() =T(0.2)=>  {lower_head, through_door}
-    
-            lower_head: SetHeadAngle(0)
-    
-            through_door: self.DriveThrough()
-    
-            {lower_head, through_door} =C=> self.CheckCarrying() =C=> ParentCompletes()
-    
-        """
+        #         droplift: self.AdjustLiftHeight() =N=>
+        #             SetHeadAngle(0) =T(0.2)=> check_start  # Time for vision to process
+        # 
+        #         check_start: PilotCheckStartDetail()
+        #         check_start =S=> turn_to_gate1
+        #         check_start =D=> away_from_collide
+        #         check_start =F=> Forward(-80) =C=> check_start2
+        # 
+        #         check_start2: PilotCheckStartDetail()
+        #         check_start2 =S=> turn_to_gate1
+        #         check_start2 =D=> away_from_collide2
+        #         check_start2 =F=> ParentFails()
+        # 
+        #         check_start3: PilotCheckStart()
+        #         check_start3 =S=> turn_to_gate1
+        #         check_start3 =F=> ParentFails()
+        # 
+        #         turn_to_gate1: self.TurnToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
+        #             StateNode() =T(0.2)=> forward_to_gate1
+        # 
+        #         away_from_collide: self.AwayFromCollide() =C=> StateNode() =T(0.2)=> check_start2
+        #         away_from_collide =F=> check_start2
+        # 
+        #         away_from_collide2: self.AwayFromCollide() =C=> StateNode() =T(0.2)=> check_start3
+        #         away_from_collide2 =F=> check_start3
+        # 
+        #         forward_to_gate1: self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
+        #             StateNode() =T(0.2)=> {look_up, turn_to_gate2}
+        # 
+        #         # If we're carrying a cube, we lower the lift so we can see
+        #         look_up: SetHeadAngle(35)
+        # 
+        #         turn_to_gate2: self.TurnToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
+        #             StateNode() =T(0.2)=> self.CheckCarrying() =C=> turn_to_marker1
+        # 
+        #         turn_to_marker1: self.TurnToMarker()
+        #         turn_to_marker1 =C=> marker_forward1
+        #         turn_to_marker1 =F=> marker_forward1
+        # 
+        #         marker_forward1: self.ForwardToGate(DoorPass.INNER_GATE_DISTANCE) =C=>
+        #             SetHeadAngle(40) =C=> StateNode() =T(0.2)=> turn_to_marker2
+        # 
+        #         turn_to_marker2: self.TurnToMarker()
+        #         turn_to_marker2 =C=> marker_forward2
+        #         turn_to_marker2 =F=> marker_forward2
+        # 
+        #         marker_forward2: StateNode() =T(0.2)=>  {lower_head, through_door}
+        # 
+        #         lower_head: SetHeadAngle(0)
+        # 
+        #         through_door: self.DriveThrough()
+        # 
+        #         {lower_head, through_door} =C=> self.CheckCarrying() =C=> ParentCompletes()
+        # 
         
-        # Code generated by genfsm on Tue Feb  4 21:25:16 2020:
+        # Code generated by genfsm on Sat May  8 00:32:53 2021:
         
         droplift = self.AdjustLiftHeight() .set_name("droplift") .set_parent(self)
         setheadangle1 = SetHeadAngle(0) .set_name("setheadangle1") .set_parent(self)
-        check_start = PilotCheckStart() .set_name("check_start") .set_parent(self)
+        check_start = PilotCheckStartDetail() .set_name("check_start") .set_parent(self)
         forward1 = Forward(-80) .set_name("forward1") .set_parent(self)
-        check_start2 = PilotCheckStart() .set_name("check_start2") .set_parent(self)
+        check_start2 = PilotCheckStartDetail() .set_name("check_start2") .set_parent(self)
         parentfails1 = ParentFails() .set_name("parentfails1") .set_parent(self)
+        check_start3 = PilotCheckStart() .set_name("check_start3") .set_parent(self)
+        parentfails2 = ParentFails() .set_name("parentfails2") .set_parent(self)
         turn_to_gate1 = self.TurnToGate(DoorPass.OUTER_GATE_DISTANCE) .set_name("turn_to_gate1") .set_parent(self)
         statenode1 = StateNode() .set_name("statenode1") .set_parent(self)
-        forward_to_gate1 = self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) .set_name("forward_to_gate1") .set_parent(self)
+        away_from_collide = self.AwayFromCollide() .set_name("away_from_collide") .set_parent(self)
         statenode2 = StateNode() .set_name("statenode2") .set_parent(self)
+        away_from_collide2 = self.AwayFromCollide() .set_name("away_from_collide2") .set_parent(self)
+        statenode3 = StateNode() .set_name("statenode3") .set_parent(self)
+        forward_to_gate1 = self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) .set_name("forward_to_gate1") .set_parent(self)
+        statenode4 = StateNode() .set_name("statenode4") .set_parent(self)
         look_up = SetHeadAngle(35) .set_name("look_up") .set_parent(self)
         turn_to_gate2 = self.TurnToGate(DoorPass.INNER_GATE_DISTANCE) .set_name("turn_to_gate2") .set_parent(self)
-        statenode3 = StateNode() .set_name("statenode3") .set_parent(self)
+        statenode5 = StateNode() .set_name("statenode5") .set_parent(self)
         checkcarrying1 = self.CheckCarrying() .set_name("checkcarrying1") .set_parent(self)
         turn_to_marker1 = self.TurnToMarker() .set_name("turn_to_marker1") .set_parent(self)
         marker_forward1 = self.ForwardToGate(DoorPass.INNER_GATE_DISTANCE) .set_name("marker_forward1") .set_parent(self)
         setheadangle2 = SetHeadAngle(40) .set_name("setheadangle2") .set_parent(self)
-        statenode4 = StateNode() .set_name("statenode4") .set_parent(self)
+        statenode6 = StateNode() .set_name("statenode6") .set_parent(self)
         turn_to_marker2 = self.TurnToMarker() .set_name("turn_to_marker2") .set_parent(self)
         marker_forward2 = StateNode() .set_name("marker_forward2") .set_parent(self)
         lower_head = SetHeadAngle(0) .set_name("lower_head") .set_parent(self)
@@ -242,6 +280,9 @@ class DoorPass(StateNode):
         successtrans1 = SuccessTrans() .set_name("successtrans1")
         successtrans1 .add_sources(check_start) .add_destinations(turn_to_gate1)
         
+        datatrans1 = DataTrans() .set_name("datatrans1")
+        datatrans1 .add_sources(check_start) .add_destinations(away_from_collide)
+        
         failuretrans1 = FailureTrans() .set_name("failuretrans1")
         failuretrans1 .add_sources(check_start) .add_destinations(forward1)
         
@@ -251,8 +292,17 @@ class DoorPass(StateNode):
         successtrans2 = SuccessTrans() .set_name("successtrans2")
         successtrans2 .add_sources(check_start2) .add_destinations(turn_to_gate1)
         
+        datatrans2 = DataTrans() .set_name("datatrans2")
+        datatrans2 .add_sources(check_start2) .add_destinations(away_from_collide2)
+        
         failuretrans2 = FailureTrans() .set_name("failuretrans2")
         failuretrans2 .add_sources(check_start2) .add_destinations(parentfails1)
+        
+        successtrans3 = SuccessTrans() .set_name("successtrans3")
+        successtrans3 .add_sources(check_start3) .add_destinations(turn_to_gate1)
+        
+        failuretrans3 = FailureTrans() .set_name("failuretrans3")
+        failuretrans3 .add_sources(check_start3) .add_destinations(parentfails2)
         
         completiontrans2 = CompletionTrans() .set_name("completiontrans2")
         completiontrans2 .add_sources(turn_to_gate1) .add_destinations(statenode1)
@@ -261,48 +311,66 @@ class DoorPass(StateNode):
         timertrans2 .add_sources(statenode1) .add_destinations(forward_to_gate1)
         
         completiontrans3 = CompletionTrans() .set_name("completiontrans3")
-        completiontrans3 .add_sources(forward_to_gate1) .add_destinations(statenode2)
+        completiontrans3 .add_sources(away_from_collide) .add_destinations(statenode2)
         
         timertrans3 = TimerTrans(0.2) .set_name("timertrans3")
-        timertrans3 .add_sources(statenode2) .add_destinations(look_up,turn_to_gate2)
-        
-        completiontrans4 = CompletionTrans() .set_name("completiontrans4")
-        completiontrans4 .add_sources(turn_to_gate2) .add_destinations(statenode3)
-        
-        timertrans4 = TimerTrans(0.2) .set_name("timertrans4")
-        timertrans4 .add_sources(statenode3) .add_destinations(checkcarrying1)
-        
-        completiontrans5 = CompletionTrans() .set_name("completiontrans5")
-        completiontrans5 .add_sources(checkcarrying1) .add_destinations(turn_to_marker1)
-        
-        completiontrans6 = CompletionTrans() .set_name("completiontrans6")
-        completiontrans6 .add_sources(turn_to_marker1) .add_destinations(marker_forward1)
-        
-        failuretrans3 = FailureTrans() .set_name("failuretrans3")
-        failuretrans3 .add_sources(turn_to_marker1) .add_destinations(marker_forward1)
-        
-        completiontrans7 = CompletionTrans() .set_name("completiontrans7")
-        completiontrans7 .add_sources(marker_forward1) .add_destinations(setheadangle2)
-        
-        completiontrans8 = CompletionTrans() .set_name("completiontrans8")
-        completiontrans8 .add_sources(setheadangle2) .add_destinations(statenode4)
-        
-        timertrans5 = TimerTrans(0.2) .set_name("timertrans5")
-        timertrans5 .add_sources(statenode4) .add_destinations(turn_to_marker2)
-        
-        completiontrans9 = CompletionTrans() .set_name("completiontrans9")
-        completiontrans9 .add_sources(turn_to_marker2) .add_destinations(marker_forward2)
+        timertrans3 .add_sources(statenode2) .add_destinations(check_start2)
         
         failuretrans4 = FailureTrans() .set_name("failuretrans4")
-        failuretrans4 .add_sources(turn_to_marker2) .add_destinations(marker_forward2)
+        failuretrans4 .add_sources(away_from_collide) .add_destinations(check_start2)
+        
+        completiontrans4 = CompletionTrans() .set_name("completiontrans4")
+        completiontrans4 .add_sources(away_from_collide2) .add_destinations(statenode3)
+        
+        timertrans4 = TimerTrans(0.2) .set_name("timertrans4")
+        timertrans4 .add_sources(statenode3) .add_destinations(check_start3)
+        
+        failuretrans5 = FailureTrans() .set_name("failuretrans5")
+        failuretrans5 .add_sources(away_from_collide2) .add_destinations(check_start3)
+        
+        completiontrans5 = CompletionTrans() .set_name("completiontrans5")
+        completiontrans5 .add_sources(forward_to_gate1) .add_destinations(statenode4)
+        
+        timertrans5 = TimerTrans(0.2) .set_name("timertrans5")
+        timertrans5 .add_sources(statenode4) .add_destinations(look_up,turn_to_gate2)
+        
+        completiontrans6 = CompletionTrans() .set_name("completiontrans6")
+        completiontrans6 .add_sources(turn_to_gate2) .add_destinations(statenode5)
         
         timertrans6 = TimerTrans(0.2) .set_name("timertrans6")
-        timertrans6 .add_sources(marker_forward2) .add_destinations(lower_head,through_door)
+        timertrans6 .add_sources(statenode5) .add_destinations(checkcarrying1)
+        
+        completiontrans7 = CompletionTrans() .set_name("completiontrans7")
+        completiontrans7 .add_sources(checkcarrying1) .add_destinations(turn_to_marker1)
+        
+        completiontrans8 = CompletionTrans() .set_name("completiontrans8")
+        completiontrans8 .add_sources(turn_to_marker1) .add_destinations(marker_forward1)
+        
+        failuretrans6 = FailureTrans() .set_name("failuretrans6")
+        failuretrans6 .add_sources(turn_to_marker1) .add_destinations(marker_forward1)
+        
+        completiontrans9 = CompletionTrans() .set_name("completiontrans9")
+        completiontrans9 .add_sources(marker_forward1) .add_destinations(setheadangle2)
         
         completiontrans10 = CompletionTrans() .set_name("completiontrans10")
-        completiontrans10 .add_sources(lower_head,through_door) .add_destinations(checkcarrying2)
+        completiontrans10 .add_sources(setheadangle2) .add_destinations(statenode6)
+        
+        timertrans7 = TimerTrans(0.2) .set_name("timertrans7")
+        timertrans7 .add_sources(statenode6) .add_destinations(turn_to_marker2)
         
         completiontrans11 = CompletionTrans() .set_name("completiontrans11")
-        completiontrans11 .add_sources(checkcarrying2) .add_destinations(parentcompletes1)
+        completiontrans11 .add_sources(turn_to_marker2) .add_destinations(marker_forward2)
+        
+        failuretrans7 = FailureTrans() .set_name("failuretrans7")
+        failuretrans7 .add_sources(turn_to_marker2) .add_destinations(marker_forward2)
+        
+        timertrans8 = TimerTrans(0.2) .set_name("timertrans8")
+        timertrans8 .add_sources(marker_forward2) .add_destinations(lower_head,through_door)
+        
+        completiontrans12 = CompletionTrans() .set_name("completiontrans12")
+        completiontrans12 .add_sources(lower_head,through_door) .add_destinations(checkcarrying2)
+        
+        completiontrans13 = CompletionTrans() .set_name("completiontrans13")
+        completiontrans13 .add_sources(checkcarrying2) .add_destinations(parentcompletes1)
         
         return self
