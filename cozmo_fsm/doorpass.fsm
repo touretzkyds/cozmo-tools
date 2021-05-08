@@ -67,6 +67,28 @@ class DoorPass(StateNode):
             super().start(event)
 
 
+    class AwayFromCollide(Forward):
+        def start(self, event=None):
+            # super().start(event)
+            if isinstance(event,DataEvent):
+                startNode = event.data[0]
+                collideObj = event.data[1]
+                (rx, ry, rtheta) = self.robot.world.particle_filter.pose_estimate()
+                cx, cy = collideObj.center[0,0],collideObj.center[1,0]
+                ctheta = atan2(cy-ry, cx-rx)
+                delta_angle = wrap_angle(ctheta - rtheta)
+                delta_angle = delta_angle/pi*180
+                if -90 < delta_angle and delta_angle < 90:
+                    self.distance = distance_mm(-40)
+                else:
+                    self.distance = distance_mm(40)
+                self.speed = speed_mmps(50)
+                super().start(event)
+            else:
+                raise ValueError('DataEvent to AwayFromCollide must be a StartCollides.args', event.data)
+                self.post_failure()
+
+
     class TurnToGate(Turn):
         """Turn to the approach gate, or post success if we're already there."""
         def __init__(self,offset):
@@ -164,16 +186,28 @@ class DoorPass(StateNode):
         droplift: self.AdjustLiftHeight() =N=>
             SetHeadAngle(0) =T(0.2)=> check_start  # Time for vision to process
 
-        check_start: PilotCheckStart()
+        check_start: PilotCheckStartDetail()
         check_start =S=> turn_to_gate1
+        check_start =D=> away_from_collide
         check_start =F=> Forward(-80) =C=> check_start2
 
-        check_start2: PilotCheckStart()
+        check_start2: PilotCheckStartDetail()
         check_start2 =S=> turn_to_gate1
+        check_start2 =D=> away_from_collide2
         check_start2 =F=> ParentFails()
+
+        check_start3: PilotCheckStart()
+        check_start3 =S=> turn_to_gate1
+        check_start3 =F=> ParentFails()
 
         turn_to_gate1: self.TurnToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
             StateNode() =T(0.2)=> forward_to_gate1
+
+        away_from_collide: self.AwayFromCollide() =C=> StateNode() =T(0.2)=> check_start2
+        away_from_collide =F=> check_start2
+
+        away_from_collide2: self.AwayFromCollide() =C=> StateNode() =T(0.2)=> check_start3
+        away_from_collide2 =F=> check_start3
 
         forward_to_gate1: self.ForwardToGate(DoorPass.OUTER_GATE_DISTANCE) =C=>
             StateNode() =T(0.2)=> {look_up, turn_to_gate2}
