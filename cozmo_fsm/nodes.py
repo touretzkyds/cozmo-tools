@@ -224,12 +224,16 @@ class DriveContinuous(StateNode):
             # Heading determines whether we're solving y=f(x) or x=f(y)
             if abs(self.target_q) < pi/4 or abs(abs(self.target_q)-pi) < pi/4:
                 self.mode = 'x'    # y = m*x + b
-                self.m = (self.cur.y-self.prev.y) / (self.cur.x-self.prev.x)
+                xdiff = self.cur.x - self.prev.x
+                xdiv = xdiff if xdiff != 0 else 0.01
+                self.m = (self.cur.y-self.prev.y) / xdiv
                 self.b = self.cur.y - self.m * self.cur.x
                 #print('   y =', self.m, ' * x +', self.b)
             else:
                 self.mode = 'y'    # x = m*y + b
-                self.m = (self.cur.x-self.prev.x) / (self.cur.y-self.prev.y)
+                ydiff = self.cur.y - self.prev.y
+                ydiv = ydiff if ydiff != 0 else 0.01
+                self.m = (self.cur.x-self.prev.x) / ydiv
                 self.b = self.cur.x - self.m * self.cur.y
                 #print('   x =', self.m, ' * y +', self.b)
 
