@@ -32,13 +32,15 @@ class SimServer():
         self.started = False
 
 class SimRobot():
-    def __init__(self):
+    def __init__(self, run_in_cloud=False):
         robot = self
 
         robot.loop = asyncio.get_event_loop()
-        robot.erouter = EventRouter()
-        robot.erouter.robot = robot
-        robot.erouter.start()
+
+        if not run_in_cloud:
+            robot.erouter = EventRouter()
+            robot.erouter.robot = robot
+            robot.erouter.start()
 
         robot.head_angle = Angle(radians=0)
         robot.shoulder_angle = Angle(radians=0)
