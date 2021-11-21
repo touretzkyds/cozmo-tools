@@ -168,7 +168,7 @@ class PathPlanner():
                     break
             if start_escape_move is None:
                 print('PathPlanner: Start collides!', collider)
-                return PilotEvent(StartCollides,collider=collider,grid_display=None)
+                return PilotEvent(StartCollides,collider=collider,grid_display=None,text="start collides")
 
         # Run the wavefront path planner
         rrt_instance.obstacles = fat_obstacles
