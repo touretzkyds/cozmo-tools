@@ -440,123 +440,121 @@ class GoToCube(StateNode):
                 self.post_failure()
 
     def setup(self):
-        """
-            # GoToCube machine
-    
-            droplift: SetLiftHeight(0)
-            droplift =C=> after_drop
-            droplift =F=> after_drop
-    
-            after_drop: StateNode() =N=> {looker, waitlift, monitor_cube_pose}
-    
-            looker: LookAtObject()
-    
-            waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
-               check_almost_docked
-    
-            monitor_cube_pose: self.CheckCubePoseValid()
-            monitor_cube_pose =C=> StateNode() =T(1)=> monitor_cube_pose
-            monitor_cube_pose =F=> ParentFails()
-    
-            check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
-            check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
-            check_almost_docked =S=> setup_manual_dock   # we're close: skip the Pilot and set up dock manually
-            check_almost_docked =F=> pilot_check_start   # not close: use the Pilot to path plan
-    
-            setup_manual_dock: Forward(-10)
-            setup_manual_dock =C=> manual_dock1
-            setup_manual_dock =F=> failure
-    
-            manual_dock1: self.ManualDock1()
-            manual_dock1 =D=> Turn() =C=> Print('turned. wait...') =N=> manual_dock1
-            manual_dock1 =C=> Print('wait...') =N=> manual_dock2
-            manual_dock1 =T(10)=> Print('Cannot manual dock from here') =N=> pilot_check_start  # temporary
-    
-            manual_dock2: self.ManualDock2()
-            manual_dock2 =C=> Print('wait...') =N=> turn_to_cube1
-            manual_dock2 =F=> failure
-    
-            pilot_check_start: PilotCheckStart()
-            pilot_check_start =S=> Print('Start collision check passed.') =N=> go_side
-            # TODO: instead of blindly backing up, find the best direction to move.
-            pilot_check_start =F=> Print('Backing up to escape start collision...') =N=> backup_for_escape
-    
-            backup_for_escape: Forward(-80)
-            backup_for_escape =C=> pilot_check_start2
-            backup_for_escape =F=> failure
-    
-            # Second chance to avoid StartCollides.  There is no third chance.
-            pilot_check_start2: PilotCheckStart()
-            pilot_check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
-            pilot_check_start2 =PILOT(StartCollides)=> check_start2_pilot: ParentPilotEvent() =N=> failure
-            pilot_check_start2 =F=> failure
-    
-            go_side: self.PilotToSide()
-            go_side =PILOT(GoalCollides)=> failure
-            go_side =PILOT(MaxIterations)=> failure
-            go_side =PILOT=> go_side_pilot: ParentPilotEvent() =N=> failure
-            go_side =F=> failure
-            go_side =C=> self.ReportPosition('go_side_deccel')
-                =T(0.75)=> self.ReportPosition('go_side_stopped')
-                =N=> turn_to_cube1
-    
-            turn_to_cube1: self.TurnToCube(check_vis=True) =C=>
-                self.ReportPosition('turn_to_cube1_deccel')
-                =T(0.75)=> self.ReportPosition('turn_to_cube1_stopped')
-                =N=> Print('wait to approach...') =N=> approach
-            turn_to_cube1 =F=> recover1
-    
-            recover1: Forward(-50)
-            recover1 =C=> turn_to_cube2
-            recover1 =F=> failure
-    
-            approach: self.ForwardToCube(60) =C=> StateNode() =T(0.75)=>
-                self.ReportPosition('approach') =T(0.75)=>
-                self.ReportPosition('approach') =N=> turn_to_cube_1a
-    
-            turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=> Print('wait...') =N=> exit_to_roll
-            turn_to_cube_1a =F=> failure
-    
-            approach =F=> failure
-    
-            exit_to_roll: self.ReadyToRoll()
-            exit_to_roll =F=> forward_to_cube_1a
-            exit_to_roll =S=> Forward(-5) =C=> SetLiftHeight(1) =C=> forward_to_cube_1a
-    
-            forward_to_cube_1a: self.ForwardToCube(15) =C=> success
-    
-            turn_to_cube2: self.TurnToCube(check_vis=True)
-            turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
-            turn_to_cube2 =C=> forward_to_cube2
-    
-            forward_to_cube2: self.ForwardToCube(60)
-            forward_to_cube2 =C=> turn_to_cube3
-            forward_to_cube2 =F=> failure
-    
-            turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
-            turn_to_cube3 =C=> exit_to_roll2
-            turn_to_cube3 =F=> failure
-    
-            exit_to_roll2: self.ReadyToRoll()
-            exit_to_roll2 =F=> forward_to_cube3
-            exit_to_roll2 =S=> Forward(-5) =C=> SetLiftHeight(1) =C=> forward_to_cube3
-    
-            forward_to_cube3: self.ForwardToCube(20) =C=> success
-    
-            success: Print('GoToSide has succeeded.') =N=> ParentCompletes()
-    
-            failure: Print('GoToSide has failed.') =N=> check_cube_pose
-    
-            check_cube_pose: self.CheckCubePoseValid()
-            check_cube_pose =C=> choose_another_side
-            check_cube_pose =F=> ParentFails()
-    
-            choose_another_side: self.ChooseAnotherSide()
-            choose_another_side =F=> ParentFails()
-            choose_another_side =S=> droplift
-        """
+        #         # GoToCube machine
+        # 
+        #         droplift: SetLiftHeight(0)
+        #         droplift =C=> after_drop
+        #         droplift =F=> after_drop
+        # 
+        #         after_drop: StateNode() =N=> {looker, waitlift, monitor_cube_pose}
+        # 
+        #         looker: LookAtObject()
+        # 
+        #         waitlift: StateNode() =T(1)=>    # allow time for vision to set up world map
+        #            check_almost_docked
+        # 
+        #         monitor_cube_pose: self.CheckCubePoseValid()
+        #         monitor_cube_pose =C=> StateNode() =T(1)=> monitor_cube_pose
+        #         monitor_cube_pose =F=> ParentFails()
+        # 
+        #         check_almost_docked: self.CheckAlmostDocked()   # sets up parent.side
+        #         check_almost_docked =C=> turn_to_cube2       # we're good to dock right now
+        #         check_almost_docked =S=> setup_manual_dock   # we're close: skip the Pilot and set up dock manually
+        #         check_almost_docked =F=> pilot_check_start   # not close: use the Pilot to path plan
+        # 
+        #         setup_manual_dock: Forward(-10)
+        #         setup_manual_dock =C=> manual_dock1
+        #         setup_manual_dock =F=> failure
+        # 
+        #         manual_dock1: self.ManualDock1()
+        #         manual_dock1 =D=> Turn() =C=> Print('turned. wait...') =N=> manual_dock1
+        #         manual_dock1 =C=> Print('wait...') =N=> manual_dock2
+        #         manual_dock1 =T(10)=> Print('Cannot manual dock from here') =N=> pilot_check_start  # temporary
+        # 
+        #         manual_dock2: self.ManualDock2()
+        #         manual_dock2 =C=> Print('wait...') =N=> turn_to_cube1
+        #         manual_dock2 =F=> failure
+        # 
+        #         pilot_check_start: PilotCheckStart()
+        #         pilot_check_start =S=> Print('Start collision check passed.') =N=> go_side
+        #         # TODO: instead of blindly backing up, find the best direction to move.
+        #         pilot_check_start =F=> Print('Backing up to escape start collision...') =N=> backup_for_escape
+        # 
+        #         backup_for_escape: Forward(-80)
+        #         backup_for_escape =C=> pilot_check_start2
+        #         backup_for_escape =F=> failure
+        # 
+        #         # Second chance to avoid StartCollides.  There is no third chance.
+        #         pilot_check_start2: PilotCheckStart()
+        #         pilot_check_start2 =S=> Print('Start collision re-check passed.') =N=> go_side
+        #         pilot_check_start2 =PILOT(StartCollides)=> check_start2_pilot: ParentPilotEvent() =N=> failure
+        #         pilot_check_start2 =F=> failure
+        # 
+        #         go_side: self.PilotToSide()
+        #         go_side =PILOT(GoalCollides)=> failure
+        #         go_side =PILOT(MaxIterations)=> failure
+        #         go_side =PILOT=> go_side_pilot: ParentPilotEvent() =N=> failure
+        #         go_side =F=> failure
+        #         go_side =C=> self.ReportPosition('go_side_deccel')
+        #             =T(0.75)=> self.ReportPosition('go_side_stopped')
+        #             =N=> turn_to_cube1
+        # 
+        #         turn_to_cube1: self.TurnToCube(check_vis=True) =C=>
+        #             self.ReportPosition('turn_to_cube1_deccel')
+        #             =T(0.75)=> self.ReportPosition('turn_to_cube1_stopped')
+        #             =N=> Print('wait to approach...') =N=> approach
+        #         turn_to_cube1 =F=> recover1
+        # 
+        #         recover1: Forward(-50)
+        #         recover1 =C=> turn_to_cube2
+        #         recover1 =F=> failure
+        # 
+        #         approach: self.ForwardToCube(60) =C=> StateNode() =T(0.75)=>
+        #             self.ReportPosition('approach') =T(0.75)=>
+        #             self.ReportPosition('approach') =N=> turn_to_cube_1a
+        # 
+        #         turn_to_cube_1a: self.TurnToCube(check_vis=False) =C=> Print('wait...') =N=> exit_to_roll
+        #         turn_to_cube_1a =F=> failure
+        # 
+        #         approach =F=> failure
+        # 
+        #         exit_to_roll: self.ReadyToRoll()
+        #         exit_to_roll =F=> forward_to_cube_1a
+        #         exit_to_roll =S=> Forward(-5) =C=> SetLiftHeight(1) =C=> forward_to_cube_1a
+        # 
+        #         forward_to_cube_1a: self.ForwardToCube(15) =C=> success
+        # 
+        #         turn_to_cube2: self.TurnToCube(check_vis=True)
+        #         turn_to_cube2 =F=> Print("TurnToCube2: Cube Lost") =N=> self.InvalidatePose() =N=> failure
+        #         turn_to_cube2 =C=> forward_to_cube2
+        # 
+        #         forward_to_cube2: self.ForwardToCube(60)
+        #         forward_to_cube2 =C=> turn_to_cube3
+        #         forward_to_cube2 =F=> failure
+        # 
+        #         turn_to_cube3: self.TurnToCube(check_vis=False)   # can't fail
+        #         turn_to_cube3 =C=> exit_to_roll2
+        #         turn_to_cube3 =F=> failure
+        # 
+        #         exit_to_roll2: self.ReadyToRoll()
+        #         exit_to_roll2 =F=> forward_to_cube3
+        #         exit_to_roll2 =S=> Forward(-5) =C=> SetLiftHeight(1) =C=> forward_to_cube3
+        # 
+        #         forward_to_cube3: self.ForwardToCube(20) =C=> success
+        # 
+        #         success: Print('GoToSide has succeeded.') =N=> ParentCompletes()
+        # 
+        #         failure: Print('GoToSide has failed.') =N=> check_cube_pose
+        # 
+        #         check_cube_pose: self.CheckCubePoseValid()
+        #         check_cube_pose =C=> choose_another_side
+        #         check_cube_pose =F=> ParentFails()
+        # 
+        #         choose_another_side: self.ChooseAnotherSide()
+        #         choose_another_side =F=> ParentFails()
+        #         choose_another_side =S=> droplift
         
-        # Code generated by genfsm on Fri Jan  3 11:28:24 2020:
+        # Code generated by genfsm on Sun Dec 26 04:35:50 2021:
         
         droplift = SetLiftHeight(0) .set_name("droplift") .set_parent(self)
         after_drop = StateNode() .set_name("after_drop") .set_parent(self)
@@ -1043,83 +1041,81 @@ class PickUpCube(StateNode):
         super().start(event)
 
     def setup(self):
-        """
-            # PickUpCube machine
-    
-            fetch: SetFetching() =C=> check_carry
-    
-            check_carry: CheckCarrying()
-            check_carry =S=> DropObject() =C=> goto_cube
-            check_carry =F=> goto_cube
-    
-            goto_cube: GoToCube()
-            goto_cube =C=> AbortHeadAction() =T(0.1) => # clear head track
-               {raise_lift, raise_head}
-            goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> pilot_frustrated
-            goto_cube =F=> pilot_frustrated
-    
-            raise_lift: SetLiftHeight(0.4)
-    
-            raise_head: SetHeadAngle(5)
-            raise_head =C=> wait_head: AbortHeadAction() =C=> StateNode() =T(0.2)=> raise_head2
-            raise_head =F=> wait_head
-            raise_head2: SetHeadAngle(0, num_retries=2)
-            raise_head2 =F=> verify
-    
-            {raise_lift, raise_head2} =C=> verify
-    
-            verify: self.VerifyPickup()
-            verify =S=> set_carrying
-            verify =F=> StateNode() =T(0.5)=> verify2
-    
-            verify2: self.VerifyPickup()
-            verify2 =S=> set_carrying
-            verify2 =F=> StateNode() =T(0.2)=> frustrated   # Time delay before animation
-    
-            # verify3 is dead code
-            verify3: self.VerifyPickup()
-            verify3 =S=> set_carrying
-            verify3 =F=> frustrated
-    
-            set_carrying: SetCarrying() =N=> StateNode() =T(0.2)=> satisfied  # Time delay before animation
-    
-            satisfied: AnimationTriggerNode(trigger=cozmo.anim.Triggers.ReactToBlockPickupSuccess,
-                                            ignore_body_track=True,
-                                            ignore_head_track=True,
-                                            ignore_lift_track=True)
-            satisfied =C=> {final_raise, drop_head}
-            satisfied =F=> StopAllMotors() =T(1)=> {final_raise, drop_head}  # in case of tracks locked error
-    
-            final_raise: SetLiftHeight(1.0)
-            drop_head: SetHeadAngle(0)
-    
-            {final_raise, drop_head} =C=> ParentCompletes()
-    
-            frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
-                                             ignore_body_track=True,
-                                             ignore_head_track=True,
-                                             ignore_lift_track=True) =C=> missed_cube
-            frustrated =F=> StopAllMotors() =T(1)=> missed_cube
-    
-            missed_cube: SetNotCarrying() =C=> Forward(-5) =C=> {drop_lift, drop_head_low}
-    
-            drop_lift: SetLiftHeight(0)
-            drop_lift =C=> backupmore
-            drop_lift =F=> backupmore
-    
-            backupmore: Forward(-5)
-    
-            drop_head_low: SetHeadAngle(-20)
-    
-            {backupmore, drop_head_low} =C=> fail
-    
-            pilot_frustrated: PilotFrustration() =C=> fail
-    
-            fail: SetNotFetching() =C=> ParentFails()
-    
-        """
+        #         # PickUpCube machine
+        # 
+        #         fetch: SetFetching() =C=> check_carry
+        # 
+        #         check_carry: CheckCarrying()
+        #         check_carry =S=> DropObject() =C=> goto_cube
+        #         check_carry =F=> goto_cube
+        # 
+        #         goto_cube: GoToCube()
+        #         goto_cube =C=> AbortHeadAction() =T(0.1) => # clear head track
+        #            {raise_lift, raise_head}
+        #         goto_cube =PILOT=> goto_cube_pilot: ParentPilotEvent() =N=> pilot_frustrated
+        #         goto_cube =F=> pilot_frustrated
+        # 
+        #         raise_lift: SetLiftHeight(0.4)
+        # 
+        #         raise_head: SetHeadAngle(5)
+        #         raise_head =C=> wait_head: AbortHeadAction() =C=> StateNode() =T(0.2)=> raise_head2
+        #         raise_head =F=> wait_head
+        #         raise_head2: SetHeadAngle(0, num_retries=2)
+        #         raise_head2 =F=> verify
+        # 
+        #         {raise_lift, raise_head2} =C=> verify
+        # 
+        #         verify: self.VerifyPickup()
+        #         verify =S=> set_carrying
+        #         verify =F=> StateNode() =T(0.5)=> verify2
+        # 
+        #         verify2: self.VerifyPickup()
+        #         verify2 =S=> set_carrying
+        #         verify2 =F=> StateNode() =T(0.2)=> frustrated   # Time delay before animation
+        # 
+        #         # verify3 is dead code
+        #         verify3: self.VerifyPickup()
+        #         verify3 =S=> set_carrying
+        #         verify3 =F=> frustrated
+        # 
+        #         set_carrying: SetCarrying() =N=> StateNode() =T(0.2)=> satisfied  # Time delay before animation
+        # 
+        #         satisfied: AnimationTriggerNode(trigger=cozmo.anim.Triggers.ReactToBlockPickupSuccess,
+        #                                         ignore_body_track=True,
+        #                                         ignore_head_track=True,
+        #                                         ignore_lift_track=True)
+        #         satisfied =C=> {final_raise, drop_head}
+        #         satisfied =F=> StopAllMotors() =T(1)=> {final_raise, drop_head}  # in case of tracks locked error
+        # 
+        #         final_raise: SetLiftHeight(1.0)
+        #         drop_head: SetHeadAngle(0)
+        # 
+        #         {final_raise, drop_head} =C=> ParentCompletes()
+        # 
+        #         frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
+        #                                          ignore_body_track=True,
+        #                                          ignore_head_track=True,
+        #                                          ignore_lift_track=True) =C=> missed_cube
+        #         frustrated =F=> StopAllMotors() =T(1)=> missed_cube
+        # 
+        #         missed_cube: SetNotCarrying() =C=> Forward(-5) =C=> {drop_lift, drop_head_low}
+        # 
+        #         drop_lift: SetLiftHeight(0)
+        #         drop_lift =C=> backupmore
+        #         drop_lift =F=> backupmore
+        # 
+        #         backupmore: Forward(-5)
+        # 
+        #         drop_head_low: SetHeadAngle(-20)
+        # 
+        #         {backupmore, drop_head_low} =C=> fail
+        # 
+        #         pilot_frustrated: PilotFrustration() =C=> fail
+        # 
+        #         fail: SetNotFetching() =C=> ParentFails()
+        # 
         
-        # Code generated by genfsm on Fri Jan  3 11:28:24 2020:
+        # Code generated by genfsm on Sun Dec 26 04:35:50 2021:
         
         fetch = SetFetching() .set_name("fetch") .set_parent(self)
         check_carry = CheckCarrying() .set_name("check_carry") .set_parent(self)
@@ -1297,38 +1293,36 @@ class DropObject(StateNode):
             self.post_failure()
 
     def setup(self):
-        """
-            SetLiftHeight(0) =C=> check_carrying
-    
-            check_carrying: CheckCarrying()
-            check_carrying =F=> {backup, lookdown}
-            check_carrying =S=> self.SetObject() =N=>
-              SetNotCarrying() =N=> SetFetching() =N=> {backup, lookdown}
-    
-            backup: Forward(-15)
-    
-            # Robots differ on head angle alignment, so try a shallow angle,
-            # and if we don't see the cube, try a steeper one.
-            lookdown: SetHeadAngle(-12)
-            lookdown =F=> head_angle_wait  # Shouldn't fail, but just in case
-    
-            {backup, lookdown} =C=> head_angle_wait
-    
-            head_angle_wait: StateNode() =T(0.5)=> check_visible
-    
-            check_visible: self.CheckCubeVisible()
-            check_visible =C=> wrap_up
-            check_visible =F=> lookdown2
-    
-            # Try a lower head angle, but keep going even if we don't see the object
-            lookdown2: SetHeadAngle(-20)
-            lookdown2 =F=> wrap_up  # Shouldn't fail, but just in case
-            lookdown2 =T(0.5)=> wrap_up
-    
-            wrap_up: SetNotFetching() =N=> ParentCompletes()
-        """
+        #         SetLiftHeight(0) =C=> check_carrying
+        # 
+        #         check_carrying: CheckCarrying()
+        #         check_carrying =F=> {backup, lookdown}
+        #         check_carrying =S=> self.SetObject() =N=>
+        #           SetNotCarrying() =N=> SetFetching() =N=> {backup, lookdown}
+        # 
+        #         backup: Forward(-15)
+        # 
+        #         # Robots differ on head angle alignment, so try a shallow angle,
+        #         # and if we don't see the cube, try a steeper one.
+        #         lookdown: SetHeadAngle(-12)
+        #         lookdown =F=> head_angle_wait  # Shouldn't fail, but just in case
+        # 
+        #         {backup, lookdown} =C=> head_angle_wait
+        # 
+        #         head_angle_wait: StateNode() =T(0.5)=> check_visible
+        # 
+        #         check_visible: self.CheckCubeVisible()
+        #         check_visible =C=> wrap_up
+        #         check_visible =F=> lookdown2
+        # 
+        #         # Try a lower head angle, but keep going even if we don't see the object
+        #         lookdown2: SetHeadAngle(-20)
+        #         lookdown2 =F=> wrap_up  # Shouldn't fail, but just in case
+        #         lookdown2 =T(0.5)=> wrap_up
+        # 
+        #         wrap_up: SetNotFetching() =N=> ParentCompletes()
         
-        # Code generated by genfsm on Fri Jan  3 11:28:24 2020:
+        # Code generated by genfsm on Sun Dec 26 04:35:50 2021:
         
         setliftheight3 = SetLiftHeight(0) .set_name("setliftheight3") .set_parent(self)
         check_carrying = CheckCarrying() .set_name("check_carrying") .set_parent(self)
@@ -1388,7 +1382,7 @@ class DropObject(StateNode):
         return self
 
 
-class RollCube(StateNode):
+class PivotCube(StateNode):
     def __init__(self):
         super().__init__()
 
@@ -1396,26 +1390,24 @@ class RollCube(StateNode):
         super().start(event)
 
     def setup(self):
-        """
-            put_arm: SetLiftHeight(0.68)
-            put_arm =C=> {drop, back}
-            put_arm =F=> ParentFails()
-    
-            drop: SetLiftHeight(0.28)
-            back: Forward(-60)
-    
-            drop =F=> ParentFails()
-            back =F=> ParentFails()
-    
-            {drop, back} =C=> reset
-            {drop, back} =F=> ParentFails()
-    
-            reset: SetLiftHeight(0)
-            reset =C=> Forward(-10) =C=> ParentCompletes()
-            reset =F=> ParentFails()
-        """
+        #         put_arm: SetLiftHeight(0.68)
+        #         put_arm =C=> {drop, back}
+        #         put_arm =F=> ParentFails()
+        # 
+        #         drop: SetLiftHeight(0.28)
+        #         back: Forward(-60)
+        # 
+        #         drop =F=> ParentFails()
+        #         back =F=> ParentFails()
+        # 
+        #         {drop, back} =C=> reset
+        #         {drop, back} =F=> ParentFails()
+        # 
+        #         reset: SetLiftHeight(0)
+        #         reset =C=> Forward(-10) =C=> ParentCompletes()
+        #         reset =F=> ParentFails()
         
-        # Code generated by genfsm on Fri Jan  3 11:28:24 2020:
+        # Code generated by genfsm on Sun Dec 26 04:35:50 2021:
         
         put_arm = SetLiftHeight(0.68) .set_name("put_arm") .set_parent(self)
         parentfails5 = ParentFails() .set_name("parentfails5") .set_parent(self)
@@ -1661,79 +1653,77 @@ class RollingCube(StateNode):
 
 
     def setup(self):
-        """
-            # RollingCube machine
-    
-            start: SetFetching() =C=> {looker, check_cube_pose}
-    
-            looker: LookAtObject()
-    
-            check_cube_pose: self.CheckCubePoseValidOnce(check_vis=False)
-            check_cube_pose =C=> check_orientation
-            check_cube_pose =F=> fail
-    
-            check_orientation: self.CheckOrientation()
-            check_orientation =C=> goto_cube
-            check_orientation =S=> StateNode() =T(0.5)=> satisfied
-            check_orientation =F=> StateNode() =T(0.5)=> frustrated
-    
-            satisfied: AnimationTriggerNode(trigger=cozmo.anim.Triggers.RollBlockSuccess,
-                                            ignore_body_track=True,
-                                            ignore_head_track=True,
-                                            ignore_lift_track=True)
-    
-            satisfied =C=> ParentCompletes()
-            satisfied =F=> StopAllMotors() =T(1)=> ParentCompletes()
-    
-            frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
-                                             ignore_body_track=True,
-                                             ignore_head_track=True,
-                                             ignore_lift_track=True)
-            frustrated =C=> goto_cube
-            frustrated =F=> StopAllMotors() =T(1)=> goto_cube
-    
-            goto_cube: GoToCube()
-            goto_cube =F=> Print('goto_cube has failed.') =N=> try_again
-            goto_cube =C=> Print('goto_cube has succeeded.') =N=> decide_roll_counts
-    
-            decide_roll_counts: self.CheckCounts()
-            decide_roll_counts =D(0)=> Print('No way to achieve from this side') =C=> check_cube_pose_valid
-            decide_roll_counts =D(1)=> Print('Roll once') =C=> roll1
-            decide_roll_counts =D(2)=> Print('Roll twice') =C=> roll2
-            decide_roll_counts =D(3)=> Print('Roll thrice') =C=> roll3
-    
-            check_cube_pose_valid: self.CheckCubePoseValidOnce(check_vis=True)
-            check_cube_pose_valid =C=> check_orientation
-            check_cube_pose_valid =F=> setup_check_again
-    
-            setup_check_again: Forward(-30)
-            setup_check_again =C=> Print('backing up...') =T(1)=> check_cube_pose_valid2
-            setup_check_again =F=> try_again
-    
-            check_cube_pose_valid2:self.CheckCubePoseValidOnce(check_vis=True, reset=True)
-            check_cube_pose_valid2 =C=> check_orientation
-            check_cube_pose_valid2 =F=> try_again
-    
-            roll1: RollCube()
-            roll1 =C=> Forward(-30) =C=> Print('Checking the new orientation...') =T(1)=> check_cube_pose_valid
-            roll1 =F=> try_again
-    
-            roll2: RollCube()
-            roll2 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll1
-            roll2 =F=> try_again
-    
-            roll3: RollCube()
-            roll3 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll2
-            roll3 =F=> try_again
-    
-            try_again: self.TryAgain()
-            try_again =S=> check_cube_pose_valid
-            try_again =F=> fail
-    
-            fail: SetNotFetching() =C=> ParentFails()
-        """
+        #         # RollingCube machine
+        # 
+        #         start: SetFetching() =C=> {looker, check_cube_pose}
+        # 
+        #         looker: LookAtObject()
+        # 
+        #         check_cube_pose: self.CheckCubePoseValidOnce(check_vis=False)
+        #         check_cube_pose =C=> check_orientation
+        #         check_cube_pose =F=> fail
+        # 
+        #         check_orientation: self.CheckOrientation()
+        #         check_orientation =C=> goto_cube
+        #         check_orientation =S=> StateNode() =T(0.5)=> satisfied
+        #         check_orientation =F=> StateNode() =T(0.5)=> frustrated
+        # 
+        #         satisfied: AnimationTriggerNode(trigger=cozmo.anim.Triggers.RollBlockSuccess,
+        #                                         ignore_body_track=True,
+        #                                         ignore_head_track=True,
+        #                                         ignore_lift_track=True)
+        # 
+        #         satisfied =C=> ParentCompletes()
+        #         satisfied =F=> StopAllMotors() =T(1)=> ParentCompletes()
+        # 
+        #         frustrated: AnimationTriggerNode(trigger=cozmo.anim.Triggers.FrustratedByFailure,
+        #                                          ignore_body_track=True,
+        #                                          ignore_head_track=True,
+        #                                          ignore_lift_track=True)
+        #         frustrated =C=> goto_cube
+        #         frustrated =F=> StopAllMotors() =T(1)=> goto_cube
+        # 
+        #         goto_cube: GoToCube()
+        #         goto_cube =F=> Print('goto_cube has failed.') =N=> try_again
+        #         goto_cube =C=> Print('goto_cube has succeeded.') =N=> decide_roll_counts
+        # 
+        #         decide_roll_counts: self.CheckCounts()
+        #         decide_roll_counts =D(0)=> Print('No way to achieve from this side') =C=> check_cube_pose_valid
+        #         decide_roll_counts =D(1)=> Print('Roll once') =C=> roll1
+        #         decide_roll_counts =D(2)=> Print('Roll twice') =C=> roll2
+        #         decide_roll_counts =D(3)=> Print('Roll thrice') =C=> roll3
+        # 
+        #         check_cube_pose_valid: self.CheckCubePoseValidOnce(check_vis=True)
+        #         check_cube_pose_valid =C=> check_orientation
+        #         check_cube_pose_valid =F=> setup_check_again
+        # 
+        #         setup_check_again: Forward(-30)
+        #         setup_check_again =C=> Print('backing up...') =T(1)=> check_cube_pose_valid2
+        #         setup_check_again =F=> try_again
+        # 
+        #         check_cube_pose_valid2:self.CheckCubePoseValidOnce(check_vis=True, reset=True)
+        #         check_cube_pose_valid2 =C=> check_orientation
+        #         check_cube_pose_valid2 =F=> try_again
+        # 
+        #         roll1: PivotCube()
+        #         roll1 =C=> Forward(-30) =C=> Print('Checking the new orientation...') =T(1)=> check_cube_pose_valid
+        #         roll1 =F=> try_again
+        # 
+        #         roll2: PivotCube()
+        #         roll2 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll1
+        #         roll2 =F=> try_again
+        # 
+        #         roll3: PivotCube()
+        #         roll3 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll2
+        #         roll3 =F=> try_again
+        # 
+        #         try_again: self.TryAgain()
+        #         try_again =S=> check_cube_pose_valid
+        #         try_again =F=> fail
+        # 
+        #         fail: SetNotFetching() =C=> ParentFails()
         
-        # Code generated by genfsm on Fri Jan  3 11:28:24 2020:
+        # Code generated by genfsm on Sun Dec 26 04:35:50 2021:
         
         start = SetFetching() .set_name("start") .set_parent(self)
         looker = LookAtObject() .set_name("looker") .set_parent(self)
@@ -1765,13 +1755,13 @@ class RollingCube(StateNode):
         setup_check_again = Forward(-30) .set_name("setup_check_again") .set_parent(self)
         print17 = Print('backing up...') .set_name("print17") .set_parent(self)
         check_cube_pose_valid2 = self.CheckCubePoseValidOnce(check_vis=True, reset=True) .set_name("check_cube_pose_valid2") .set_parent(self)
-        roll1 = RollCube() .set_name("roll1") .set_parent(self)
+        roll1 = PivotCube() .set_name("roll1") .set_parent(self)
         forward5 = Forward(-30) .set_name("forward5") .set_parent(self)
         print18 = Print('Checking the new orientation...') .set_name("print18") .set_parent(self)
-        roll2 = RollCube() .set_name("roll2") .set_parent(self)
+        roll2 = PivotCube() .set_name("roll2") .set_parent(self)
         setliftheight4 = SetLiftHeight(1) .set_name("setliftheight4") .set_parent(self)
         forwardtocube1 = self.ForwardToCube(15) .set_name("forwardtocube1") .set_parent(self)
-        roll3 = RollCube() .set_name("roll3") .set_parent(self)
+        roll3 = PivotCube() .set_name("roll3") .set_parent(self)
         setliftheight5 = SetLiftHeight(1) .set_name("setliftheight5") .set_parent(self)
         forwardtocube2 = self.ForwardToCube(15) .set_name("forwardtocube2") .set_parent(self)
         try_again = self.TryAgain() .set_name("try_again") .set_parent(self)

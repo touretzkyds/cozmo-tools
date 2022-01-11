@@ -862,7 +862,7 @@ class DropObject(StateNode):
     }
 
 
-class RollCube(StateNode):
+class PivotCube(StateNode):
     def __init__(self):
         super().__init__()
 
@@ -1143,15 +1143,15 @@ class RollingCube(StateNode):
         check_cube_pose_valid2 =C=> check_orientation
         check_cube_pose_valid2 =F=> try_again
 
-        roll1: RollCube()
+        roll1: PivotCube()
         roll1 =C=> Forward(-30) =C=> Print('Checking the new orientation...') =T(1)=> check_cube_pose_valid
         roll1 =F=> try_again
 
-        roll2: RollCube()
+        roll2: PivotCube()
         roll2 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll1
         roll2 =F=> try_again
 
-        roll3: RollCube()
+        roll3: PivotCube()
         roll3 =C=> SetLiftHeight(1) =C=> self.ForwardToCube(15) =C=> roll2
         roll3 =F=> try_again
 
