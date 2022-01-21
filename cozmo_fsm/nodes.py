@@ -1085,7 +1085,7 @@ class SetLiftAngle(SetLiftHeight):
         super().start(event)
 
 
-class DockWithCube(ActionNode):
+class SdkDockWithCube(ActionNode):
     "Uses SDK's dock_with_cube method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
@@ -1105,7 +1105,7 @@ class DockWithCube(ActionNode):
         return self.robot.dock_with_cube(self.object, **self.action_kwargs)
 
 
-class PickUpObject(ActionNode):
+class SdkPickUpObject(ActionNode):
     "Uses SDK's pick_up_object method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
@@ -1125,7 +1125,7 @@ class PickUpObject(ActionNode):
         return self.robot.pickup_object(self.object, **self.action_kwargs)
 
 
-class PlaceObjectOnGroundHere(ActionNode):
+class SdkPlaceObjectOnGroundHere(ActionNode):
     "Uses SDK's place_object_on_ground_here method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
@@ -1144,7 +1144,7 @@ class PlaceObjectOnGroundHere(ActionNode):
             raise ValueError('No object to place')
         return self.robot.place_object_on_ground_here(self.object, **self.action_kwargs)
 
-class PlaceOnObject(ActionNode):
+class SdkPlaceOnObject(ActionNode):
     "Uses SDK's place_on_object method."
     def __init__(self, object=None, abort_on_stop=False, **action_kwargs):
         self.object = object
@@ -1164,7 +1164,7 @@ class PlaceOnObject(ActionNode):
         return self.robot.place_on_object(self.object, **self.action_kwargs)
 
 
-class RollCube(ActionNode):
+class SdkRollCube(ActionNode):
     "Uses SDK's roll_cube method."
     def __init__(self, object=None, abort_on_stop=True, **action_kwargs):
         self.object = object
