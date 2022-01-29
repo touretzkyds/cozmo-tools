@@ -23,7 +23,7 @@ Windows:
    your Windows computer so that you get the proper device drivers. Make sure
    that iTunes can talk to your iOS device before proceeding.
 4. To get simple_cli and genfsm to work, add the following to your $Profile:
-   function simple_cli() { py -i C:\Users\<username>\...\cozmo-tools\simple-cli }
+   function simple_cli() { py -i C:\Users\<username>\...\cozmo-tools\simple_cli }
    function genfsm($file) { py C:\Users\<username>\...\cozmo-tools\genfsm $file }
 5. To allow Python to find the cozmo_fsm package, edit your user enviornment
    variables and create a new variable called PYTHONPATH that points to the
