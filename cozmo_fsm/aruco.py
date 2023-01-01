@@ -54,8 +54,8 @@ class Aruco(object):
     def __init__(self, robot, arucolibname, marker_size=ARUCO_MARKER_SIZE, disabled_ids=[]):
         self.arucolibname = arucolibname
         if arucolibname is not None:
-            self.aruco_lib = cv2.aruco.Dictionary_get(arucolibname)
-            self.aruco_params = cv2.aruco.DetectorParameters_create()
+            self.aruco_lib = cv2.aruco.getPredefinedDictionary(arucolibname)
+            self.aruco_params = cv2.aruco.DetectorParameters()
         self.seen_marker_ids = []
         self.seen_marker_objects = dict()
         self.disabled_ids = disabled_ids  # disable markers with high false detection rates
