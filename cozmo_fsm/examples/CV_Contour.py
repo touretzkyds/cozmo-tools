@@ -53,7 +53,7 @@ class CV_Contour(StateMachineProgram):
                 depth += 1
                 temp = self.hierarchy[0,temp,3]
             contour = scale * self.contours[index]
-            cv2.drawContours(annotated_image, [contour], 0, self.colors[depth], 1)
+            cv2.drawContours(annotated_image, [contour], 0, self.colors[depth], 2)
         cv2.imshow('contour',annotated_image)
         cv2.waitKey(1)
         return annotated_image
