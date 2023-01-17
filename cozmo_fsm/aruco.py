@@ -55,7 +55,6 @@ class Aruco(object):
         self.arucolibname = arucolibname
         if arucolibname is not None:
             self.aruco_lib = cv2.aruco.getPredefinedDictionary(arucolibname)
-            self.aruco_params = cv2.aruco.DetectorParameters()
         self.seen_marker_ids = []
         self.seen_marker_objects = dict()
         self.disabled_ids = disabled_ids  # disable markers with high false detection rates
@@ -78,7 +77,7 @@ class Aruco(object):
         self.seen_marker_ids = []
         self.seen_marker_objects = dict()
         (self.corners,self.ids,_) = \
-            cv2.aruco.detectMarkers(gray,self.aruco_lib,parameters=self.aruco_params)
+            cv2.aruco.detectMarkers(gray, self.aruco_lib)
         if self.ids is None: return
 
         # Estimate poses
