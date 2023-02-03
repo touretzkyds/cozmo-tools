@@ -449,6 +449,7 @@ class ParticleFilter():
             if var > 0:
                 self.resample()
                 self.state = self.LOCALIZED
+                self.variance_estimate()
         if self.robot.carrying:
             self.robot.world.world_map.update_carried_object(self.robot.carrying)
 
