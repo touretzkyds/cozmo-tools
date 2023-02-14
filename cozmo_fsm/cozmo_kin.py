@@ -10,6 +10,8 @@ from .rrt_shapes import *
 # ================ Constants ================
 
 wheelbase = 45 # millimeters
+front_wheel_diameter = 52 # millimeters
+hook_spacing = 35 # millimeters
 center_of_rotation_offset = -19.7 # millimeters
 
 # ================================================================
