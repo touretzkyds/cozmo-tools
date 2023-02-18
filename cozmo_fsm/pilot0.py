@@ -31,7 +31,7 @@ class PilotCheckStart(StateNode):
 
 
 class PilotCheckStartDetail(StateNode):
-    "Fails if rrt planner indicates start_collides"
+    "Posts collision object if rrt planner indicates start_collides"
 
     def start(self, event=None):
         super().start(event)

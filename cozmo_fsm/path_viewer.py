@@ -111,8 +111,13 @@ class PathViewer():
             print("Type 'h' in the path viewer window for help.")
 
     def clear(self):
-        global the_items
+        global the_items, old_grid
         the_items = []
+        old_grid = np.zeros([1,1], dtype=np.int32)
+        the_rrt.grid_display = None
+        the_rrt.draw_path = None
+        the_rrt.treeA = []
+        the_rrt.treeB = []
 
     def set_rrt(self,new_rrt):
         global the_rrt
@@ -293,12 +298,6 @@ class PathViewer():
     def add_tree(self, tree, color):
         global the_items
         the_items.append((tree,color))
-
-    def clear_trees(self):
-        global the_items
-        the_items = []
-        self.robot.world.rrt.treeA = []
-        self.robot.world.rrt.treeB = []
 
     def display(self):
         glMatrixMode(GL_PROJECTION)

@@ -49,8 +49,14 @@ class PilotBase(StateNode):
 
     """Base class for PilotToObject, PilotToPose, etc."""
 
+    class ClearDisplays(StateNode):
+        def start(self,event=None):
+            super().start()
+            if self.robot.world.path_viewer:
+                self.robot.world.path_viewer.clear()
+
     class SendObject(StateNode):
-        def start(self):
+        def start(self,event=None):
           super().start()
           object = self.parent.object
           if object.pose_confidence < 0:
@@ -65,9 +71,6 @@ class PilotBase(StateNode):
             if not isinstance(event, DataEvent):
                 raise ValueError(event)
             (navplan, grid_display) = event.data
-            if grid_display is not None:
-                if self.parent.robot.world.path_viewer:
-                    self.parent.robot.world.path_viewer.clear_trees()
 
             self.robot.world.rrt.draw_path = navplan.extract_path()
             #print('ReceivePlan: draw_path=', self.robot.world.rrt.draw_path)
@@ -181,7 +184,7 @@ class PilotToObject(PilotBase):
     $setup{
         # PilotToObject machine
 
-        launch: self.SendObject() =D=> planner
+        launch: self.ClearDisplays() =N=> self.SendObject() =D=> planner
 
         planner: PathPlannerProcess() =D=> recv
         planner =PILOT=> ParentPilotEvent() =N=> Print('Path planner failed')
@@ -230,9 +233,6 @@ class PilotToPose(PilotBase):
             start_node = RRTNode(x=pose_x, y=pose_y, q=pose_theta)
             goal_node = RRTNode(x=tpose.position.x, y=tpose.position.y,
                                 q=tpose.rotation.angle_z.radians)
-
-            if self.robot.world.path_viewer:
-                self.robot.world.path_viewer.clear()
 
             start_escape_move = None
             try:
@@ -292,7 +292,6 @@ class PilotToPose(PilotBase):
             if self.parent.verbose:
                 print('Path planner generated',len(treeA)+len(treeB),'nodes.')
             if self.parent.robot.world.path_viewer:
-                self.parent.robot.world.path_viewer.clear()
                 self.parent.robot.world.path_viewer.add_tree(path, (1,0,0,0.75))
 
             self.robot.world.rrt.draw_path = path
@@ -361,6 +360,8 @@ class PilotToPose(PilotBase):
 
     $setup{
         # PilotToPose machine
+
+        launch: self.ClearDisplays() =N=> planner
 
         planner: self.PilotRRTPlanner() =D=> recv
         planner =PILOT=> ParentPilotEvent() =N=> Print('Path planner failed')

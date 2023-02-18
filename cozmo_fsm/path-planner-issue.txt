@@ -1,0 +1,18 @@
+RRT planner should not try to use doorways as maneuverable space.  Use
+wavefront for doorway passage.  Instead of giving the doorways wider
+openings when RRT planning, we should block them off.
+
+Wavefront planner is failing when a sideways cube is close to the
+wall, even if there is room for the robot to fit.  Perhaps walls are
+being inflated too thick?
+
+Should we restrict the RRT algorithm to a smaller box, since we only
+use it for short-range planning now?  This might help prevent it from
+exceeding max_iter by exploring areas far from the robot and the goal.
+
+DriveContinuous should turn more slowly when the robot is carrying a
+cube, because it tends to overshoot.
+
+In CalypsoMachine.fsm, in the first line of the ExpressFrustration
+fsm, change =N=> to => and you'll get an error from genfsm that
+reports the wrong line as the location of the syntax error.
