@@ -603,20 +603,26 @@ class SetFetching(StateNode):
         super().__init__()
 
     def start(self, event=None):
+        super().start(event)
         if self.objparam is not None:
             self.object = self.objparam
         else:
             self.object = self.parent.object
         if isinstance(self.object, LightCube):
-            self.wmobject = self.object.wm_obj
+            try:
+                self.wmobject = self.object.wm_obj
+            except:
+                self.wmobject = None
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
         else:
             raise ValueError(self.object)
-        self.robot.fetching = self.wmobject
-        super().start(event)
-        self.post_completion()
+        if self.wmobject:
+            self.robot.fetching = self.wmobject
+            self.post_completion()
+        else:
+            self.post_failure()
 
 
 class SetNotFetching(StateNode):
@@ -723,20 +729,32 @@ class PickUpCube(StateNode):
     def start(self, event=None):
         if isinstance(self.cube, LightCube):
             self.object = self.cube
-            self.wmobject = self.object.wm_obj
+            try:
+                self.wmobject = self.object.wm_obj
+            except:
+                self.wmobject = None
         elif isinstance(self.cube, LightCubeObj):
             self.wmobject = self.cube
             self.object = self.cube.sdk_obj
         elif isinstance(self.object, LightCube):
-            self.wmobject = self.object.wm_obj
+            try:
+                self.wmobject = self.object.wm_obj
+            except:
+                self.wmobject = None
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
         else:
             raise ValueError(self.object)
+        super().start(event)
+        if not (self.object.pose and self.object.pose.is_valid and
+                self.wmobject and not self.wmobject.pose_confidence < 0):
+            print('PickUpCube: cube has invalid pose!', self.object, self.object.pose)
+            self.post_event(PilotEvent(InvalidPose))
+            self.post_failure()
+            return
         self.children['goto_cube'].object = self.object
         print('Picking up',self.wmobject)
-        super().start(event)
 
     $setup{
         # PickUpCube machine
@@ -831,6 +849,8 @@ class DropObject(StateNode):
             self.post_failure()
 
     $setup {
+        # DropObject machine
+
         SetLiftHeight(0) =C=> check_carrying
 
         check_carrying: CheckCarrying()
@@ -900,12 +920,15 @@ class RollingCube(StateNode):
 
     def start(self, event=None):
         if isinstance(self.object, LightCube):
-            self.wmobject = self.object.wm_obj
+            try:
+                self.wmobject = self.object.wm_obj
+            except:
+                self.wmobject = None
         elif isinstance(self.object, LightCubeObj):
             self.wmobject = self.object
             self.object = self.object.sdk_obj
         else:
-            return
+            raise ValueError(self.object)
         self.children['looker'].object = self.object
         self.children['goto_cube'].object = self.object
         self.children['goto_cube'].roll_cube = True
@@ -914,8 +937,8 @@ class RollingCube(StateNode):
         self.children['roll2'].object = self.object
         self.children['roll3'].object = self.object
         super().start(event)
-        if self.wmobject.pose_confidence < 0:
-            print('RollingCube: cube has invalid pose!', self.wmobject, self.object.pose)
+        if (not self.wmobject) or self.wmobject.pose_confidence < 0:
+            print('RollingCube: cube has invalid pose!', self.object, self.object.pose)
             self.post_event(PilotEvent(InvalidPose))
             self.post_failure()
 
