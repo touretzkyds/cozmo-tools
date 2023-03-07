@@ -32,6 +32,8 @@ class DoorPass(StateNode):
             doorway = self.robot.world.world_map.objects.get(door)
         elif isinstance(door, DoorwayObj):
             doorway = door
+        else:
+            doorway = None
         if isinstance(doorway, DoorwayObj):
             self.object = doorway
         else:

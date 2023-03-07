@@ -35,7 +35,7 @@ class CozmoKinematics(Kinematics):
 
         front_axle_frame = Joint('front_axle', parent=base_frame,
                                  description='Center of the front axle',
-                                 alpha=pi/2)
+                                 d=front_wheel_diameter/2, alpha=pi/2)
         back_axle_frame = Joint('back_axle', parent=base_frame, r=-46., alpha=pi/2)
 
         # This frame is on the midline.  Could add separate left and right shoulders.

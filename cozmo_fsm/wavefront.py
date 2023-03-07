@@ -118,26 +118,30 @@ class WaveFront():
         return (empty_points, goal_points)
 
     def generate_cube_goal_points(self,shape,obstacle_inflation):
-        # for cubes, charger, markers, mapFace
+        # Generate points for cubes, charger, markers, mapFace in
+        # standard orientation.  Will rotate these later.
         if shape.obstacle_id.startswith('Cube'):
             (xsize,ysize,_) = LightCubeObj.light_cube_size
+            goal_offset = 55 # distance from edge in mm
         elif shape.obstacle_id.startswith('Charger'):
             (xsize,ysize,_) = ChargerObj.charger_size
+            goal_offset = 15 # distance from edge in mm
         elif shape.obstacle_id.startswith('CustomMarkerObj'):
             (xsize,ysize,_) = CustomMarkerObj.custom_marker_size
+            goal_offset = 15 # distance from edge in mm
         elif shape.obstacle_id == 'MapFace':
             (xsize,ysize) = MapFaceObj.mapFace_size
+            goal_offset = 15 # distance from edge in mm
         else:
             raise ValueError('Unrecognized goal shape', shape)
         ((xmin,ymin), (xmax,ymax)) = shape.get_bounding_box()
         goal_points, empty_points = [], []
-        for offset in range(floor(xsize/2), ceil(xsize/2)+obstacle_inflation):
+        for offset in range(floor(xsize/2), ceil(xsize/2)+obstacle_inflation+2):
                 empty_points.append([shape.center[0,0]-offset, shape.center[1,0]])
                 empty_points.append([shape.center[0,0]+offset, shape.center[1,0]])
-        for offset in range(floor(ysize/2), ceil(ysize/2)+obstacle_inflation):
+        for offset in range(floor(ysize/2), ceil(ysize/2)+obstacle_inflation+2):
                 empty_points.append([shape.center[0,0], shape.center[1,0]-offset])
                 empty_points.append([shape.center[0,0], shape.center[1,0]+offset])
-        goal_offset = 15 # distance from edge in mm
         goal_points.append([shape.center[0,0]-xsize/2-goal_offset, shape.center[1,0]])
         goal_points.append([shape.center[0,0]+xsize/2+goal_offset, shape.center[1,0]])
         goal_points.append([shape.center[0,0], shape.center[1,0]-ysize/2-goal_offset])
