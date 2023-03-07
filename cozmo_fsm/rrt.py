@@ -616,8 +616,9 @@ class RRT():
         # Rooms aren't obstacles, so include them separately.
         rooms = [obj for obj in objs if isinstance(obj,RoomObj)]
         # Cubes and markers may not be obstacles if they are goal locations, so include them again.
-        goals = [obj for obj in objs if isinstance(obj,(LightCubeObj,CustomMarkerObj)) and obj.pose_confidence >= 0 or isinstance(obj,MapFaceObj)]
-
+        goals = [ obj for obj in objs if 
+                 (isinstance(obj,(LightCubeObj,CustomMarkerObj)) and obj.pose_confidence >= 0) or
+                 isinstance(obj,MapFaceObj) ]
         for obj in self.obstacles + rooms + goals:
             ((x0,y0),(x1,y1)) = obj.get_bounding_box()
             xmin = min(xmin, x0)

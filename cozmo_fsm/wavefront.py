@@ -14,7 +14,7 @@ from .worldmap import LightCubeObj, ChargerObj, CustomMarkerObj, MapFaceObj
 class WaveFront():
     goal_marker = 2**31 - 1
 
-    def __init__(self, square_size=5, bbox=None, grid_shape=(100,100), inflate_size=50):
+    def __init__(self, square_size=5, bbox=None, grid_shape=(150,150), inflate_size=50):
         self.square_size = square_size  # in mm
         self.bbox = bbox  # in mm
         self.inflate_size = inflate_size  # in mm
