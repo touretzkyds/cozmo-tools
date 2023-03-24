@@ -168,18 +168,7 @@ class StateMachineProgram(StateNode):
         self.robot.world.rrt = self.rrt or RRT(self.robot)
 
         if self.simple_cli_callback:
-            # Make worldmap cubes and charger accessible to simple_cli
-            cubes = self.robot.world.light_cubes
-            wc1 = wc2 = wc3 = wcharger = None
-            if 1 in cubes:
-                wc1 = self.robot.world.world_map.update_cube(cubes[1])
-            if 2 in cubes:
-                wc2 = self.robot.world.world_map.update_cube(cubes[2])
-            if 3 in cubes:
-                wc3 = self.robot.world.world_map.update_cube(cubes[3])
-            if self.robot.world.charger is not None:
-                wcharger = self.robot.world.world_map.update_charger()
-            self.simple_cli_callback(wc1, wc2, wc3, wcharger)
+            self.make_cubes_available()
 
         # Polling
         self.set_polling_interval(0.025)  # for kine and motion model update
@@ -242,6 +231,20 @@ class StateMachineProgram(StateNode):
         # Call parent's start() to launch the state machine by invoking the start node.
         super().start()
 
+    def make_cubes_available(self):
+        # Make worldmap cubes and charger accessible to simple_cli
+        cubes = self.robot.world.light_cubes
+        wc1 = wc2 = wc3 = wcharger = None
+        if 1 in cubes:
+            wc1 = self.robot.world.world_map.update_cube(cubes[1])
+        if 2 in cubes:
+            wc2 = self.robot.world.world_map.update_cube(cubes[2])
+        if 3 in cubes:
+            wc3 = self.robot.world.world_map.update_cube(cubes[3])
+        if self.robot.world.charger is not None:
+            wcharger = self.robot.world.world_map.update_charger()
+        self.simple_cli_callback(wc1, wc2, wc3, wcharger)
+
     def robot_picked_up(self):
         print('** Robot was picked up!', self.robot.accelerometer)
         self.robot.stop_all_motors()
@@ -292,6 +295,9 @@ class StateMachineProgram(StateNode):
                     print('Invalidating pose of', wcube)
                     wcube.pose_confidence = -1
                     cube.movement_start_time = None
+
+        if self.simple_cli_callback:
+            self.make_cubes_available()
 
         # Update robot kinematic description
         self.robot.kine.get_pose()
