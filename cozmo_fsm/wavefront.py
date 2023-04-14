@@ -122,7 +122,7 @@ class WaveFront():
         # standard orientation.  Will rotate these later.
         if shape.obstacle_id.startswith('Cube'):
             (xsize,ysize,_) = LightCubeObj.light_cube_size
-            goal_offset = 55 # distance from edge in mm
+            goal_offset = 25 # distance from edge in mm
         elif shape.obstacle_id.startswith('Charger'):
             (xsize,ysize,_) = ChargerObj.charger_size
             goal_offset = 15 # distance from edge in mm
