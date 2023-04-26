@@ -404,7 +404,9 @@ class SetPose(StateNode):
             pose = event.data
         else:
             pose = self.pose
-        self.robot.world.particle_filter.set_pose(self.pose.x, self.pose.y, self.pose.angle_z.radians)
+        self.robot.world.particle_filter.set_pose(self.pose.position.x,
+                                                  self.pose.position.y,
+                                                  self.pose.rotation.angle_z.radians)
 
 
 class Print(StateNode):
