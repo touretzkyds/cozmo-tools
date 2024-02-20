@@ -12,7 +12,7 @@ class CV_GoodFeatures(StateMachineProgram):
         super().__init__(aruco=False, cam_viewer=False, annotate_sdk=False)
 
     def start(self):
-        self.colors = np.random.randint(0,255,(101,3),dtype=np.int)
+        self.colors = np.random.randint(0,255,(101,3),dtype=np.uint8)
         dummy = numpy.array([[0]],dtype='uint8')
         super().start()
 

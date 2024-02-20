@@ -24,7 +24,7 @@ class CV_OpticalFlow(StateMachineProgram):
                                            cv2.TERM_CRITERIA_COUNT,
                                            10, 0.03) )
 
-        self.colors = np.random.randint(0, 255, (100,3), dtype=np.int)
+        self.colors = np.random.randint(0, 255, (100,3), dtype=np.uint8)
 
         self.prev_gray = None
         self.good_new = None
@@ -40,14 +40,14 @@ class CV_OpticalFlow(StateMachineProgram):
             self.prev_feat = cv2.goodFeaturesToTrack(gray, mask=None,
                                                      **self.feature_params)
             return
-        new_feat, st, err = \
+        new_feat, status, err = \
                   cv2.calcOpticalFlowPyrLK(self.prev_gray, gray,
                                            self.prev_feat, None, **self.lk_params)
         if new_feat is None:
             self.good_new = None
             return
-        self.good_new = new_feat[st==1]
-        self.good_old = self.prev_feat[st==1]
+        self.good_new = new_feat[status == 1]
+        self.good_old = self.prev_feat[status == 1]
         self.prev_gray = gray
         self.prev_feat = self.good_new.reshape(-1,1,2)
 
@@ -59,6 +59,10 @@ class CV_OpticalFlow(StateMachineProgram):
         for i,(new,old) in enumerate(zip(self.good_new, self.good_old)):
             a,b = new.ravel()
             c,d = old.ravel()
+            a = int(a)
+            b = int(b)
+            c = int(c)
+            d = int(d)
             self.mask = cv2.line(self.mask, (a+a,b+b), (c+c,d+d),
                                  self.colors[i].tolist(), 2)
             cv2.circle(image,(a+a,b+b),5,self.colors[i].tolist(),-1)
