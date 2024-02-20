@@ -404,7 +404,9 @@ class SetPose(StateNode):
             pose = event.data
         else:
             pose = self.pose
-        self.robot.world.particle_filter.set_pose(self.pose.x, self.pose.y, self.pose.angle_z.radians)
+        self.robot.world.particle_filter.set_pose(self.pose.position.x,
+                                                  self.pose.position.y,
+                                                  self.pose.rotation.angle_z.radians)
 
 
 class Print(StateNode):
@@ -497,8 +499,10 @@ class GetColorImage(ColorImageBase):
     def new_image(self,event,**kwargs):
         if self.is_color(event.image):
             self.robot.world.latest_color_image = event.image
-            self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
             self.robot.camera.color_image_enabled = self.save_enabled
+            try:
+                self.robot.world.remove_event_handler(cozmo.world.EvtNewCameraImage, self.new_image)
+            except: pass
             self.post_data(event.image)
 
 class SaveImage(StateNode):
