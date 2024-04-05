@@ -1,6 +1,6 @@
 cozmo
 numpy
-Pillow
+Pillow<10.0.0
 opencv-python
 opencv-contrib-python
 colorama
