@@ -942,8 +942,10 @@ class Say(ActionNode):
             utterance = random.choice(utterance)
         if not isinstance(utterance, str):
             utterance = repr(utterance)
-        self.utterance = utterance
+        if len(utterance) > 255:
+            utterance = "Text too long:" + utterance[0:200]
         print("Speaking: '",utterance,"'",sep='')
+        self.utterance = utterance
         super().start(event)
 
     def action_launcher(self):
