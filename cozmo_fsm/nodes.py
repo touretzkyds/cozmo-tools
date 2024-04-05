@@ -943,7 +943,7 @@ class Say(ActionNode):
         if not isinstance(utterance, str):
             utterance = repr(utterance)
         if len(utterance) > 255:
-            utterance = "Text too long:" + utterance[0:200]
+            utterance = "Text too long: " + utterance[0:200]
         print("Speaking: '",utterance,"'",sep='')
         self.utterance = utterance
         super().start(event)
