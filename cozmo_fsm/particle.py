@@ -877,15 +877,15 @@ class SLAMSensorModel(SensorModel):
             image_points.append(corners[3])
 
         # Find rotation and translation vector from camera frame using SolvePnP
-        (success, rvecs, tvecs) = cv2.solvePnP(np.array(world_points),
+        (success, rvec, tvec) = cv2.solvePnP(np.array(world_points),
                                                np.array(image_points),
                                                self.robot.world.aruco.camera_matrix,
                                                self.robot.world.aruco.distortion_array)
-        rotationm, jcob = cv2.Rodrigues(rvecs)
+        rotationm, jcob = cv2.Rodrigues(rvec)
         # Change to marker frame.
         # Arucos seen head-on have orientation 0, so work with that for now.
         # Later we will flip the orientation to pi for the worldmap.
-        transformed = np.matrix(rotationm).T*(-np.matrix(tvecs))
+        transformed = np.matrix(rotationm).T*(-np.matrix(tvec))
         angles_xyz = rotation_matrix_to_euler_angles(rotationm)
         # euler angle flip when back of wall is seen
         if angles_xyz[2] > pi/2:
