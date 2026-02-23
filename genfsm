@@ -170,7 +170,7 @@ def handle_newline():
 
 def lexer (string):
     """Convert input string into a sequence of lexer tokens."""
-    r_identifier = re.compile('((self\.)|)\w+')
+    r_identifier = re.compile(r'((self\.)|)\w+')
     tokens = []
     while string:
         was_in_table = False
@@ -570,8 +570,8 @@ def process_file():
     global line_cache, current_line, starting_line, indent_level
     line_cache = [None] # dummy line 0
     current_line = 0
-    r_setup = re.compile('^\s*\$setup\s*((\"\"\")|(\'\'\')|\{)\s*((\#.*)|)$')
-    r_indent = re.compile('^\s*')
+    r_setup = re.compile(r'^\s*\$setup\s*((\"\"\")|(\'\'\')|\{)\s*((\#.*)|)$')
+    r_indent = re.compile(r'^\s*')
     while True:
         line = in_f.readline()
         if not line: break
@@ -588,10 +588,10 @@ def process_file():
         delim = setup_match.group(1)[0]
         if delim == '{':
             close_delim = '}'
-            r_end = re.compile('\s*\}\s*$')
+            r_end = re.compile(r'\s*\}\s*$')
         else:
             close_delim = delim * 3
-            r_end = re.compile('^\s*' + close_delim)
+            r_end = re.compile(r'^\s*' + close_delim)
 
         # Collect the lines of the state machine.
         starting_line = current_line + 1
