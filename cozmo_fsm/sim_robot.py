@@ -35,7 +35,7 @@ class SimRobot():
     def __init__(self, run_in_cloud=False):
         robot = self
 
-        robot.loop = asyncio.get_event_loop()
+        robot.loop = asyncio.new_event_loop()
 
         if not run_in_cloud:
             robot.erouter = EventRouter()
